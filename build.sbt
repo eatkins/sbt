@@ -20,6 +20,7 @@ ThisBuild / turbo := true
 def buildLevelSettings: Seq[Setting[_]] =
   inThisBuild(
     Seq(
+      doc in Compile := file("/dev/null"),
       organization := "org.scala-sbt",
       description := "sbt is an interactive build tool",
       bintrayOrganization := Some("sbt"),
@@ -62,6 +63,7 @@ def commonBaseSettings: Seq[Setting[_]] = Def.settings(
        |""".stripMargin
     )
   ),
+  doc in Compile := file("/dev/null"),
   scalaVersion := baseScalaVersion,
   componentID := None,
   resolvers += Resolver.typesafeIvyRepo("releases").withName("typesafe-sbt-build-ivy-releases"),
@@ -559,6 +561,7 @@ lazy val scriptedSbtReduxProj = (project in file("scripted-sbt-redux"))
   .dependsOn(commandProj, utilLogging, utilScripted)
   .settings(
     baseSettings,
+    doc in Compile := file("/dev/null"),
     name := "Scripted sbt Redux",
     libraryDependencies ++= Seq(launcherInterface % "provided"),
     resourceGenerators in Compile += Def task {
@@ -847,6 +850,7 @@ lazy val mainProj = (project in file("main"))
   )
   .settings(
     testedBaseSettings,
+    doc in Compile := file("/dev/null"),
     name := "Main",
     checkPluginCross := {
       val sv = scalaVersion.value
