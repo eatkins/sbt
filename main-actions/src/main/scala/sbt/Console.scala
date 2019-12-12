@@ -8,10 +8,12 @@
 package sbt
 
 import java.io.File
+
 import sbt.internal.inc.AnalyzingCompiler
-import sbt.internal.util.JLine
+import sbt.internal.util.Terminal
 import sbt.util.Logger
-import xsbti.compile.{ Inputs, Compilers }
+import xsbti.compile.{ Compilers, Inputs }
+
 import scala.util.Try
 
 final class Console(compiler: AnalyzingCompiler) {
@@ -46,10 +48,7 @@ final class Console(compiler: AnalyzingCompiler) {
   )(loader: Option[ClassLoader], bindings: Seq[(String, Any)])(implicit log: Logger): Try[Unit] = {
     def console0() =
       compiler.console(classpath, options, initialCommands, cleanupCommands, log)(loader, bindings)
-    JLine.usingTerminal { t =>
-      t.init
-      Run.executeTrapExit(console0, log)
-    }
+    Terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
   }
 }
 
