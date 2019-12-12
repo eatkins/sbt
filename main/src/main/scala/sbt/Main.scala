@@ -9,7 +9,7 @@ package sbt
 
 import java.io.{ File, IOException }
 import java.net.URI
-import java.nio.file.{ FileAlreadyExistsException, Files, FileSystems }
+import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{ Locale, Properties }
@@ -23,7 +23,7 @@ import sbt.internal._
 import sbt.internal.inc.ScalaInstance
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util._
-import sbt.internal.util.complete.{ SizeParser, Parser }
+import sbt.internal.util.complete.{ Parser, SizeParser }
 import sbt.io._
 import sbt.io.syntax._
 import sbt.util.{ Level, Logger, Show }
@@ -886,7 +886,7 @@ object BuiltinCommands {
   }
 
   def shell: Command = Command.command(Shell, Help.more(Shell, ShellDetailed)) { s0 =>
-    import sbt.internal.{ ConsolePromptEvent, ConsoleUnpromptEvent }
+    import sbt.internal.ConsolePromptEvent
     val exchange = StandardMain.exchange
     val welcomeState = displayWelcomeBanner(s0)
     val s1 = exchange run welcomeState
@@ -902,7 +902,6 @@ object BuiltinCommands {
         remainingCommands = exec +: Exec(Shell, None) +: s1.remainingCommands
       )
       .setInteractive(true)
-    exchange publishEventMessage ConsoleUnpromptEvent(exec.source)
     if (exec.commandLine.trim.isEmpty) newState
     else newState.clearGlobalLog
   }
