@@ -7,33 +7,31 @@
 
 package sbt
 
-import sbt.util.Level
-import sbt.internal.util.{ AttributeKey, FullReader, JLine, Terminal }
+import java.io.File
+
+import sbt.BasicCommandStrings._
+import sbt.BasicKeys._
+import sbt.Command.applyEffect
+import sbt.CommandUtil._
+import sbt.internal.client.NetworkClient
+import sbt.internal.inc.ModuleUtilities
+import sbt.internal.inc.classpath.ClasspathUtilities.toLoader
+import sbt.internal.util.Types.{ const, idFun }
+import sbt.internal.util.Util.{ AnyOps, nil, nilSeq, none }
+import sbt.internal.util.complete.DefaultParsers._
 import sbt.internal.util.complete.{
   Completion,
   Completions,
-  DefaultParsers,
   HistoryCommands,
   Parser,
   TokenCompletions,
   History => CHistory
 }
-import sbt.internal.util.Types.{ const, idFun }
-import sbt.internal.util.Util.{ AnyOps, nil, nilSeq, none }
-import sbt.internal.inc.classpath.ClasspathUtilities.toLoader
-import sbt.internal.inc.ModuleUtilities
-import sbt.internal.client.NetworkClient
-import DefaultParsers._
-
-import Function.tupled
-import Command.applyEffect
-import BasicCommandStrings._
-import CommandUtil._
-import BasicKeys._
-import java.io.File
-
+import sbt.internal.util.{ AttributeKey, FullReader, LineReader, Terminal }
 import sbt.io.IO
+import sbt.util.Level
 
+import scala.Function.tupled
 import scala.collection.mutable.ListBuffer
 import scala.util.control.NonFatal
 
@@ -373,7 +371,7 @@ object BasicCommands {
     val history = (s get historyPath) getOrElse (new File(s.baseDir, ".history")).some
     val prompt = (s get shellPrompt) match { case Some(pf) => pf(s); case None => "> " }
     val reader =
-      new FullReader(history, s.combinedParser, JLine.HandleCONT, Terminal.wrappedSystemIn)
+      new FullReader(history, s.combinedParser, LineReader.HandleCONT, Terminal.wrappedSystemIn)
     val line = reader.readLine(prompt)
     line match {
       case Some(line) =>
