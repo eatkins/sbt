@@ -18,7 +18,7 @@ import sbt.nio.Watch.NullLogger
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
 import sbt.internal.util.codec.JValueFormats
-import sbt.internal.util.{ MainAppender, ObjectEvent, StringEvent }
+import sbt.internal.util.{ ConsoleOut, MainAppender, ObjectEvent, StringEvent, Terminal }
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
 import sbt.protocol.{ EventMessage, ExecStatusEvent }
@@ -49,6 +49,7 @@ private[sbt] final class CommandExchange {
   private val channelBufferLock = new AnyRef {}
   private val commandChannelQueue = new LinkedBlockingQueue[CommandChannel]
   private val nextChannelId: AtomicInteger = new AtomicInteger(0)
+  private[this] val activePrompt = new AtomicBoolean(false)
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
 
   def channels: List[CommandChannel] = channelBuffer.toList
@@ -71,7 +72,11 @@ private[sbt] final class CommandExchange {
       commandChannelQueue.poll(1, TimeUnit.SECONDS)
       slurpMessages()
       Option(commandQueue.poll) match {
-        case Some(x) => x
+        case Some(exec) =>
+          val needFinish = needToFinishPromptLine()
+          if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0"))
+            ConsoleOut.systemOut.println("")
+          exec
         case None =>
           val newDeadline = if (deadline.fold(false)(_.isOverdue())) {
             GCUtil.forceGcWithInterval(interval, logger)
@@ -117,6 +122,7 @@ private[sbt] final class CommandExchange {
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
+      if (needToFinishPromptLine()) ConsoleOut.systemOut.println("")
       s.log.info(s"new client connected: $name")
       val logger: Logger = {
         val log = LogExchange.logger(name, None, None)
@@ -308,7 +314,9 @@ private[sbt] final class CommandExchange {
       // Special treatment for ConsolePromptEvent since it's hand coded without codec.
       case entry: ConsolePromptEvent =>
         channels collect {
-          case c: ConsoleChannel => c.publishEventMessage(entry)
+          case c: ConsoleChannel =>
+            c.publishEventMessage(entry)
+            activePrompt.set(Terminal.systemInIsAttached)
         }
       case entry: ExecStatusEvent =>
         channels collect {
@@ -333,4 +341,5 @@ private[sbt] final class CommandExchange {
         }
     }
   }
+  private[this] def needToFinishPromptLine(): Boolean = activePrompt.compareAndSet(true, false)
 }
