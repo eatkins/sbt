@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
 import sbt.BasicCommandStrings.{
   ContinuousExecutePrefix,
   FailureWall,
+  PopOnFailure,
+  StashOnFailure,
   continuousBriefHelp,
   continuousDetail
 }
@@ -24,7 +26,9 @@ import sbt.Scope.Global
 import sbt.internal.LabeledFunctions._
 import sbt.internal.io.WatchState
 import sbt.internal.nio._
+import sbt.internal.util.complete.DefaultParsers.{ OptSpace, any, matched }
 import sbt.internal.util.complete.Parser._
+import sbt.internal.util.complete.Parsers._
 import sbt.internal.util.complete.{ Parser, Parsers }
 import sbt.internal.util.{ AttributeKey, Terminal, Util }
 import sbt.nio.Keys.{ fileInputs, _ }
@@ -1106,4 +1110,44 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       underlying.register(glob)
     override def close(): Unit = underlying.close()
   }
+}
+
+private[sbt] object ContinuousCommands {
+  private[this] val watchStateCallbacks =
+    AttributeKey[java.util.Map[Int, (State => State, State => State)]](
+      "sbt-watch-state-callbacks",
+      "",
+      Int.MaxValue
+    )
+  private[this] val preWatch = Command.arb(state => {
+    (matched("__preWatch ") ~> IntBasic ~ (OptSpace ~> matched(any.*))).examples().map {
+      case (i, cmd) =>
+        val s = state.get(watchStateCallbacks) match {
+          case Some(map) =>
+            map.get(i) match {
+              case null     => state
+              case (pre, _) => pre(state)
+            }
+          case None => state
+        }
+        () => StashOnFailure :: cmd :: FailureWall :: s"__postWatch $i" :: PopOnFailure :: s
+    }
+  }) { case (_, newState) => newState() }
+  private[this] val postWatch = Command.arb(state => {
+    (matched("__postWatch ") ~> IntBasic).examples().map { i =>
+      state.get(watchStateCallbacks) match {
+        case Some(map) =>
+          map.get(i) match {
+            case null      => () => state
+            case (_, post) => () => post(state)
+          }
+        case None =>
+          () => {
+            println("cool")
+            state
+          }
+      }
+    }
+  }) { case (_, newState) => newState() }
+  private[sbt] def value: Seq[Command] = preWatch :: postWatch :: Nil
 }

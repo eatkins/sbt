@@ -534,4 +534,5 @@ object BasicCommands {
       "is-command-alias",
       "Internal: marker for Commands created as aliases for another command."
     )
+
 }
