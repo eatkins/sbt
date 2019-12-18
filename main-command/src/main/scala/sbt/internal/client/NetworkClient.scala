@@ -33,7 +33,6 @@ import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
 
 class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[String]) { self =>
-  private val channelName = new AtomicReference("_")
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
