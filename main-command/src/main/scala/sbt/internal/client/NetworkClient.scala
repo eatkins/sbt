@@ -10,6 +10,7 @@ package internal
 package client
 
 import java.io.{ File, IOException }
+import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.{ ArrayBlockingQueue, TimeUnit }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
@@ -40,18 +41,25 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
 
   private val console = ConsoleAppender("thin1")
   private def baseDirectory: File = configuration.baseDirectory
+  private def portfile = baseDirectory / "project" / "target" / "active.json"
 
-  lazy val connection = init()
+  lazy val connection: ServerConnection = try init()
+  catch {
+    case _: ConnectionRefusedException =>
+      Files.deleteIfExists(portfile.toPath)
+      init()
+  }
 
   start()
+  private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
 
   // Open server connection based on the portfile
   def init(): ServerConnection = {
-    val portfile = baseDirectory / "project" / "target" / "active.json"
     if (!portfile.exists) {
       forkServer(portfile)
     }
-    val (sk, tkn) = ClientSocket.socket(portfile)
+    val (sk, tkn) = try ClientSocket.socket(portfile)
+    catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = self.onNotification(msg)
       override def onRequest(msg: JsonRpcRequestMessage): Unit = self.onRequest(msg)
