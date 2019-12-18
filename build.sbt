@@ -4,6 +4,7 @@ import Util._
 import com.typesafe.tools.mima.core.ProblemFilters._
 import com.typesafe.tools.mima.core._
 import local.Scripted
+import java.nio.file.{ Files, Path => JPath }
 
 import scala.util.Try
 
@@ -11,8 +12,8 @@ ThisBuild / version := {
   val v = "1.4.0-SNAPSHOT"
   nightlyVersion.getOrElse(v)
 }
-ThisBuild / scalafmtOnCompile := !(Global / insideCI).value
-ThisBuild / Test / scalafmtOnCompile := !(Global / insideCI).value
+ThisBuild / scalafmtOnCompile := !(Global / insideCI).value && !scala.util.Properties.isWin
+ThisBuild / Test / scalafmtOnCompile := !(Global / insideCI).value && !scala.util.Properties.isWin
 ThisBuild / turbo := true
 
 // ThisBuild settings take lower precedence,
@@ -77,6 +78,7 @@ def commonBaseSettings: Seq[Setting[_]] = Def.settings(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-w", "1"),
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2"),
   javacOptions in compile ++= Seq("-Xlint", "-Xlint:-serial"),
+  Compile / doc := file("/dev/null"),
   Compile / doc / scalacOptions ++= {
     import scala.sys.process._
     val devnull = ProcessLogger(_ => ())
@@ -88,16 +90,6 @@ def commonBaseSettings: Seq[Setting[_]] = Def.settings(
       s"https://github.com/sbt/sbt/tree/$tagOrSha€{FILE_PATH}.scala"
     )
   },
-  Compile / javafmtOnCompile := Def
-    .taskDyn(if ((scalafmtOnCompile).value) Compile / javafmt else Def.task(()))
-    .value,
-  Test / javafmtOnCompile := Def
-    .taskDyn(if ((Test / scalafmtOnCompile).value) Test / javafmt else Def.task(()))
-    .value,
-  Compile / unmanagedSources / inputFileStamps :=
-    (Compile / unmanagedSources / inputFileStamps).dependsOn(Compile / javafmtOnCompile).value,
-  Test / unmanagedSources / inputFileStamps :=
-    (Test / unmanagedSources / inputFileStamps).dependsOn(Test / javafmtOnCompile).value,
   crossScalaVersions := Seq(baseScalaVersion),
   bintrayPackage := (bintrayPackage in ThisBuild).value,
   bintrayRepository := (bintrayRepository in ThisBuild).value,
@@ -340,7 +332,7 @@ lazy val utilPosition = (project in file("internal") / "util-position")
 
 lazy val utilLogging = (project in file("internal") / "util-logging")
   .enablePlugins(ContrabandPlugin, JsonCodecPlugin)
-  .dependsOn(utilInterface)
+  .dependsOn(utilInterface, collectionProj)
   .settings(
     utilCommonSettings,
     name := "Util Logging",
@@ -838,6 +830,7 @@ lazy val zincLmIntegrationProj = (project in file("zinc-lm-integration"))
   )
   .configure(addSbtZincCompileCore, addSbtLmCore, addSbtLmIvyTest)
 
+val makeClientBinary = taskKey[JPath]("Creates a binary for the sbt client")
 // The main integration project for sbt.  It brings all of the projects together, configures them, and provides for overriding conventions.
 lazy val mainProj = (project in file("main"))
   .enablePlugins(ContrabandPlugin)
@@ -872,6 +865,31 @@ lazy val mainProj = (project in file("main"))
     sourceManaged in (Compile, generateContrabands) := baseDirectory.value / "src" / "main" / "contraband-scala",
     testOptions in Test += Tests
       .Argument(TestFrameworks.ScalaCheck, "-minSuccessfulTests", "1000"),
+    makeClientBinary := {
+      val classpath = (Compile / fullClasspath).value.map(_.data)
+      val bin = target.value.toPath / "sbt-client.sh"
+      val script = s"""#!/bin/sh
+        |
+        |cmd=
+        |args=()
+        |for arg in "$$@"; do
+        |  if [[ $$arg == "-console" ]]
+        |    then cmd="sbt"
+        |    else args+="$$arg"
+        |  fi
+        |done
+        |if [[ -z $${cmd} ]]
+        |then
+        |  exec java -cp ${classpath
+                        .mkString(java.io.File.pathSeparator)} sbt.internal.client.SimpleClient $$@
+        |else
+        |  exec $$cmd "$${args[@]}"
+        |fi
+      """.stripMargin
+      Files.write(bin, script.getBytes)
+      bin.toFile.setExecutable(true)
+      bin
+    },
     mimaSettings,
     mimaBinaryIssueFilters ++= Vector(
       // New and changed methods on KeyIndex. internal.
@@ -947,6 +965,10 @@ lazy val mainProj = (project in file("main"))
       // since we're returning the same values as before.
       exclude[IncompatibleSignatureProblem]("sbt.Classpaths.mkIvyConfiguration"),
       exclude[IncompatibleMethTypeProblem]("sbt.internal.server.Definition*"),
+      // This seems to be a mima problem. The older constructor still exists but
+      // mima seems to incorrectly miss the secondary constructor that provides
+      // the binary compatible version.
+      exclude[IncompatibleMethTypeProblem]("sbt.internal.server.NetworkChannel.this")
     )
   )
   .configure(
@@ -1005,6 +1027,130 @@ lazy val serverTestProj = (project in file("server-test"))
         s"-Dsbt.server.version=${version.value}",
         s"-Dsbt.server.scala.version=${scalaVersion.value}"
       )
+    },
+  )
+val generateReflectionConfig = taskKey[Unit]("generate the graalvm reflection config")
+val genExecutable = taskKey[java.nio.file.Path]("generate a java implementation of the thin client")
+val graalClasspath = taskKey[String]("Generate the classpath for graal (compacted for windows)")
+val genNativeExecutable = taskKey[java.nio.file.Path]("Generate a native executable")
+lazy val sbtClientProj = (project in file("client"))
+  .dependsOn(commandProj)
+  .enablePlugins(GraalVMNativeImagePlugin)
+  .settings(
+    name := "sbt-client",
+    crossPaths := false,
+    exportJars := true,
+    libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
+    libraryDependencies += "net.java.dev.jna" % "jna-platform" % "5.5.0",
+    graalClasspath := {
+      val original = (Compile / fullClasspathAsJars).value.map(_.data)
+      val outputDir = target.value / "graalcp"
+      IO.delete(outputDir)
+      IO.createDirectory(outputDir)
+      original.zipWithIndex.map { case (f, i) =>
+	Files.createSymbolicLink(outputDir.toPath / s"$i.jar", f.toPath)
+	s"$i.jar"
+      }.mkString(java.io.File.pathSeparator)
+    },
+    genNativeExecutable := {
+      val prefix = Seq(graalVMNativeImageCommand.value, "-cp", graalClasspath.value)
+      val full = prefix ++ graalVMNativeImageOptions.value :+ "sbt.client.Client"
+      val pb = new java.lang.ProcessBuilder(full:_*)
+      println(full.mkString("\"", "\" \"", "\""))
+      pb.directory(target.value / "graalcp")
+      val proc = pb.start()
+      new Thread {
+	setDaemon(true)
+	start()
+	val is = proc.getInputStream
+	val es = proc.getErrorStream
+	override def run(): Unit = {
+	  while (proc.isAlive) {
+	    if (is.available > 0 || es.available > 0) {
+	      while (is.available > 0) System.out.print(is.read.toChar) 
+	      while (es.available > 0) System.err.print(es.read.toChar)
+	    }
+	    if (proc.isAlive) Thread.sleep(10)
+	  }
+	}
+      }
+      proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES) 
+      file("").toPath
+    },
+    graalVMNativeImageOptions += "-H:IncludeResourceBundles=jline.console.completer.CandidateListCompletionHandler",
+    graalVMNativeImageOptions += s"-H:DynamicProxyConfigurationFiles=${(Compile / resourceDirectory).value / "proxies.json"}",
+    graalVMNativeImageOptions += {
+      val classes = Seq(
+        "org.scalasbt.ipcsocket",
+        "org.scalasbt.ipcsocket.Impl",
+        "com.sun.jna",
+        "sbt.client",
+      )
+      s"--initialize-at-run-time=${classes.mkString(",")}"
+    },
+    graalVMNativeImageOptions += "--verbose",
+    graalVMNativeImageOptions += "--no-fallback",
+    graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",  
+    graalVMNativeImageCommand := "C:\\Users\\micro\\graalvm\\bin\\native-image.cmd",
+    //graalVMNativeImageCommand := "/Users/ethanatkins/.sdkman/candidates/java/20.0.0.r11-grl/bin/native-image",
+    genExecutable := {
+      val output = target.value.toPath / "bin" / "client"
+      java.nio.file.Files.createDirectories(output.getParent)
+      val cp = (Compile / fullClasspathAsJars).value.map(_.data)
+      java.nio.file.Files.write(output, s"""
+        |#!/bin/sh
+        |
+        |java -cp ${cp.mkString(java.io.File.pathSeparator)} sbt.client.Client $$*
+        """.stripMargin.linesIterator.toSeq.tail.mkString("\n").getBytes)
+      output.toFile.setExecutable(true)
+      output
+    },
+    generateReflectionConfig := {
+      val cp =
+        ((Compile / run / fullClasspath).value
+          .map(_.data) :+ (sbtLaunchJar in bundledLauncherProj).value)
+          .mkString(java.io.File.pathSeparator)
+      val javabin = "/Users/ethanatkins/.jabba/jdk/graalvm@19.3.0/Contents/Home/bin/java"
+      val agent = "-agentlib:native-image-agent=config-output-dir=META-INF/native-image"
+      val base = target.value / "graal"
+      val scalaSourceDir = base / "src" / "main" / "scala"
+      IO.delete(base / "target")
+      IO.createDirectory(scalaSourceDir)
+      IO.createDirectory(base / "META-INF" / "native-image")
+      IO.createDirectory(base / "project")
+      IO.write(base / "project" / "build.properties", sbtVersion.value)
+      IO.write(base / "build.sbt", "")
+      IO.write(scalaSourceDir / "A.scala", "object A")
+      val proc = new ProcessBuilder(
+        javabin,
+        agent,
+        "-cp",
+        cp,
+        "sbt.client.Client",
+        base.toString
+      ).directory(base).start()
+      val os = proc.getOutputStream
+      "compile\n".getBytes.foreach(b => os.write(b & 0xFF))
+      os.flush()
+      "shutdown\n".getBytes.foreach(b => os.write(b & 0xFF))
+      os.flush()
+      import scala.concurrent.duration._
+      val limit = 1.minute.fromNow
+      val is = proc.getInputStream
+      val es = proc.getErrorStream
+      while (proc.isAlive && Deadline.now < limit) {
+        while (is.available > 0) {
+          System.out.write(is.read)
+        }
+        System.out.flush()
+        while (es.available > 0) {
+          System.err.write(es.read)
+        }
+        System.err.flush()
+        Thread.sleep(2)
+      }
+      proc.destroy
+      ()
     },
   )
 

@@ -10,18 +10,25 @@ package internal
 
 import java.io.IOException
 import java.net.Socket
-import java.util.concurrent.{ ConcurrentLinkedQueue, LinkedBlockingQueue, TimeUnit }
 import java.util.concurrent.atomic._
+import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
 
 import sbt.BasicKeys._
 import sbt.nio.Watch.NullLogger
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.server._
-import sbt.internal.util.{ ConsoleOut, MainAppender, ObjectEvent, Terminal }
+import sbt.internal.util.{ ObjectEvent, Terminal }
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
 import sbt.protocol.{ ExecStatusEvent, LogEvent }
-import sbt.util.{ Level, LogExchange, Logger }
+import sbt.util.Logger
+import sbt.internal.ui.{ AskUserTask, UITask }
+import sbt.internal.util._
+import sbt.io.syntax._
+import sbt.io.{ Hash, IO }
+import sbt.nio.Watch.NullLogger
+import sbt.protocol.ExecStatusEvent
+import sbt.util.Logger
 import sjsonnew.JsonFormat
 
 import scala.annotation.tailrec
@@ -42,45 +49,55 @@ private[sbt] final class CommandExchange {
   private var server: Option[ServerInstance] = None
   private val firstInstance: AtomicBoolean = new AtomicBoolean(true)
   private var consoleChannel: Option[ConsoleChannel] = None
-  private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
+  private val commandQueue: LinkedBlockingQueue[Exec] = new LinkedBlockingQueue[Exec]
   private val channelBuffer: ListBuffer[CommandChannel] = new ListBuffer()
   private val channelBufferLock = new AnyRef {}
-  private val commandChannelQueue = new LinkedBlockingQueue[CommandChannel]
+  private val maintenanceChannelQueue = new LinkedBlockingQueue[MaintenanceTask]
   private val nextChannelId: AtomicInteger = new AtomicInteger(0)
-  private[this] val activePrompt = new AtomicBoolean(false)
+  private[this] val lastState = new AtomicReference[State]
+  private[this] val currentExec = new AtomicReference[Exec]
+  private[this] val lastProgressEvent = new AtomicReference[ProgressEvent]
 
   def channels: List[CommandChannel] = channelBuffer.toList
-  private[this] def removeChannel(channel: CommandChannel): Unit = {
-    channelBufferLock.synchronized {
-      channelBuffer -= channel
-      ()
-    }
-  }
 
   def subscribe(c: CommandChannel): Unit = channelBufferLock.synchronized {
     channelBuffer.append(c)
-    c.register(commandChannelQueue)
+    c.register(commandQueue, maintenanceChannelQueue)
   }
 
+  private[sbt] def withState[T](f: State => T): T = f(lastState.get)
   def blockUntilNextExec: Exec = blockUntilNextExec(Duration.Inf, NullLogger)
   // periodically move all messages from all the channels
-  private[sbt] def blockUntilNextExec(interval: Duration, logger: Logger): Exec = {
+  private[sbt] def blockUntilNextExec(interval: Duration, logger: Logger): Exec =
+    blockUntilNextExec(interval, None, logger)
+  private[sbt] def blockUntilNextExec(
+      interval: Duration,
+      state: Option[State],
+      logger: Logger
+  ): Exec = {
+    state.foreach(lastState.set)
     @tailrec def impl(deadline: Option[Deadline]): Exec = {
-      @tailrec def slurpMessages(): Unit =
-        channels.foldLeft(Option.empty[Exec]) { _ orElse _.poll } match {
-          case None => ()
-          case Some(x) =>
-            commandQueue.add(x)
-            slurpMessages()
-        }
-      commandChannelQueue.poll(1, TimeUnit.SECONDS)
-      slurpMessages()
-      Option(commandQueue.poll) match {
+      state.foreach(s => channels.foreach(_.prompt(ConsolePromptEvent(s))))
+      def poll: Option[Exec] =
+        Option(deadline match {
+          case Some(d: Deadline) => commandQueue.poll(d.timeLeft.toMillis, TimeUnit.MILLISECONDS)
+          case _                 => commandQueue.take
+        })
+      poll match {
         case Some(exec) =>
-          val needFinish = needToFinishPromptLine()
-          if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0"))
-            ConsoleOut.systemOut.println("")
-          exec
+          exec.commandLine match {
+            case "shutdown" => exec.withCommandLine("exit")
+            case "exit" if exec.source.fold(false)(_.channelName.startsWith("network")) =>
+              channels.collectFirst {
+                case c: NetworkChannel if exec.source.fold(false)(_.channelName == c.name) => c
+              } match {
+                case Some(c) if c.isAttached =>
+                  c.shutdown(false)
+                  impl(deadline)
+                case _ => exec
+              }
+            case _ => exec
+          }
         case None =>
           val newDeadline = if (deadline.fold(false)(_.isOverdue())) {
             GCUtil.forceGcWithInterval(interval, logger)
@@ -90,27 +107,43 @@ private[sbt] final class CommandExchange {
       }
     }
     // Do not manually run GC until the user has been idling for at least the min gc interval.
-    impl(interval match {
+    val res = impl(interval match {
       case d: FiniteDuration => Some(d.fromNow)
       case _                 => None
     })
+    currentExec.set(res)
+    res
   }
 
-  def run(s: State): State = {
+  def run(s: State): State = run(s, s.get(autoStartServer).getOrElse(true))
+  def run(s: State, autoStart: Boolean): State = {
     if (consoleChannel.isEmpty) {
-      val console0 = new ConsoleChannel("console0")
+      val name = "console0"
+      val console0 = new ConsoleChannel(name, mkAskUser(name))
       consoleChannel = Some(console0)
       subscribe(console0)
     }
-    val autoStartServerAttr = s get autoStartServer match {
-      case Some(bool) => bool
-      case None       => true
-    }
-    if (autoStartServerSysProp && autoStartServerAttr) runServer(s)
+    if (autoStartServerSysProp && autoStart) runServer(s)
     else s
   }
+  private[sbt] def setState(s: State): Unit = lastState.set(s)
 
   private def newNetworkName: String = s"network-${nextChannelId.incrementAndGet()}"
+
+  private[sbt] def removeChannel(c: CommandChannel): Unit = channelBufferLock.synchronized {
+    Util.ignoreResult(channelBuffer -= c)
+  }
+
+  private[sbt] def addBatchChannel(useSuperShell: Boolean): Unit = {
+    if (!channels.exists(_.name == "anonymous"))
+      subscribe(new BatchCommandChannel(mkAskUser("anonymous"), useSuperShell))
+  }
+
+  private[this] def mkAskUser(
+      name: String,
+  ): (State, CommandChannel) => UITask = { (state, channel) =>
+    ContinuousCommands.watchUIThreadFor(channel).getOrElse(new AskUserTask(state, channel))
+  }
 
   /**
    * Check if a server instance is running already, and start one if it isn't.
@@ -121,22 +154,21 @@ private[sbt] final class CommandExchange {
     lazy val auth: Set[ServerAuthentication] =
       s.get(serverAuthentication).getOrElse(Set(ServerAuthentication.Token))
     lazy val connectionType = s.get(serverConnectionType).getOrElse(ConnectionType.Tcp)
-    lazy val level = s.get(serverLogLevel).orElse(s.get(logLevel)).getOrElse(Level.Warn)
     lazy val handlers = s.get(fullServerHandlers).getOrElse(Nil)
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
-      if (needToFinishPromptLine()) ConsoleOut.systemOut.println("")
-      s.log.info(s"new client connected: $name")
-      val logger: Logger = {
-        val log = LogExchange.logger(name, None, None)
-        LogExchange.unbindLoggerAppenders(name)
-        val appender = MainAppender.defaultScreen(s.globalLogging.console)
-        LogExchange.bindLoggerAppenders(name, List(appender -> level))
-        log
-      }
+      s.log.debug(s"new client connected: $name")
       val channel =
-        new NetworkChannel(name, socket, Project structure s, auth, instance, handlers, logger)
+        new NetworkChannel(
+          name,
+          socket,
+          Project structure s,
+          auth,
+          instance,
+          handlers,
+          mkAskUser(name)
+        )
       subscribe(channel)
     }
     if (server.isEmpty && firstInstance.get) {
@@ -180,12 +212,14 @@ private[sbt] final class CommandExchange {
           server = None
           firstInstance.set(false)
       }
+      Terminal.close()
     }
     s
   }
 
   def shutdown(): Unit = {
-    channels foreach (_.shutdown())
+    maintenanceThread.close()
+    channels foreach (_.shutdown(true))
     // interrupt and kill the thread
     server.foreach(_.shutdown())
     server = None
@@ -232,11 +266,10 @@ private[sbt] final class CommandExchange {
 
   // This is an interface to directly notify events.
   private[sbt] def notifyEvent[A: JsonFormat](method: String, params: A): Unit = {
-    channels
-      .collect { case c: NetworkChannel => c }
-      .foreach {
-        tryTo(_.notifyEvent(method, params))
-      }
+    channels.foreach {
+      case c: NetworkChannel => tryTo(_.notifyEvent(method, params))(c)
+      case _                 =>
+    }
   }
 
   private def tryTo(f: NetworkChannel => Unit)(
@@ -281,19 +314,14 @@ private[sbt] final class CommandExchange {
     } tryTo(_.respond(event))(channel)
   }
 
-  def prompt(event: ConsolePromptEvent): Unit = {
-    activePrompt.set(Terminal.systemInIsAttached)
-    channels
-      .collect { case c: ConsoleChannel => c }
-      .foreach { _.prompt(event) }
-  }
+  def prompt(event: ConsolePromptEvent): Unit = channels.foreach(_.prompt(event))
+  def unprompt(event: ConsoleUnpromptEvent): Unit = channels.foreach(_.unprompt(event))
 
   def logMessage(event: LogEvent): Unit = {
-    channels
-      .collect { case c: NetworkChannel => c }
-      .foreach {
-        tryTo(_.notifyEvent(event))
-      }
+    channels.foreach {
+      case c: NetworkChannel => tryTo(_.notifyEvent(event))(c)
+      case _                 =>
+    }
   }
 
   def notifyStatus(event: ExecStatusEvent): Unit = {
@@ -305,5 +333,64 @@ private[sbt] final class CommandExchange {
     } tryTo(_.notifyEvent(event))(channel)
   }
 
-  private[this] def needToFinishPromptLine(): Boolean = activePrompt.compareAndSet(true, false)
+  private[sbt] def killChannel(channel: String): Unit = {
+    channels.find(_.name == channel).foreach(_.shutdown(false))
+  }
+  private[sbt] def updateProgress(pe: ProgressEvent): Unit = {
+    lastProgressEvent.set(pe)
+    channels.foreach(c => ProgressState.updateProgressState(pe, c.terminal))
+  }
+  private[this] class MaintenanceThread
+      extends Thread("sbt-command-exchange-maintenance")
+      with AutoCloseable {
+    setDaemon(true)
+    start()
+    private[this] val isStopped = new AtomicBoolean(false)
+    private[this] def cancel(e: Exec): Unit = {
+      if (e.commandLine.startsWith("console")) {
+        val terminal = Terminal.get
+        terminal.write(13, 4)
+        terminal.printStream.println("\nconsole session killed by remote sbt client")
+      } else {
+        Util.ignoreResult(NetworkChannel.cancel(e.execId, e.execId.getOrElse("0")))
+      }
+    }
+    override def run(): Unit = {
+      def shutdown(mt: MaintenanceTask): Unit = {
+        Option(currentExec.get).foreach(cancel)
+        commandQueue.clear()
+        val exit =
+          Exec("shutdown", Some(Exec.newExecId), Some(CommandSource(mt.channel.name)))
+        commandQueue.add(exit)
+        ()
+      }
+      @tailrec def impl(): Unit = {
+        maintenanceChannelQueue.take match {
+          case null =>
+          case mt: MaintenanceTask =>
+            mt.task match {
+              case "attach"                 => mt.channel.prompt(ConsolePromptEvent(lastState.get))
+              case k if k == "kill channel" => mt.channel.shutdown(false)
+              case k if k.startsWith("kill") =>
+                val name = k.split("kill[ ]+").lastOption
+                Option(currentExec.get).filter(e => name.contains(e.commandLine)).foreach(cancel)
+              case "exit" =>
+                mt.channel.shutdown(false)
+                if (mt.channel.name.contains("console")) shutdown(mt)
+              case "shutdown" => shutdown(mt)
+              case _          =>
+            }
+        }
+        if (!isStopped.get) impl()
+      }
+      try impl()
+      catch { case _: InterruptedException => }
+    }
+    override def close(): Unit = if (isStopped.compareAndSet(false, true)) {
+      interrupt()
+    }
+  }
+  private[sbt] def channelForName(channelName: String): Option[CommandChannel] =
+    channels.find(_.name == channelName)
+  private[this] val maintenanceThread = new MaintenanceThread
 }

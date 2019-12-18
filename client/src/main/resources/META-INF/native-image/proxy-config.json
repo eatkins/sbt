@@ -1,0 +1,4 @@
+[
+    [ "com.sun.jna.Library", "com.sun.jna.platform.win32.WinNT" ],
+    [ "org.scalasbt.ipcsocket.Win32NamedPipeLibrary" ]
+]

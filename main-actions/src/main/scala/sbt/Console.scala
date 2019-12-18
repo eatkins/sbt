@@ -45,14 +45,30 @@ final class Console(compiler: AnalyzingCompiler) {
       initialCommands: String,
       cleanupCommands: String
   )(loader: Option[ClassLoader], bindings: Seq[(String, Any)])(implicit log: Logger): Try[Unit] = {
-    def console0() =
-      compiler.console(classpath map { x =>
+    apply(classpath, options, initialCommands, cleanupCommands, Terminal.get)(loader, bindings)
+  }
+  def apply(
+      classpath: Seq[File],
+      options: Seq[String],
+      initialCommands: String,
+      cleanupCommands: String,
+      terminal: Terminal
+  )(loader: Option[ClassLoader], bindings: Seq[(String, Any)])(implicit log: Logger): Try[Unit] = {
+    def console0(): Unit =
+      try compiler.console(classpath map { x =>
         PlainVirtualFile(x.toPath)
       }, options, initialCommands, cleanupCommands, log)(
         loader,
         bindings
       )
-    Terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
+      catch { case e: InterruptedException => println(s"MOFO $e") }
+    val previous = sys.props.get("scala.color").getOrElse("auto")
+    try {
+      sys.props("scala.color") = if (terminal.isColorEnabled) "true" else "false"
+      terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
+    } finally {
+      sys.props("scala.color") = previous
+    }
   }
 }
 

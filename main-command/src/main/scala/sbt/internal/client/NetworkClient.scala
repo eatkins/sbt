@@ -9,47 +9,97 @@ package sbt
 package internal
 package client
 
-import java.io.{ File, IOException }
+import java.io.{ File, IOException, InputStream }
+import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue, TimeUnit }
 
+import sbt.internal.client.NetworkClient.Arguments
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.protocol._
-import sbt.internal.util.{ ConsoleAppender, LineReader }
+import sbt.internal.util.{ ConsoleAppender, NetworkReader, Terminal }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.protocol._
 import sbt.util.Level
+import sjsonnew.BasicJsonProtocol._
+import sjsonnew.shaded.scalajson.ast.unsafe.JObject
 import sjsonnew.support.scalajson.unsafe.Converter
 
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.sys.process.{ BasicIO, Process, ProcessLogger }
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
 
-class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[String]) { self =>
-  private val channelName = new AtomicReference("_")
+trait ConsoleInterface {
+  def appendLog(level: Level.Value, message: => String): Unit
+  def success(msg: String): Unit
+}
+
+trait NetworkClientImpl { self =>
+  def baseDirectory: File
+  def arguments: List[String] = (sbtArguments ++ commandArguments).toList
+  def console: ConsoleInterface
+  def sbtArguments: Seq[String]
+  def commandArguments: Seq[String]
+  val sbtScript: String
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
   private val pendingExecIds = ListBuffer.empty[String]
+  private val pendingCompletions = new ConcurrentHashMap[String, Seq[String] => Unit]
 
-  private val console = ConsoleAppender("thin1")
-  private def baseDirectory: File = configuration.baseDirectory
+  private def portfile = baseDirectory / "project" / "target" / "active.json"
 
-  lazy val connection = init()
+  lazy val connection: ServerConnection =
+    try init()
+    catch {
+      case _: ConnectionRefusedException =>
+        Files.deleteIfExists(portfile.toPath)
+        init()
+    }
 
+  private[this] val mainThread = Thread.currentThread
+  private[this] val stdinBytes = new LinkedBlockingQueue[Int]
+  private[this] val stdin: InputStream = new InputStream {
+    override def available(): Int = stdinBytes.size
+    override def read: Int = stdinBytes.take
+  }
+  private[this] val inputThread = new RawInputThread
   start()
+  private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
 
   // Open server connection based on the portfile
   def init(): ServerConnection = {
-    val portfile = baseDirectory / "project" / "target" / "active.json"
     if (!portfile.exists) {
+      println(s"FUCK Me no portfile")
       forkServer(portfile)
     }
-    val (sk, tkn) = ClientSocket.socket(portfile)
+    val (sk, tkn) =
+      try ClientSocket.socket(portfile)
+      catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
-      override def onNotification(msg: JsonRpcNotificationMessage): Unit = self.onNotification(msg)
+      override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
+        msg.method match {
+          case "shutdown" =>
+            val log = msg.params match {
+              case Some(jvalue) => Converter.fromJson[Boolean](jvalue).getOrElse(true)
+              case _            => false
+            }
+            if (running.compareAndSet(true, false) && log) {
+              System.err.println()
+              console.appendLog(Level.Info, "Remote server exited. Shutting down.")
+            }
+            inputThread.close()
+            stdinBytes.offer(-1)
+            mainThread.interrupt()
+          case "readInput" =>
+          case _           => self.onNotification(msg)
+        }
+      }
       override def onRequest(msg: JsonRpcRequestMessage): Unit = self.onRequest(msg)
       override def onResponse(msg: JsonRpcResponseMessage): Unit = self.onResponse(msg)
       override def onShutdown(): Unit = {
@@ -58,7 +108,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     }
     // initiate handshake
     val execId = UUID.randomUUID.toString
-    val initCommand = InitCommand(tkn, Option(execId))
+    val initCommand = InitCommand(tkn, Option(execId), Some(true))
     conn.sendString(Serialization.serializeCommandAsJsonMessage(initCommand))
     conn
   }
@@ -69,34 +119,29 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
    */
   def forkServer(portfile: File): Unit = {
     console.appendLog(Level.Info, "server was not detected. starting an instance")
-    val args = List[String]()
-    val launchOpts = List("-Xms2048M", "-Xmx2048M", "-Xss2M")
-    val launcherJarString = sys.props.get("java.class.path") match {
-      case Some(cp) =>
-        cp.split(File.pathSeparator)
-          .toList
-          .headOption
-          .getOrElse(sys.error("launcher JAR classpath not found"))
-      case _ => sys.error("property java.class.path expected")
-    }
-    val cmd = "java" :: launchOpts ::: "-jar" :: launcherJarString :: args
-    // val cmd = "sbt"
-    val io = BasicIO(false, ProcessLogger(_ => ()))
-    val _ = Process(cmd, baseDirectory).run(io)
-    def waitForPortfile(n: Int): Unit =
-      if (portfile.exists) {
-        console.appendLog(Level.Info, "server found")
-      } else {
-        if (n <= 0) sys.error(s"timeout. $portfile is not found.")
-        else {
-          Thread.sleep(1000)
-          if ((n - 1) % 10 == 0) {
-            console.appendLog(Level.Info, "waiting for the server...")
-          }
-          waitForPortfile(n - 1)
-        }
+    val cmd = sbtScript +: sbtArguments
+    val process = new ProcessBuilder(cmd: _*).directory(baseDirectory).start()
+    val stdout = process.getInputStream
+    val stderr = process.getErrorStream
+    @tailrec
+    def blockUntilStart(): Unit = {
+      while (stdout.available > 0) {
+        System.out.write(stdout.read)
       }
-    waitForPortfile(90)
+      while (stderr.available > 0) {
+        System.err.write(stderr.read)
+      }
+      Thread.sleep(10)
+      if (!portfile.exists) blockUntilStart()
+      else {
+        stdout.close()
+        stderr.close()
+        process.getOutputStream.close()
+      }
+    }
+
+    try blockUntilStart()
+    catch { case t: Throwable => t.printStackTrace() }
   }
 
   /** Called on the response for a returning message. */
@@ -124,9 +169,25 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
         onReturningReponse(msg)
         lock.synchronized {
           pendingExecIds -= execId
+          stdinBytes.offer(-1)
+          lock.notifyAll()
         }
         ()
-      case _ =>
+      case execId =>
+        pendingCompletions.remove(execId) match {
+          case null =>
+          case completions =>
+            completions(msg.result match {
+              case Some(o: JObject) =>
+                o.value
+                  .collectFirst {
+                    case i if i.field == "items" =>
+                      Converter.fromJson[Seq[String]](i.value).getOrElse(Nil)
+                  }
+                  .getOrElse(Nil)
+              case _ => Nil
+            })
+        }
     }
   }
 
@@ -134,17 +195,56 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     def splitToMessage: Vector[(Level.Value, String)] =
       (msg.method, msg.params) match {
         case ("window/logMessage", Some(json)) =>
-          import sbt.internal.langserver.codec.JsonProtocol._
-          Converter.fromJson[LogMessageParams](json) match {
-            case Success(params) => splitLogMessage(params)
-            case Failure(e)      => Vector()
+//          import sbt.internal.langserver.codec.JsonProtocol._
+//          Converter.fromJson[LogMessageParams](json) match {
+//            case Success(params) => splitLogMessage(params)
+//            case Failure(_)      => Vector()
+//          }
+          Vector()
+        case ("sbt/terminalprops", Some(json)) =>
+          Converter.fromJson[String](json) match {
+            case Success(id) =>
+              val response = TerminalPropertiesResponse.apply(
+                width = Terminal.console.getWidth,
+                height = Terminal.console.getHeight,
+                isAnsiSupported = Terminal.console.isAnsiSupported,
+                isColorEnabled = Terminal.console.isColorEnabled,
+                isSupershellEnabled = Terminal.console.isSupershellEnabled,
+                isEchoEnabled = Terminal.console.isEchoEnabled
+              )
+              sendCommandResponse("sbt/terminalpropsresponse", response, id)
+            case Failure(_) =>
           }
+          Vector.empty
+        case ("sbt/terminalcap", Some(json)) =>
+          import sbt.protocol.codec.JsonProtocol._
+          Converter.fromJson[TerminalCapabilitiesQuery](json) match {
+            case Success(terminalCapabilitiesQuery) =>
+              val response = TerminalCapabilitiesResponse.apply(
+                terminalCapabilitiesQuery.id,
+                terminalCapabilitiesQuery.boolean.map(Terminal.console.getBooleanCapability),
+                terminalCapabilitiesQuery.numeric.map(Terminal.console.getNumericCapability),
+                terminalCapabilitiesQuery.string.map(Terminal.console.getStringCapability),
+              )
+              sendCommandResponse("sbt/terminalcapresponse", response, terminalCapabilitiesQuery.id)
+            case Failure(_) =>
+          }
+          Vector.empty
+        case ("systemOut", Some(json)) =>
+          Converter.fromJson[Seq[Byte]](json) match {
+            case Success(params) =>
+              System.out.write(params.toArray)
+              System.out.flush()
+            case Failure(_) =>
+          }
+          Vector.empty
         case ("textDocument/publishDiagnostics", Some(json)) =>
           import sbt.internal.langserver.codec.JsonProtocol._
           Converter.fromJson[PublishDiagnosticsParams](json) match {
-            case Success(params) => splitDiagnostics(params)
-            case Failure(e)      => Vector()
+            case Success(params) => splitDiagnostics(params); Vector()
+            case Failure(_)      => Vector()
           }
+        case ("shutdown", Some(_)) => Vector.empty
         case _ =>
           Vector(
             (
@@ -196,44 +296,77 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   def start(): Unit = {
     console.appendLog(Level.Info, "entering *experimental* thin client - BEEP WHIRR")
     val _ = connection
-    val userCommands = arguments filterNot { cmd =>
-      cmd.startsWith("-")
+    val cleaned = arguments.collect { case c if !c.startsWith("-") => c.trim }
+    val userCommands = cleaned.takeWhile(_ != "exit")
+    @tailrec def loop(limit: Option[Deadline]): Unit = {
+      val byte: Int = limit match {
+        case Some(d) => stdinBytes.poll((d - Deadline.now).toMillis, TimeUnit.MILLISECONDS)
+        case _       => stdin.read
+      }
+      byte match {
+        case -1 =>
+        case byte =>
+          sendJson("inputStream", byte.toString)
+          if (running.get && !limit.fold(false)(_.isOverdue)) loop(limit)
+      }
     }
-    if (userCommands.isEmpty) shell()
-    else batchExecute(userCommands)
+    if (cleaned.isEmpty) {
+      //shell()
+      connection.sendString(Serialization.serializeCommandAsJsonMessage(Attach()))
+      try loop(None)
+      catch { case _: InterruptedException => }
+    } else {
+      batchExecute(userCommands, loop)
+    }
+    System.exit(0)
   }
 
-  def batchExecute(userCommands: List[String]): Unit = {
+  def batchExecute(userCommands: List[String], wait: Option[Deadline] => Unit): Unit = {
     userCommands foreach { cmd =>
       println("> " + cmd)
-      val execId =
-        if (cmd == "shutdown") sendExecCommand("exit")
-        else sendExecCommand(cmd)
-      while (pendingExecIds contains execId) {
-        Thread.sleep(100)
-      }
+      if (cmd == "shutdown") sendAndWait("exit", Some(100.millis.fromNow), wait)
+      else sendAndWait(cmd, None, wait)
+      System.exit(0)
     }
   }
 
-  def shell(): Unit = {
-    val reader = LineReader.simple(None, LineReader.HandleCONT, injectThreadSleep = true)
-    while (running.get) {
-      reader.readLine("> ", None) match {
-        case Some("shutdown") =>
-          // `sbt -client shutdown` shuts down the server
-          sendExecCommand("exit")
-          Thread.sleep(100)
-          running.set(false)
-        case Some("exit") =>
-          running.set(false)
-        case Some(s) if s.trim.nonEmpty =>
-          val execId = sendExecCommand(s)
-          while (pendingExecIds contains execId) {
-            Thread.sleep(100)
-          }
-        case _ => //
-      }
+  private def sendAndWait(
+      cmd: String,
+      limit: Option[Deadline],
+      wait: Option[Deadline] => Unit
+  ): Unit = {
+    val execId = sendExecCommand(cmd)
+    while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
+      wait(limit)
     }
+  }
+
+  def shell(): Unit = shell(_.foreach(d => Thread.sleep((d - Deadline.now).toMillis)))
+  def shell(wait: Option[Deadline] => Unit): Unit = {
+    val reader =
+      new NetworkReader(Terminal.console, (prefix, level) => {
+        val execId = sendJson("sbt/completion", s"""{"query":"$prefix","level":$level}""")
+        val result = new LinkedBlockingQueue[Seq[String]]()
+        pendingCompletions.put(execId, result.put)
+        val completions = result.take
+        val insert = completions.collect {
+          case c if c.startsWith(prefix) => c.substring(prefix.length)
+        }
+        (insert, completions)
+      })
+    try {
+      while (running.get) {
+        reader.readLine("> ", None) match {
+          case Some("shutdown") =>
+            // `sbt -client shutdown` shuts down the server
+            sendAndWait("exit", Some(100.millis.fromNow), wait)
+            running.set(false)
+          case Some("exit")               => running.set(false)
+          case Some(s) if s.trim.nonEmpty => sendAndWait(s, None, wait)
+          case _                          => //
+        }
+      }
+    } catch { case _: InterruptedException => running.set(false) }
   }
 
   def sendExecCommand(commandLine: String): String = {
@@ -249,23 +382,164 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     try {
       val s = Serialization.serializeCommandAsJsonMessage(command)
       connection.sendString(s)
+      lock.synchronized {
+        status.set("Processing")
+      }
     } catch {
-      case _: IOException =>
-      // log.debug(e.getMessage)
-      // toDel += client
+      case e: IOException =>
+        System.err.println(s"Caught exception writing command to server: $e")
+        running.set(false)
     }
-    lock.synchronized {
-      status.set("Processing")
+  }
+  def sendCommandResponse(method: String, command: EventMessage, id: String): Unit = {
+    try {
+      val s = new String(Serialization.serializeEventMessage(command))
+      val msg =
+        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "$method", "params": $s }"""
+      connection.sendString(msg)
+    } catch {
+      case e: IOException =>
+        System.err.println(s"Caught exception writing command to server: $e")
+        running.set(false)
     }
+  }
+  def sendJson(method: String, params: String): String = {
+    val uuid = UUID.randomUUID.toString
+    val msg = s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "$method", "params": $params }"""
+    connection.sendString(msg)
+    uuid
+  }
+
+  private[this] class RawInputThread extends Thread("sbt-read-input-thread") with AutoCloseable {
+    setDaemon(true)
+    start()
+    val stopped = new AtomicBoolean(false)
+    override final def run(): Unit = {
+      @tailrec def read(): Unit = System.in.read match {
+        case -1 =>
+        case b =>
+          stdinBytes.offer(b)
+          if (!stopped.get()) read()
+      }
+      try Terminal.console.withRawSystemIn(read())
+      catch { case _: InterruptedException => stopped.set(true) }
+    }
+
+    override def close(): Unit = {
+      stopped.set(true)
+      RawInputThread.this.interrupt()
+    }
+  }
+}
+class NetworkClient(
+    configuration: xsbti.AppConfiguration,
+    override val sbtArguments: Seq[String],
+    override val commandArguments: Seq[String],
+    override val sbtScript: String,
+) extends {
+  override val console: ConsoleInterface = {
+    val appender = ConsoleAppender("thin")
+    new ConsoleInterface {
+      override def appendLog(level: Level.Value, message: => String): Unit =
+        appender.appendLog(level, message)
+      override def success(msg: String): Unit = appender.success(msg)
+    }
+  }
+} with NetworkClientImpl {
+  def this(configuration: xsbti.AppConfiguration, arguments: Arguments) =
+    this(
+      configuration,
+      arguments.sbtArguments,
+      arguments.commandArguments,
+      arguments.sbtScript,
+    )
+  def this(configuration: xsbti.AppConfiguration, args: List[String]) =
+    this(configuration, NetworkClient.parseArgs(args.toArray))
+  override def baseDirectory: File = configuration.baseDirectory
+}
+
+class SimpleClient(
+    override val baseDirectory: File,
+    val sbtArguments: Seq[String],
+    val commandArguments: Seq[String],
+    override val sbtScript: String,
+) extends {
+  override val console: ConsoleInterface = new ConsoleInterface {
+    import scala.Console.{ GREEN, RED, RESET, YELLOW }
+    override def appendLog(level: Level.Value, message: => String): Unit = {
+      val prefix = level match {
+        case Level.Error => s"[$RED$level$RESET]"
+        case Level.Warn  => s"[$YELLOW$level$RESET]"
+        case _           => s"[$RESET$level$RESET]"
+      }
+      println(s"$prefix $message")
+    }
+
+    override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
+  }
+} with NetworkClientImpl {
+  println(s"fuck $baseDirectory")
+}
+
+object SimpleClient {
+  def main(args: Array[String]): Unit = {
+    apply(args)
+    ()
+  }
+  def apply(args: Array[String]): SimpleClient = {
+    val arguments = NetworkClient.parseArgs(args)
+    new SimpleClient(
+      arguments.baseDirectory,
+      arguments.sbtArguments,
+      arguments.commandArguments,
+      arguments.sbtScript,
+    )
   }
 }
 
 object NetworkClient {
+  private[client] class Arguments(
+      val baseDirectory: File,
+      val sbtArguments: Seq[String],
+      val commandArguments: Seq[String],
+      val sbtScript: String,
+  )
+  private[client] def parseArgs(args: Array[String]): Arguments = {
+    var i = 0
+    var sbtScript = "sbt"
+    val commandArgs = new mutable.ArrayBuffer[String]
+    val sbtArguments = new mutable.ArrayBuffer[String]
+    var pwd: Option[File] = None
+    val SysProp = "-D([^=]+)=(.*)".r
+    while (i < args.length) {
+      args(i) match {
+        case a if a.startsWith("--pwd=") =>
+          pwd = a.split("--pwd=").lastOption.map(new File(_).getCanonicalFile)
+        case a if a.startsWith("--sbt-script=") =>
+          sbtScript = a.split("--sbt-script=").lastOption.getOrElse(sbtScript)
+        case a if !a.startsWith("-") => commandArgs += a
+        case a @ SysProp(key, value) =>
+          System.setProperty(key, value)
+          sbtArguments += a
+        case a =>
+          sbtArguments += a
+      }
+      i += 1
+    }
+    val file = pwd.getOrElse(new File("").getCanonicalFile)
+    new Arguments(file, sbtArguments, commandArgs, sbtScript)
+  }
   def run(configuration: xsbti.AppConfiguration, arguments: List[String]): Unit =
     try {
-      new NetworkClient(configuration, arguments)
+      val args = parseArgs(arguments.toArray)
+      new NetworkClient(
+        configuration,
+        args.sbtArguments,
+        args.commandArguments,
+        args.sbtScript,
+      )
       ()
     } catch {
-      case NonFatal(e) => println(e.getMessage)
+      case NonFatal(e) => e.printStackTrace()
     }
 }

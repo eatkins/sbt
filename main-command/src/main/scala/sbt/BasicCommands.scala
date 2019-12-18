@@ -346,7 +346,13 @@ object BasicCommands {
   private[this] def classpathStrings: Parser[Seq[String]] =
     token(StringBasic.map(s => IO.pathSplit(s).toSeq), "<classpath>")
 
-  def exit: Command = Command.command(TerminateAction, exitBrief, exitBrief)(_ exit true)
+  def exit: Command = Command.command(TerminateAction, exitBrief, exitBrief) { s =>
+    s.source match {
+      case Some(c) if c.channelName.startsWith("network") =>
+        s"${DisconnectNetworkChannel} ${c.channelName}" :: s
+      case _ => s exit true
+    }
+  }
 
   @deprecated("Replaced by BuiltInCommands.continuous", "1.3.0")
   def continuous: Command =
@@ -375,8 +381,7 @@ object BasicCommands {
   def oldshell: Command = Command.command(OldShell, Help.more(Shell, OldShellDetailed)) { s =>
     val history = (s get historyPath) getOrElse (new File(s.baseDir, ".history")).some
     val prompt = (s get shellPrompt) match { case Some(pf) => pf(s); case None => "> " }
-    val reader =
-      new FullReader(history, s.combinedParser, LineReader.HandleCONT, Terminal.wrappedSystemIn)
+    val reader = new FullReader(history, s.combinedParser, LineReader.HandleCONT, Terminal.console)
     val line = reader.readLine(prompt)
     line match {
       case Some(line) =>
@@ -539,4 +544,5 @@ object BasicCommands {
       "is-command-alias",
       "Internal: marker for Commands created as aliases for another command."
     )
+
 }

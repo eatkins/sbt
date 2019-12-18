@@ -10,6 +10,7 @@ interface CommandMessage {
 type InitCommand implements CommandMessage {
   token: String
   execId: String
+  skipAnalysis: Boolean @since("1.4.0")
 }
 
 ## Command to execute sbt command.
@@ -22,8 +23,12 @@ type SettingQuery implements CommandMessage {
   setting: String!
 }
 
+type Attach implements CommandMessage {
+}
+
 type CompletionParams {
   query: String!
+  level: Int @since("1.4.0")
 }
 
 ## Message for events.
@@ -74,4 +79,30 @@ type CompletionResponse {
 type ExecutionEvent {
   success: String!
   commandLine: String!
+}
+
+type TerminalPropertiesQuery implements CommandMessage {
+}
+
+type TerminalPropertiesResponse implements EventMessage {
+    width: Int!
+    height: Int!
+    isAnsiSupported: Boolean!
+    isColorEnabled: Boolean!
+    isSupershellEnabled: Boolean!
+    isEchoEnabled: Boolean!
+}
+
+type TerminalCapabilitiesQuery implements CommandMessage {
+    id: String!
+    boolean: String
+    numeric: String
+    string: String
+}
+
+type TerminalCapabilitiesResponse implements EventMessage {
+    id: String!
+    boolean: Boolean
+    numeric: Int
+    string: String
 }

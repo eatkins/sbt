@@ -28,7 +28,7 @@ class ManagedLogger(
   override def log(level: Level.Value, message: => String): Unit = {
     xlogger.log(
       ConsoleAppender.toXLevel(level),
-      new ObjectMessage(StringEvent(level.toString, message, channelName, execId))
+      new ObjectMessage(StringEvent(level.toString, message + "\n", channelName, execId))
     )
   }
 

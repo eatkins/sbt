@@ -39,7 +39,6 @@ private[sbt] object LanguageServerProtocol {
   def handler(converter: FileConverter): ServerHandler =
     ServerHandler({
       case callback: ServerCallback =>
-        import callback._
         ServerIntent(
           {
             import sbt.internal.langserver.codec.JsonProtocol._
@@ -54,47 +53,59 @@ private[sbt] object LanguageServerProtocol {
 
             {
               case r: JsonRpcRequestMessage if r.method == "initialize" =>
-                if (authOptions(ServerAuthentication.Token)) {
-                  val param = Converter.fromJson[InitializeParams](json(r)).get
-                  val optionJson = param.initializationOptions.getOrElse(
-                    throw LangServerError(
-                      ErrorCodes.InvalidParams,
-                      "initializationOptions is expected on 'initialize' param."
-                    )
+                val param = Converter.fromJson[InitializeParams](json(r)).get
+                val optionJson = param.initializationOptions.getOrElse(
+                  throw LangServerError(
+                    ErrorCodes.InvalidParams,
+                    "initializationOptions is expected on 'initialize' param."
                   )
-                  val opt = Converter.fromJson[InitializeOption](optionJson).get
+                )
+                val opt = Converter.fromJson[InitializeOption](optionJson).get
+                if (callback.authOptions(ServerAuthentication.Token)) {
                   val token = opt.token.getOrElse(sys.error("'token' is missing."))
-                  if (authenticate(token)) ()
+                  if (callback.authenticate(token)) ()
                   else throw LangServerError(ErrorCodes.InvalidRequest, "invalid token")
                 } else ()
-                setInitialized(true)
-                appendExec(Exec(s"collectAnalyses", None, Some(CommandSource(name))))
-                jsonRpcRespond(InitializeResult(serverCapabilities), Option(r.id))
+                callback.setInitialized(true)
+                if (!opt.skipAnalysis.getOrElse(false)) {
+                  callback.appendExec(
+                    Exec(s"collectAnalyses", None, Some(CommandSource(callback.name)))
+                  )
+                }
+                callback.jsonRpcRespond(InitializeResult(serverCapabilities), Option(r.id))
 
               case r: JsonRpcRequestMessage if r.method == "textDocument/definition" =>
                 implicit val executionContext: ExecutionContext = StandardMain.executionContext
-                Definition.lspDefinition(json(r), r.id, CommandSource(name), converter, log)
+                Definition.lspDefinition(
+                  json(r),
+                  r.id,
+                  CommandSource(callback.name),
+                  converter,
+                  callback.log
+                )
                 ()
               case r: JsonRpcRequestMessage if r.method == "sbt/exec" =>
                 val param = Converter.fromJson[SbtExecParams](json(r)).get
-                appendExec(Exec(param.commandLine, Some(r.id), Some(CommandSource(name))))
+                callback.appendExec(
+                  Exec(param.commandLine, Some(r.id), Some(CommandSource(callback.name)))
+                )
                 ()
               case r: JsonRpcRequestMessage if r.method == "sbt/setting" =>
                 import sbt.protocol.codec.JsonProtocol._
                 val param = Converter.fromJson[Q](json(r)).get
-                onSettingQuery(Option(r.id), param)
+                callback.onSettingQuery(Option(r.id), param)
               case r: JsonRpcRequestMessage if r.method == "sbt/cancelRequest" =>
-                import sbt.protocol.codec.JsonProtocol._
                 val param = Converter.fromJson[CRP](json(r)).get
-                onCancellationRequest(Option(r.id), param)
+                callback.onCancellationRequest(Option(r.id), param)
               case r: JsonRpcRequestMessage if r.method == "sbt/completion" =>
                 import sbt.protocol.codec.JsonProtocol._
                 val param = Converter.fromJson[CP](json(r)).get
-                onCompletionRequest(Option(r.id), param)
+                callback.onCompletionRequest(Option(r.id), param)
             }
           }, {
             case n: JsonRpcNotificationMessage if n.method == "textDocument/didSave" =>
-              appendExec(Exec(";Test/compile; collectAnalyses", None, Some(CommandSource(name))))
+              val cmd = "Test/compile; collectAnalyses"
+              callback.appendExec(Exec(cmd, None, Some(CommandSource(callback.name))))
               ()
           }
         )
@@ -115,18 +126,18 @@ private[sbt] trait LanguageServerProtocol { self: NetworkChannel =>
   protected def onCancellationRequest(execId: Option[String], crp: CRP): Unit
 
   protected lazy val callbackImpl: ServerCallback = new ServerCallback {
-    def jsonRpcRespond[A: JsonFormat](event: A, execId: Option[String]): Unit =
+    override def jsonRpcRespond[A: JsonFormat](event: A, execId: Option[String]): Unit =
       self.respondResult(event, execId)
 
-    def jsonRpcRespondError(execId: Option[String], code: Long, message: String): Unit =
+    override def jsonRpcRespondError(execId: Option[String], code: Long, message: String): Unit =
       self.respondError(code, message, execId)
 
-    def jsonRpcNotify[A: JsonFormat](method: String, params: A): Unit =
+    override def jsonRpcNotify[A: JsonFormat](method: String, params: A): Unit =
       self.jsonRpcNotify(method, params)
 
-    def appendExec(exec: Exec): Boolean = self.append(exec)
-    def log: Logger = self.log
-    def name: String = self.name
+    override def appendExec(exec: Exec): Boolean = self.append(exec)
+    override def log: Logger = self.log
+    override def name: String = self.name
     private[sbt] def authOptions: Set[ServerAuthentication] = self.authOptions
     private[sbt] def authenticate(token: String): Boolean = self.authenticate(token)
     private[sbt] def setInitialized(value: Boolean): Unit = self.setInitialized(value)

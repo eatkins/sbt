@@ -12,6 +12,7 @@ import java.net.URI
 import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
 import java.util.Properties
 import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.atomic.AtomicBoolean
 
 import sbt.BasicCommandStrings.{ Shell, TemplateCommand }
 import sbt.Project.LoadAction
@@ -21,6 +22,7 @@ import sbt.internal.CommandStrings.BootCommand
 import sbt.internal._
 import sbt.internal.inc.ScalaInstance
 import sbt.internal.nio.CheckBuildSources
+import sbt.internal.server.NetworkChannel
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ Parser, SizeParser }
@@ -122,30 +124,37 @@ object StandardMain {
     pool.foreach(_.shutdownNow())
   }
 
+  private[this] val isShutdown = new AtomicBoolean(false)
   def runManaged(s: State): xsbti.MainResult = {
     val previous = TrapExit.installManager()
     try {
       val hook = ShutdownHooks.add(closeRunnable)
       try {
         MainLoop.runLogged(s)
+      } catch {
+        case _: InterruptedException if isShutdown.get =>
+          new xsbti.Exit { override def code(): Int = 0 }
       } finally {
         try DefaultBackgroundJobService.shutdown()
         finally hook.close()
         ()
       }
-    } finally TrapExit.uninstallManager(previous)
+    } finally {
+      TrapExit.uninstallManager(previous)
+    }
   }
 
   /** The common interface to standard output, used for all built-in ConsoleLoggers. */
-  val console: ConsoleOut =
-    ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
+  val console: ConsoleOut = ConsoleOut.systemOut
+  //ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
+  ConsoleOut.setGlobalProxy(console)
 
   private[this] def initialGlobalLogging(file: Option[File]): GlobalLogging = {
     file.foreach(f => if (!f.exists()) IO.createDirectory(f))
     GlobalLogging.initial(
-      MainAppender.globalDefault(console),
+      MainAppender.globalDefault(ConsoleOut.globalProxy),
       File.createTempFile("sbt-global-log", ".log", file.orNull),
-      console
+      ConsoleOut.globalProxy
     )
   }
   def initialGlobalLogging(file: File): GlobalLogging = initialGlobalLogging(Option(file))
@@ -242,7 +251,9 @@ object BuiltinCommands {
       act,
       continuous,
       clearCaches,
-    ) ++ allBasicCommands
+      NetworkChannel.disconnect,
+      waitCmd,
+    ) ++ allBasicCommands ++ ContinuousCommands.value
 
   def DefaultBootCommands: Seq[String] =
     WriteSbtVersion :: LoadProject :: NotifyUsersAboutShell :: s"$IfLast $Shell" :: Nil
@@ -764,17 +775,16 @@ object BuiltinCommands {
   @tailrec
   private[this] def doLoadFailed(s: State, loadArg: String): State = {
     s.log.warn("Project loading failed: (r)etry, (q)uit, (l)ast, or (i)gnore? (default: r)")
-    val result = Terminal.withRawSystemIn {
-      Terminal.withEcho(toggle = true)(Terminal.wrappedSystemIn.read() match {
-        case -1 => 'q'.toInt
-        case b  => b
-      })
+    val terminal = Terminal.console
+    val result = terminal.withRawSystemIn(terminal.inputStream.read) match {
+      case -1 => 'q'.toInt
+      case b  => b
     }
     def retry: State = loadProjectCommand(LoadProject, loadArg) :: s.clearGlobalLog
     def ignoreMsg: String =
       if (Project.isProjectLoaded(s)) "using previously loaded project" else "no project loaded"
 
-    result.toChar match {
+    result.toChar.toLower match {
       case '\n' | '\r' => retry
       case 'r' | 'R'   => retry
       case 'q' | 'Q'   => s.exit(ok = false)
@@ -885,6 +895,18 @@ object BuiltinCommands {
     Command.command(ClearCaches, help)(f)
   }
 
+  def waitCmd: Command = Command.command("wait") { s0 =>
+    val exchange = StandardMain.exchange
+    exchange prompt ConsolePromptEvent(s0)
+    import scala.concurrent.duration.Duration
+    val exec: Exec = exchange.blockUntilNextExec(Duration.Inf, Some(s0), s0.globalLogging.full)
+    val newState = s0.copy(remainingCommands = exec +: s0.remainingCommands)
+    val res =
+      if (exec.commandLine.trim.isEmpty) newState
+      else newState.clearGlobalLog
+    res
+  }
+
   def shell: Command = Command.command(Shell, Help.more(Shell, ShellDetailed)) { s0 =>
     import sbt.internal.ConsolePromptEvent
     val exchange = StandardMain.exchange
@@ -895,8 +917,8 @@ object BuiltinCommands {
       .extract(s1)
       .getOpt(Keys.minForcegcInterval)
       .getOrElse(GCUtil.defaultMinForcegcInterval)
-    val exec: Exec = exchange.blockUntilNextExec(minGCInterval, s1.globalLogging.full)
-    if (exec.source.fold(true)(_.channelName != "console0")) {
+    val exec: Exec = exchange.blockUntilNextExec(minGCInterval, Some(s1), s1.globalLogging.full)
+    if (exec.source.fold(true)(_.channelName != "console0") && !exec.commandLine.startsWith("__")) {
       s1.log.info(s"received remote command: ${exec.commandLine}")
     }
     val newState = s1
@@ -905,8 +927,10 @@ object BuiltinCommands {
         remainingCommands = exec +: Exec(Shell, None) +: s1.remainingCommands
       )
       .setInteractive(true)
-    if (exec.commandLine.trim.isEmpty) newState
-    else newState.clearGlobalLog
+    val res =
+      if (exec.commandLine.trim.isEmpty) newState
+      else newState.clearGlobalLog
+    res
   }
 
   def startServer: Command =

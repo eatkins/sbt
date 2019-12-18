@@ -70,7 +70,6 @@ import sbt.librarymanagement.CrossVersion.{ binarySbtVersion, binaryScalaVersion
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy._
 import sbt.librarymanagement.syntax._
-import sbt.nio.FileStamp.Formats.seqPathFileStampJsonFormatter
 import sbt.nio.Keys._
 import sbt.nio.file.syntax._
 import sbt.nio.file.{ FileTreeView, Glob, RecursiveGlob }
@@ -338,10 +337,7 @@ object Defaults extends BuildCommon {
         val rs = EvaluateTask.taskTimingProgress.toVector ++ EvaluateTask.taskTraceEvent.toVector
         rs map { Keys.TaskProgress(_) }
       },
-      progressState := {
-        if ((ThisBuild / useSuperShell).value) Some(new ProgressState(SysProp.supershellBlankZone))
-        else None
-      },
+      progressState := Some(new ProgressState(SysProp.supershellBlankZone)),
       Previous.cache := new Previous(
         Def.streamsManagerKey.value,
         Previous.references.value.getReferences
@@ -397,7 +393,7 @@ object Defaults extends BuildCommon {
   // TODO: This should be on the new default settings for a project.
   def projectCore: Seq[Setting[_]] = Seq(
     name := thisProject.value.id,
-    logManager := LogManager.defaults(extraLoggers.value, StandardMain.console),
+    logManager := LogManager.defaults(extraLoggers.value, ConsoleOut.terminalOut),
     onLoadMessage := (onLoadMessage or
       Def.setting {
         s"Set current project to ${name.value} (in build ${thisProjectRef.value.build})"
@@ -673,27 +669,27 @@ object Defaults extends BuildCommon {
     },
      */
     externalHooks := IncOptions.defaultExternal,
-    compileSourceFileInputs := {
-      import sjsonnew.BasicJsonProtocol.mapFormat
-      compile.value // ensures the inputFileStamps previous value is only set if compile succeeds.
-      val version = scalaVersion.value
-      val versions = crossScalaVersions.value.toSet + version
-      val prev: Map[String, Seq[(java.nio.file.Path, sbt.nio.FileStamp)]] =
-        compileSourceFileInputs.previous.map(_.filterKeys(versions)).getOrElse(Map.empty)
-      prev + (version ->
-        ((unmanagedSources / inputFileStamps).value ++ (managedSourcePaths / outputFileStamps).value))
-    },
-    compileSourceFileInputs := compileSourceFileInputs.triggeredBy(compile).value,
-    compileBinaryFileInputs := {
-      import sjsonnew.BasicJsonProtocol.mapFormat
-      compile.value // ensures the inputFileStamps previous value is only set if compile succeeds.
-      val version = scalaVersion.value
-      val versions = crossScalaVersions.value.toSet + version
-      val prev: Map[String, Seq[(java.nio.file.Path, sbt.nio.FileStamp)]] =
-        compileBinaryFileInputs.previous.map(_.filterKeys(versions)).getOrElse(Map.empty)
-      prev + (version -> (dependencyClasspathFiles / outputFileStamps).value)
-    },
-    compileBinaryFileInputs := compileBinaryFileInputs.triggeredBy(compile).value,
+    //compileSourceFileInputs := {
+    //import sjsonnew.BasicJsonProtocol.mapFormat
+    //compile.value // ensures the inputFileStamps previous value is only set if compile succeeds.
+    //val version = scalaVersion.value
+    //val versions = crossScalaVersions.value.toSet + version
+    //val prev: Map[String, Seq[(java.nio.file.Path, sbt.nio.FileStamp)]] =
+    //compileSourceFileInputs.previous.map(_.filterKeys(versions)).getOrElse(Map.empty)
+    //prev + (version ->
+    //((unmanagedSources / inputFileStamps).value ++ (managedSourcePaths / outputFileStamps).value))
+    //},
+    //compileSourceFileInputs := compileSourceFileInputs.triggeredBy(compile).value,
+    //compileBinaryFileInputs := {
+    //import sjsonnew.BasicJsonProtocol.mapFormat
+    //compile.value // ensures the inputFileStamps previous value is only set if compile succeeds.
+    //val version = scalaVersion.value
+    //val versions = crossScalaVersions.value.toSet + version
+    //val prev: Map[String, Seq[(java.nio.file.Path, sbt.nio.FileStamp)]] =
+    //compileBinaryFileInputs.previous.map(_.filterKeys(versions)).getOrElse(Map.empty)
+    //prev + (version -> (dependencyClasspathFiles / outputFileStamps).value)
+    //},
+    //compileBinaryFileInputs := compileBinaryFileInputs.triggeredBy(compile).value,
     incOptions := {
       val old = incOptions.value
       old
@@ -1502,13 +1498,13 @@ object Defaults extends BuildCommon {
 
   def askForMainClass(classes: Seq[String]): Option[String] =
     sbt.SelectMainClass(
-      if (classes.length >= 10) Some(SimpleReader.readLine(_))
+      if (classes.length >= 10) Some(SimpleReader(Terminal.console).readLine(_))
       else
         Some(s => {
           def print(st: String) = { scala.Console.out.print(st); scala.Console.out.flush() }
           print(s)
-          Terminal.withRawSystemIn {
-            Terminal.wrappedSystemIn.read match {
+          Terminal.get.withRawSystemIn {
+            Terminal.get.inputStream.read match {
               case -1 => None
               case b =>
                 val res = b.toChar.toString
@@ -2355,6 +2351,9 @@ object Classpaths {
           CrossVersion(scalaVersion, binVersion)(base).withCrossVersion(Disabled())
         },
         shellPrompt := shellPromptFromState,
+        newShellPrompt := { (t, s) =>
+          shellPromptFromState(t)(s)
+        },
         dynamicDependency := { (): Unit },
         transitiveClasspathDependency := { (): Unit },
         transitiveDynamicInputs :== Nil,
@@ -3811,11 +3810,13 @@ object Classpaths {
     }
   }
 
-  def shellPromptFromState: State => String = { s: State =>
+  def shellPromptFromState: State => String = shellPromptFromState(Terminal.console)
+  def shellPromptFromState(terminal: Terminal): State => String = { s: State =>
     val extracted = Project.extract(s)
     (name in extracted.currentRef).get(extracted.structure.data) match {
-      case Some(name) => s"sbt:$name" + Def.withColor("> ", Option(scala.Console.CYAN))
-      case _          => "> "
+      case Some(name) =>
+        s"sbt:$name" + Def.withColor(s"> ", Option(scala.Console.CYAN), terminal.isColorEnabled)
+      case _ => "> "
     }
   }
 }

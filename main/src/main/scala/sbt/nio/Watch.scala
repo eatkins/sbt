@@ -228,6 +228,9 @@ object Watch {
     override def hashCode: Int = throwable.hashCode
     override def toString: String = s"HandleError($throwable)"
   }
+  object HandleError {
+    def unapply(h: HandleError): Option[Throwable] = Some(h.throwable)
+  }
 
   /**
    * Action that indicates that an error has occurred. The watch will be terminated when this action
@@ -236,6 +239,9 @@ object Watch {
   private[sbt] final class HandleUnexpectedError(override val throwable: Throwable)
       extends HandleError(throwable) {
     override def toString: String = s"HandleUnexpectedError($throwable)"
+  }
+  object HandleUnexpectedError {
+    def unapply(h: HandleUnexpectedError): Option[Throwable] = Some(h.throwable)
   }
 
   /**
@@ -329,7 +335,7 @@ object Watch {
       new impl(input, display, description, action)
   }
 
-  private type NextAction = () => Watch.Action
+  private type NextAction = Int => Watch.Action
 
   /**
    * Runs a task and then blocks until the task is ready to run again or we no longer wish to
@@ -341,33 +347,49 @@ object Watch {
    * @return the exit [[Watch.Action]] that can be used to potentially modify the build state and
    *         the count of the number of iterations that were run. If
    */
-  def apply(task: () => Unit, onStart: NextAction, nextAction: NextAction): Watch.Action = {
-    def safeNextAction(delegate: NextAction): Watch.Action =
-      try delegate()
+  def apply(
+      initialCount: Int,
+      task: Int => Unit,
+      onStart: NextAction,
+      nextAction: NextAction,
+      recursive: Boolean
+  ): Watch.Action = {
+    def safeNextAction(count: Int, delegate: NextAction): Watch.Action =
+      try delegate(count)
       catch {
         case NonFatal(t) =>
           System.err.println(s"Watch caught unexpected error:")
           t.printStackTrace(System.err)
           new HandleError(t)
       }
-    @tailrec def next(): Watch.Action = safeNextAction(nextAction) match {
+    @tailrec def next(count: Int): Watch.Action = safeNextAction(count, nextAction) match {
       // This should never return Ignore due to this condition.
-      case Ignore => next()
+      case Ignore => next(count)
       case action => action
     }
-    @tailrec def impl(): Watch.Action = {
-      task()
-      safeNextAction(onStart) match {
+    @tailrec def impl(count: Int): Watch.Action = {
+      task(count)
+      safeNextAction(count, onStart) match {
         case Ignore =>
-          next() match {
-            case Trigger => impl()
-            case action  => action
+          next(count) match {
+            case Trigger =>
+              if (recursive) impl(count + 1)
+              else {
+                task(count)
+                Watch.Trigger
+              }
+            case action => action
           }
-        case Trigger => impl()
-        case a       => a
+        case Trigger =>
+          if (recursive) impl(count + 1)
+          else {
+            task(count)
+            Watch.Trigger
+          }
+        case a => a
       }
     }
-    try impl()
+    try impl(initialCount)
     catch { case NonFatal(t) => new HandleError(t) }
   }
 
@@ -391,9 +413,7 @@ object Watch {
    *         are non empty.
    */
   @inline
-  private[sbt] def aggregate(
-      events: Seq[(Action, Event)]
-  ): Option[(Action, Event)] =
+  private[sbt] def aggregate(events: Seq[(Action, Event)]): Option[(Action, Event)] =
     if (events.isEmpty) None else Some(events.minBy(_._1))
 
   private implicit class StringToExec(val s: String) extends AnyVal {

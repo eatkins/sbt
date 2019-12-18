@@ -15,6 +15,7 @@ import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.nio.CheckBuildSources.CheckBuildSourcesKey
 import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Terminal }
+import sbt.internal.{ CommandChannel, ConsoleUnpromptEvent, ShutdownHooks }
 import sbt.io.{ IO, Using }
 import sbt.protocol._
 import sbt.util.Logger
@@ -134,7 +135,9 @@ object MainLoop {
   /** Runs the next sequence of commands that doesn't require global logging changes. */
   @tailrec def run(state: State): RunNext =
     state.next match {
-      case State.Continue       => run(next(state))
+      case State.Continue => {
+        run(next(state))
+      }
       case State.ClearGlobalLog => new ClearGlobalLog(state.continue)
       case State.KeepLastLog    => new KeepGlobalLog(state.continue)
       case ret: State.Return    => new Return(ret.result)
@@ -186,6 +189,7 @@ object MainLoop {
       ExecStatusEvent("Processing", channelName, exec.execId, Vector())
     try {
       def process(): State = {
+        val originalLogger = state.globalLogging
         val progressState = state.get(sbt.Keys.currentTaskProgress) match {
           case Some(_) => state
           case _ =>
@@ -195,7 +199,18 @@ object MainLoop {
               state.put(sbt.Keys.currentTaskProgress, new Keys.TaskProgress(progress))
             } else state
         }
-        val newState = Command.process(exec.commandLine, progressState)
+        StandardMain.exchange.unprompt(ConsoleUnpromptEvent(exec.source, progressState))
+        val execSource = exec.source.map(_.channelName)
+        val newState = (StandardMain.exchange.channels.collectFirst {
+          case c: CommandChannel if execSource.contains(c.name) => c
+        } match {
+          case Some(channel) =>
+            Terminal.withTerminal(channel.terminal) {
+              Command.process(exec.commandLine, progressState)
+            }
+          case _ =>
+            Command.process(exec.commandLine, progressState)
+        }).copy(globalLogging = originalLogger)
         val doneEvent = ExecStatusEvent(
           "Done",
           channelName,

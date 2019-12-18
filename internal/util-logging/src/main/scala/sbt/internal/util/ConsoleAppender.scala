@@ -119,6 +119,23 @@ object ConsoleAppender {
   private[this] val showProgressHolder: AtomicBoolean = new AtomicBoolean(false)
   def setShowProgress(b: Boolean): Unit = showProgressHolder.set(b)
   def showProgress: Boolean = showProgressHolder.get
+  private[ConsoleAppender] trait Properties {
+    def isAnsiSupported: Boolean
+    def isColorEnabled: Boolean
+    def out: ConsoleOut
+  }
+  object Properties {
+    def from(terminal: Terminal): Properties = new Properties {
+      override def isAnsiSupported: Boolean = terminal.isAnsiSupported
+      override def isColorEnabled: Boolean = terminal.isColorEnabled
+      override def out = ConsoleOut.terminalOut(terminal)
+    }
+    def from(o: ConsoleOut, ansi: Boolean, color: Boolean): Properties = new Properties {
+      override def isAnsiSupported: Boolean = ansi
+      override def isColorEnabled: Boolean = color
+      override def out = o
+    }
+  }
 
   /** Hide stack trace altogether. */
   val noSuppressedMessage = (_: SuppressedTraceContext) => None
@@ -239,7 +256,38 @@ object ConsoleAppender {
    * @return A new `ConsoleAppender` that writes to `out`.
    */
   def apply(name: String, out: ConsoleOut, useFormat: Boolean): ConsoleAppender =
-    apply(name, out, formatEnabledInEnv, useFormat, noSuppressedMessage)
+    apply(name, out, useFormat || formatEnabledInEnv, useFormat, noSuppressedMessage)
+
+  /**
+   * A new `ConsoleAppender` identified by `name`, and that writes to `out`.
+   *
+   * @param name      An identifier for the `ConsoleAppender`.
+   * @param terminal  The terminal to which this appender corresponds
+   * @return A new `ConsoleAppender` that writes to `out`.
+   */
+  def apply(name: String, terminal: Terminal): ConsoleAppender = {
+    val appender = new ConsoleAppender(name, Properties.from(terminal), noSuppressedMessage)
+    appender.start()
+    appender
+  }
+
+  /**
+   * A new `ConsoleAppender` identified by `name`, and that writes to `out`.
+   *
+   * @param name      An identifier for the `ConsoleAppender`.
+   * @param terminal  The terminal to which this appender corresponds
+   * @param suppressedMessage How to handle stack traces.
+   * @return A new `ConsoleAppender` that writes to `out`.
+   */
+  def apply(
+      name: String,
+      terminal: Terminal,
+      suppressedMessage: SuppressedTraceContext => Option[String]
+  ): ConsoleAppender = {
+    val appender = new ConsoleAppender(name, Properties.from(terminal), suppressedMessage)
+    appender.start()
+    appender
+  }
 
   /**
    * A new `ConsoleAppender` identified by `name`, and that writes to `out`.
@@ -312,14 +360,23 @@ object ConsoleAppender {
  */
 class ConsoleAppender private[ConsoleAppender] (
     name: String,
-    out: ConsoleOut,
-    ansiCodesSupported: Boolean,
-    useFormat: Boolean,
+    properties: Properties,
     suppressedMessage: SuppressedTraceContext => Option[String]
 ) extends AbstractAppender(name, null, LogExchange.dummyLayout, true, Array.empty) {
+  def this(
+      name: String,
+      out: ConsoleOut,
+      ansiCodesSupported: Boolean,
+      useFormat: Boolean,
+      suppressedMessage: SuppressedTraceContext => Option[String]
+  ) = this(name, Properties.from(out, ansiCodesSupported, useFormat), suppressedMessage)
   import scala.Console.{ BLUE, GREEN, RED, YELLOW }
 
-  private val reset: String = {
+  private[util] def out: ConsoleOut = properties.out
+  private[util] def ansiCodesSupported: Boolean = properties.isAnsiSupported
+  private[util] def useFormat: Boolean = properties.isColorEnabled
+
+  private def reset: String = {
     if (ansiCodesSupported && useFormat) scala.Console.RESET
     else ""
   }
@@ -383,18 +440,6 @@ class ConsoleAppender private[ConsoleAppender] (
   }
 
   /**
-   * Formats `msg` with `format, wrapped between `RESET`s
-   *
-   * @param format The format to use
-   * @param msg    The message to format
-   * @return The formatted message.
-   */
-  private def formatted(format: String, msg: String): String = {
-    val builder = new java.lang.StringBuilder(reset.length * 2 + format.length + msg.length)
-    builder.append(reset).append(format).append(msg).append(reset).toString
-  }
-
-  /**
    * Select the right color for the label given `level`.
    *
    * @param level The label to consider to select the color.
@@ -424,22 +469,27 @@ class ConsoleAppender private[ConsoleAppender] (
       messageColor: String,
       message: String
   ): Unit =
-    out.lockObject.synchronized {
-      val builder: StringBuilder =
-        new StringBuilder(labelColor.length + label.length + messageColor.length + reset.length * 3)
-      message.linesIterator.foreach { line =>
-        builder.ensureCapacity(
-          labelColor.length + label.length + messageColor.length + line.length + reset.length * 3 + 3
-        )
-        builder.setLength(0)
-        def fmted(a: String, b: String) = builder.append(reset).append(a).append(b).append(reset)
-        builder.append(reset).append('[')
-        fmted(labelColor, label)
-        builder.append("] ")
-        fmted(messageColor, line)
-        write(builder.toString)
+    try {
+      out.lockObject.synchronized {
+        val len =
+          labelColor.length + label.length + messageColor.length + reset.length * 3 + ClearScreenAfterCursor.length
+        val builder: StringBuilder = new StringBuilder(len)
+        message.linesIterator.foreach { line =>
+          builder.ensureCapacity(len + line.length + 4)
+          builder.setLength(0)
+
+          def fmted(a: String, b: String) = builder.append(reset).append(a).append(b).append(reset)
+
+          builder.append(reset).append('[')
+          fmted(labelColor, label)
+          builder.append("] ")
+          fmted(messageColor, line)
+          builder.append(ClearScreenAfterCursor)
+          builder.append('\n')
+          write(builder.toString)
+        }
       }
-    }
+    } catch { case _: InterruptedException => }
 
   // success is called by ConsoleLogger.
   private[sbt] def success(message: => String): Unit = {
@@ -449,7 +499,7 @@ class ConsoleAppender private[ConsoleAppender] (
   private def write(msg: String): Unit = {
     val toWrite =
       if (!useFormat || !ansiCodesSupported) EscHelpers.removeEscapeSequences(msg) else msg
-    out.println(toWrite)
+    out.print(toWrite)
   }
 
   private def appendMessage(level: Level.Value, msg: Message): Unit =
@@ -483,12 +533,8 @@ class ConsoleAppender private[ConsoleAppender] (
     def appendEvent(oe: ObjectEvent[_]): Unit = {
       val contentType = oe.contentType
       contentType match {
-        case "sbt.internal.util.TraceEvent" => appendTraceEvent(oe.message.asInstanceOf[TraceEvent])
+        case "sbt.internal.util.TraceEvent"    => appendTraceEvent(oe.message.asInstanceOf[TraceEvent])
         case "sbt.internal.util.ProgressEvent" =>
-          oe.message match {
-            case pe: ProgressEvent => ProgressState.updateProgressState(pe)
-            case _                 =>
-          }
         case _ =>
           LogExchange.stringCodec[AnyRef](contentType) match {
             case Some(codec) if contentType == "sbt.internal.util.SuccessEvent" =>
@@ -517,51 +563,76 @@ private[sbt] final class ProgressState(
     val padding: AtomicInteger,
     val blankZone: Int,
     val currentLineBytes: AtomicReference[ArrayBuffer[Byte]],
+    val currentCommand: AtomicReference[String],
 ) {
   def this(blankZone: Int) =
     this(
       new AtomicReference(Nil),
       new AtomicInteger(0),
       blankZone,
-      new AtomicReference(new ArrayBuffer[Byte])
+      new AtomicReference(new ArrayBuffer[Byte]),
+      new AtomicReference("")
     )
   def reset(): Unit = {
     progressLines.set(Nil)
     padding.set(0)
+    currentLineBytes.set(new ArrayBuffer[Byte])
+    currentCommand.set("")
+  }
+  private[util] def clearBytes(): Unit = {
+    val pad = padding.get
+    if (currentLineBytes.get.isEmpty && pad > 0) padding.decrementAndGet()
+    currentLineBytes.set(new ArrayBuffer[Byte])
+  }
+
+  private[util] def addBytes(terminal: Terminal, bytes: ArrayBuffer[Byte]): Unit = {
+    val previous = currentLineBytes.get
+    val padding = this.padding.get
+    val prevLineCount = if (padding > 0) terminal.lineCount(new String(previous.toArray)) else 0
+    previous ++= bytes
+    if (padding > 0) {
+      val newLineCount = terminal.lineCount(new String(previous.toArray))
+      val diff = newLineCount - prevLineCount
+      this.padding.set(math.max(padding - diff, 0))
+    }
+  }
+
+  private[util] def printPrompt(terminal: Terminal, printStream: PrintStream): Unit =
+    if (terminal.prompt != Prompt.Running) {
+      val prefix = if (terminal.isAnsiSupported) s"$DeleteLine$CursorLeft1000" else ""
+      val pmpt = prefix.getBytes ++ terminal.prompt.render().getBytes
+      pmpt.foreach(b => printStream.write(b & 0xFF))
+    }
+  private[util] def reprint(terminal: Terminal, printStream: PrintStream): Unit = {
+    printPrompt(terminal, printStream)
+    if (progressLines.get.nonEmpty) {
+      val lines = printProgress(0, 0, terminal)
+      printStream.print(ClearScreenAfterCursor + lines)
+    }
+  }
+
+  private[util] def printProgress(height: Int, width: Int, terminal: Terminal): String = {
+    val previousLines = progressLines.get
+    if (previousLines.nonEmpty) {
+      val currentLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
+      val left = cursorLeft(1000) // resets the position to the left
+      val offset = width > 0
+      val pad = math.max(padding.get - height, 0)
+      val start = ClearScreenAfterCursor + (if (offset) cursorRight(1000) + "\n" else "")
+      val totalSize = currentLength + blankZone + pad
+      val blank = left + s"\n$DeleteLine" * (totalSize - currentLength)
+      val lines = previousLines.mkString(DeleteLine, s"\n$DeleteLine", s"\n$DeleteLine")
+      val resetCursorUp = cursorUp(totalSize + (if (offset) 1 else 0))
+      val resetCursorRight = left + (if (offset) cursorRight(width) else "")
+      val resetCursor = resetCursorUp + resetCursorRight
+      start + blank + lines + resetCursor
+    } else {
+      ClearScreenAfterCursor
+    }
   }
 }
+
 private[sbt] object ProgressState {
-  private val progressState: AtomicReference[ProgressState] = new AtomicReference(null)
-  private[util] def clearBytes(): Unit = progressState.get match {
-    case null =>
-    case state =>
-      val pad = state.padding.get
-      if (state.currentLineBytes.get.isEmpty && pad > 0) state.padding.decrementAndGet()
-      state.currentLineBytes.set(new ArrayBuffer[Byte])
-  }
-
-  private[util] def addBytes(bytes: ArrayBuffer[Byte]): Unit = progressState.get match {
-    case null =>
-    case state =>
-      val previous = state.currentLineBytes.get
-      val padding = state.padding.get
-      val prevLineCount = if (padding > 0) Terminal.lineCount(new String(previous.toArray)) else 0
-      previous ++= bytes
-      if (padding > 0) {
-        val newLineCount = Terminal.lineCount(new String(previous.toArray))
-        val diff = newLineCount - prevLineCount
-        state.padding.set(math.max(padding - diff, 0))
-      }
-  }
-
-  private[util] def reprint(printStream: PrintStream): Unit = progressState.get match {
-    case null => printStream.write('\n')
-    case state =>
-      if (state.progressLines.get.nonEmpty) {
-        val lines = printProgress(0, 0)
-        printStream.print(ClearScreenAfterCursor + "\n" + lines)
-      } else printStream.write('\n')
-  }
 
   /**
    * Receives a new task report and replaces the old one. In the event that the new
@@ -570,51 +641,53 @@ private[sbt] object ProgressState {
    * at the info or greater level, we can decrement the padding because the console
    * line will have filled in the blank line.
    */
-  private[util] def updateProgressState(pe: ProgressEvent): Unit = Terminal.withPrintStream { ps =>
-    progressState.get match {
-      case null =>
-      case state =>
-        val info = pe.items.map { item =>
-          val elapsed = item.elapsedMicros / 1000000L
-          s"  | => ${item.name} ${elapsed}s"
+  private[sbt] def updateProgressState(
+      pe: ProgressEvent,
+      terminal: Terminal
+  ): Unit = {
+    val state = terminal.progressState
+    val isRunning = terminal.prompt == Prompt.Running
+    pe.command.foreach(state.currentCommand.set)
+    if (terminal.isSupershellEnabled) {
+      if (!pe.skipIfActive.getOrElse(false) || !isRunning) {
+        terminal.withPrintStream { ps =>
+          val info = if (isRunning) {
+            pe.items.map { item =>
+              val elapsed = item.elapsedMicros / 1000000L
+              s"  | => ${item.name} ${elapsed}s"
+            }
+          } else {
+            pe.command.toSeq.map { cmd =>
+              s"sbt server is running `$cmd`. Type `kill $cmd` to stop evaluation."
+            }
+          }
+
+          val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))
+          val previousLines = state.progressLines.getAndSet(info)
+          if (previousLines != info) {
+            val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
+            val (height, width) = terminal.prompt match {
+              case Prompt.Running =>
+                val line = terminal.getLastLine
+                line.map(terminal.getLineHeightAndWidth).getOrElse((0, 0))
+              case a => terminal.getLineHeightAndWidth(a.render())
+            }
+            val prevSize = prevLength + state.padding.get
+
+            val newPadding = math.max(0, prevSize - currentLength)
+            state.padding.set(newPadding)
+            state.printPrompt(terminal, ps)
+            ps.print(state.printProgress(height, width, terminal))
+            ps.flush()
+          }
         }
-
-        val currentLength = info.foldLeft(0)(_ + Terminal.lineCount(_))
-        val previousLines = state.progressLines.getAndSet(info)
-        val prevLength = previousLines.foldLeft(0)(_ + Terminal.lineCount(_))
-
-        val (height, width) = Terminal.getLineHeightAndWidth
-        val prevSize = prevLength + state.padding.get
-
-        val newPadding = math.max(0, prevSize - currentLength)
-        state.padding.set(newPadding)
-        ps.print(printProgress(height, width))
-        ps.flush()
+      } else if (state.progressLines.get.nonEmpty) {
+        state.progressLines.set(Nil)
+        terminal.withPrintStream { ps =>
+          ps.print(ClearScreenAfterCursor)
+          ps.flush()
+        }
+      }
     }
   }
-
-  private[sbt] def set(state: ProgressState): Unit = progressState.set(state)
-
-  private[util] def printProgress(height: Int, width: Int): String = progressState.get match {
-    case null => ""
-    case state =>
-      val previousLines = state.progressLines.get
-      if (previousLines.nonEmpty) {
-        val currentLength = previousLines.foldLeft(0)(_ + Terminal.lineCount(_))
-        val left = cursorLeft(1000) // resets the position to the left
-        val offset = width > 0
-        val pad = math.max(state.padding.get - height, 0)
-        val start = ClearScreenAfterCursor + (if (offset) "\n" else "")
-        val totalSize = currentLength + state.blankZone + pad
-        val blank = left + s"\n$DeleteLine" * (totalSize - currentLength)
-        val lines = previousLines.mkString(DeleteLine, s"\n$DeleteLine", s"\n$DeleteLine")
-        val resetCursorUp = cursorUp(totalSize + (if (offset) 1 else 0))
-        val resetCursorRight = left + (if (offset) cursorRight(width) else "")
-        val resetCursor = resetCursorUp + resetCursorRight
-        start + blank + lines + resetCursor
-      } else {
-        ClearScreenAfterCursor
-      }
-  }
-
 }
