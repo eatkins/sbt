@@ -11,18 +11,23 @@ package client
 
 import java.io.{ File, IOException }
 import java.util.UUID
+import java.util.concurrent.{ ArrayBlockingQueue, TimeUnit }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
+import sbt.internal.nio.FileTreeRepository
 import sbt.internal.protocol._
 import sbt.internal.util.{ ConsoleAppender, LineReader }
 import sbt.io.IO
 import sbt.io.syntax._
+import sbt.nio.file.Glob
 import sbt.protocol._
 import sbt.util.Level
 import sjsonnew.support.scalajson.unsafe.Converter
 
+import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
 import scala.sys.process.{ BasicIO, Process, ProcessLogger }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
@@ -83,20 +88,25 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     // val cmd = "sbt"
     val io = BasicIO(false, ProcessLogger(_ => ()))
     val _ = Process(cmd, baseDirectory).run(io)
-    def waitForPortfile(n: Int): Unit =
+    val buffer = new ArrayBlockingQueue[Unit](1)
+    @tailrec def waitForPortfile(limit: Deadline, n: Int): Unit =
       if (portfile.exists) {
         console.appendLog(Level.Info, "server found")
       } else {
-        if (n <= 0) sys.error(s"timeout. $portfile is not found.")
+        if (limit.isOverdue) sys.error(s"timeout. $portfile is not found.")
         else {
-          Thread.sleep(1000)
-          if ((n - 1) % 10 == 0) {
-            console.appendLog(Level.Info, "waiting for the server...")
-          }
-          waitForPortfile(n - 1)
+          buffer.poll(1, TimeUnit.SECONDS)
+          if (n % 10 == 0) console.appendLog(Level.Info, "waiting for the server...")
+          waitForPortfile(limit, n + 1)
         }
       }
-    waitForPortfile(90)
+    val repo = FileTreeRepository.default
+    repo.register(Glob(portfile)) match {
+      case Left(e)  => throw e
+      case Right(o) => o.addObserver(t => if (t.exists) buffer.put(()))
+    }
+    try waitForPortfile(90.seconds.fromNow, 0)
+    finally repo.close()
   }
 
   /** Called on the response for a returning message. */
