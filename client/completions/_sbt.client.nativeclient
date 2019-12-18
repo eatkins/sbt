@@ -1,0 +1,5 @@
+#compdef sbtc sbt.client.nativeclient
+
+COMPLETE="--fish-completions=${words[@]}"
+COMPLETIONS=($(sbt.client.nativeclient ${COMPLETE}))
+_alternative 'arguments:custom arg:($COMPLETIONS)'

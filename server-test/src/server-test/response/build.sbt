@@ -33,8 +33,7 @@ Global / serverHandlers += ServerHandler({ callback =>
         appendExec(Exec("fooCustomFail", Some(r.id), Some(CommandSource(callback.name))))
         jsonRpcRespond("concurrent response", Some(r.id))
         ()
-    },
-    {
+    }, {
       case r if r.method == "foo/customNotification" =>
         jsonRpcRespond("notification result", None)
         ()

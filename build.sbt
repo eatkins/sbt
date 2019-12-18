@@ -4,15 +4,17 @@ import Util._
 import com.typesafe.tools.mima.core.ProblemFilters._
 import com.typesafe.tools.mima.core._
 import local.Scripted
+import java.nio.file.{ Files, Path => JPath }
 
 import scala.util.Try
 
+val isWin = scala.util.Properties.isWin
 ThisBuild / version := {
   val v = "1.4.0-SNAPSHOT"
   nightlyVersion.getOrElse(v)
 }
-ThisBuild / scalafmtOnCompile := !(Global / insideCI).value
-ThisBuild / Test / scalafmtOnCompile := !(Global / insideCI).value
+ThisBuild / scalafmtOnCompile := !(Global / insideCI).value && !isWin
+ThisBuild / Test / scalafmtOnCompile := !(Global / insideCI).value && !isWin
 ThisBuild / turbo := true
 
 // ThisBuild settings take lower precedence,
@@ -77,6 +79,7 @@ def commonBaseSettings: Seq[Setting[_]] = Def.settings(
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-w", "1"),
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2"),
   javacOptions in compile ++= Seq("-Xlint", "-Xlint:-serial"),
+  Compile / doc := file("/dev/null"),
   Compile / doc / scalacOptions ++= {
     import scala.sys.process._
     val devnull = ProcessLogger(_ => ())
@@ -88,16 +91,6 @@ def commonBaseSettings: Seq[Setting[_]] = Def.settings(
       s"https://github.com/sbt/sbt/tree/$tagOrSha€{FILE_PATH}.scala"
     )
   },
-  Compile / javafmtOnCompile := Def
-    .taskDyn(if ((scalafmtOnCompile).value) Compile / javafmt else Def.task(()))
-    .value,
-  Test / javafmtOnCompile := Def
-    .taskDyn(if ((Test / scalafmtOnCompile).value) Test / javafmt else Def.task(()))
-    .value,
-  Compile / unmanagedSources / inputFileStamps :=
-    (Compile / unmanagedSources / inputFileStamps).dependsOn(Compile / javafmtOnCompile).value,
-  Test / unmanagedSources / inputFileStamps :=
-    (Test / unmanagedSources / inputFileStamps).dependsOn(Test / javafmtOnCompile).value,
   crossScalaVersions := Seq(baseScalaVersion),
   bintrayPackage := (bintrayPackage in ThisBuild).value,
   bintrayRepository := (bintrayRepository in ThisBuild).value,
@@ -213,6 +206,8 @@ lazy val sbtRoot: Project = (project in file("."))
       .single("sbtOn")((state, dir) => s"sbtProj/test:runMain sbt.RunFromSourceMain $dir" :: state),
     mimaSettings,
     mimaPreviousArtifacts := Set.empty,
+    genFishExecutable := (sbtClientProj / genFishExecutable).value,
+    genNativeExecutable := (sbtClientProj / genNativeExecutable).value,
   )
 
 // This is used to configure an sbt-launcher for this version of sbt.
@@ -285,7 +280,7 @@ val completeProj = (project in file("internal") / "util-complete")
   .settings(
     testedBaseSettings,
     name := "Completion",
-    libraryDependencies += jline,
+    libraryDependencies += jline2,
     mimaSettings,
     // Parser is used publicly, so we can't break bincompat.
     mimaBinaryIssueFilters := Seq(
@@ -345,7 +340,7 @@ lazy val utilLogging = (project in file("internal") / "util-logging")
     utilCommonSettings,
     name := "Util Logging",
     libraryDependencies ++=
-      Seq(jline, log4jApi, log4jCore, disruptor, sjsonNewScalaJson.value, scalaReflect.value),
+      Seq(jline2, log4jApi, log4jCore, disruptor, sjsonNewScalaJson.value, scalaReflect.value),
     libraryDependencies ++= Seq(scalacheck % "test", scalatest % "test"),
     libraryDependencies ++= (scalaVersion.value match {
       case v if v.startsWith("2.12.") => List(compilerPlugin(silencerPlugin))
@@ -732,7 +727,9 @@ lazy val commandProj = (project in file("main-command"))
       // internal
       exclude[ReversedMissingMethodProblem]("sbt.internal.client.ServerConnection.*"),
       exclude[MissingTypesProblem]("sbt.internal.server.ServerConnection*"),
-      exclude[IncompatibleSignatureProblem]("sbt.internal.server.ServerConnection.*")
+      exclude[IncompatibleSignatureProblem]("sbt.internal.server.ServerConnection.*"),
+      exclude[IncompatibleSignatureProblem]("sbt.internal.ConsoleUnpromptEvent.unapply"),
+      exclude[MissingTypesProblem]("sbt.internal.ConsoleUnpromptEvent$"),
     ),
     unmanagedSources in (Compile, headerCreate) := {
       val old = (unmanagedSources in (Compile, headerCreate)).value
@@ -840,6 +837,7 @@ lazy val zincLmIntegrationProj = (project in file("zinc-lm-integration"))
   )
   .configure(addSbtZincCompileCore, addSbtLmCore, addSbtLmIvyTest)
 
+val makeClientBinary = taskKey[JPath]("Creates a binary for the sbt client")
 // The main integration project for sbt.  It brings all of the projects together, configures them, and provides for overriding conventions.
 lazy val mainProj = (project in file("main"))
   .enablePlugins(ContrabandPlugin)
@@ -874,6 +872,31 @@ lazy val mainProj = (project in file("main"))
     sourceManaged in (Compile, generateContrabands) := baseDirectory.value / "src" / "main" / "contraband-scala",
     testOptions in Test += Tests
       .Argument(TestFrameworks.ScalaCheck, "-minSuccessfulTests", "1000"),
+    makeClientBinary := {
+      val classpath = (Compile / fullClasspath).value.map(_.data)
+      val bin = target.value.toPath / "sbt-client.sh"
+      val script = s"""#!/bin/sh
+        |
+        |cmd=
+        |args=()
+        |for arg in "$$@"; do
+        |  if [[ $$arg == "-console" ]]
+        |    then cmd="sbt"
+        |    else args+="$$arg"
+        |  fi
+        |done
+        |if [[ -z $${cmd} ]]
+        |then
+        |  exec java -cp ${classpath
+                        .mkString(java.io.File.pathSeparator)} sbt.internal.client.SimpleClient $$@
+        |else
+        |  exec $$cmd "$${args[@]}"
+        |fi
+      """.stripMargin
+      Files.write(bin, script.getBytes)
+      bin.toFile.setExecutable(true)
+      bin
+    },
     mimaSettings,
     mimaBinaryIssueFilters ++= Vector(
       // New and changed methods on KeyIndex. internal.
@@ -955,6 +978,10 @@ lazy val mainProj = (project in file("main"))
       exclude[DirectMissingMethodProblem]("sbt.Classpaths.warnInsecureProtocol"),
       exclude[DirectMissingMethodProblem]("sbt.Classpaths.warnInsecureProtocolInModules"),
       exclude[MissingClassProblem]("sbt.internal.ExternalHooks*"),
+      // This seems to be a mima problem. The older constructor still exists but
+      // mima seems to incorrectly miss the secondary constructor that provides
+      // the binary compatible version.
+      exclude[IncompatibleMethTypeProblem]("sbt.internal.server.NetworkChannel.this"),
     )
   )
   .configure(
@@ -1001,6 +1028,7 @@ lazy val serverTestProj = (project in file("server-test"))
     crossScalaVersions := Seq(baseScalaVersion),
     publish / skip := true,
     // make server tests serial
+    Test / watchTriggers += baseDirectory.value.toGlob / "src" / "server-test" / **,
     Test / parallelExecution := false,
     Test / run / connectInput := true,
     Test / run / outputStrategy := Some(StdoutOutput),
@@ -1011,8 +1039,123 @@ lazy val serverTestProj = (project in file("server-test"))
       List(
         s"-Dsbt.server.classpath=$cp",
         s"-Dsbt.server.version=${version.value}",
-        s"-Dsbt.server.scala.version=${scalaVersion.value}"
+        s"-Dsbt.server.scala.version=${scalaVersion.value}",
+        s"-Dsbt.supershell=false",
       )
+    },
+  )
+val generateReflectionConfig = taskKey[Unit]("generate the graalvm reflection config")
+val genExecutable = taskKey[java.nio.file.Path]("generate a java implementation of the thin client")
+val genFishExecutable =
+  taskKey[java.nio.file.Path]("Generate a fish shell java implementation of the thin client")
+val graalClasspath = taskKey[String]("Generate the classpath for graal (compacted for windows)")
+val graalNativeImageCommand = taskKey[String]("The native image command")
+val graalNativeImageOptions = settingKey[Seq[String]]("The native image options")
+val graalNativeImageClass = settingKey[String]("The class for the native image")
+val genNativeExecutable = taskKey[java.nio.file.Path]("Generate a native executable")
+val genUniversalExecutable = taskKey[java.nio.file.Path]("Generate a universal executable")
+def buildGraalExecutable(key: TaskKey[java.nio.file.Path]) = Def.task {
+  val prefix = Seq((key / graalNativeImageCommand).value, "-cp", graalClasspath.value)
+  val full = prefix ++ (key / graalNativeImageOptions).value :+ (key / graalNativeImageClass).value
+  val pb = new java.lang.ProcessBuilder(full: _*)
+  println(full.mkString("\"", "\" \"", "\""))
+  pb.directory(target.value / "graalcp")
+  val proc = pb.start()
+  val thread = new Thread {
+    setDaemon(true)
+    val is = proc.getInputStream
+    val es = proc.getErrorStream
+
+    override def run(): Unit = {
+      Thread.sleep(100)
+      while (proc.isAlive) {
+        if (is.available > 0 || es.available > 0) {
+          while (is.available > 0) System.out.print(is.read.toChar)
+          while (es.available > 0) System.err.print(es.read.toChar)
+        }
+        if (proc.isAlive) Thread.sleep(10)
+      }
+    }
+  }
+  thread.start()
+  proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
+  file("").toPath
+}
+lazy val sbtClientProj = (project in file("client"))
+  .dependsOn(commandProj)
+  .settings(
+    name := "sbt-client",
+    crossPaths := false,
+    exportJars := true,
+    libraryDependencies += jansi,
+    libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
+    libraryDependencies += "net.java.dev.jna" % "jna-platform" % "5.5.0",
+    libraryDependencies += scalatest % "test",
+    /*
+     * On windows, the raw classpath is too large to be a command argument to an
+     * external process so we create symbolic links with short names to get the
+     * classpath length under the limit.
+     */
+    graalClasspath := {
+      val original = (Compile / fullClasspathAsJars).value.map(_.data)
+      val outputDir = target.value / "graalcp"
+      IO.createDirectory(outputDir)
+      Files.walk(outputDir.toPath).forEach {
+        case f if f.getFileName.toString.endsWith(".jar") => Files.deleteIfExists(f)
+        case f                                            => println(f)
+      }
+      original.zipWithIndex
+        .map {
+          case (f, i) =>
+            Files.createSymbolicLink(outputDir.toPath / s"$i.jar", f.toPath)
+            s"$i.jar"
+        }
+        .mkString(java.io.File.pathSeparator)
+    },
+    graalNativeImageOptions := Seq(
+      "-H:IncludeResourceBundles=jline.console.completer.CandidateListCompletionHandler",
+      s"--initialize-at-run-time=sbt.client",
+      "--verbose",
+      "-H:+ReportExceptionStackTraces",
+    ),
+    graalNativeImageCommand := System.getProperty("sbt.native-image", "native-image").toString,
+    genNativeExecutable / graalNativeImageOptions += "--no-fallback",
+    genNativeExecutable / graalNativeImageClass := "sbt.client.NativeClient",
+    genNativeExecutable := buildGraalExecutable(genNativeExecutable).value,
+    genUniversalExecutable / graalNativeImageOptions += "--force-fallback",
+    genUniversalExecutable / graalNativeImageClass := "sbt.client.Client",
+    genUniversalExecutable := buildGraalExecutable(genUniversalExecutable).value,
+    genFishExecutable := {
+      val output = target.value.toPath / "bin" / s"fish-client"
+      java.nio.file.Files.createDirectories(output.getParent)
+      val cp = (Compile / fullClasspathAsJars).value.map(_.data)
+      java.nio.file.Files.write(
+        output,
+        s"""
+        |#!/usr/local/bin/fish
+        |
+        |java -cp ${cp.mkString(java.io.File.pathSeparator)} sbt.client.Client $$argv
+        """.stripMargin.linesIterator.toSeq.tail.mkString("\n").getBytes
+      )
+      output.toFile.setExecutable(true)
+      output
+    },
+    genExecutable := {
+      val ext = if (isWin) ".bat" else ""
+      val output = target.value.toPath / "bin" / s"client$ext"
+      java.nio.file.Files.createDirectories(output.getParent)
+      val cp = (Compile / fullClasspathAsJars).value.map(_.data)
+      val args = if (isWin) "%*" else """$(printf "'%s' " "${myargs[@]}")"""
+      java.nio.file.Files.write(
+        output,
+        s"""
+        |${if (isWin) "@echo off" else "#!/bin/sh"}
+        |
+        |java -cp ${cp.mkString(java.io.File.pathSeparator)} sbt.client.Client $args
+        """.stripMargin.linesIterator.toSeq.tail.mkString("\n").getBytes
+      )
+      output.toFile.setExecutable(true)
+      output
     },
   )
 

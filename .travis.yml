@@ -25,6 +25,15 @@ matrix:
 
 before_install:
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
+  - jabba install adopt@1.8.0-222
+  - export DIR=$(pwd)
+  - git clone --single-branch --branch sbt-terminal-support https://github.com/eatkins/jline2 ~/jline2
+  - git clone --single-branch --branch master https://github.com/sbt/ipcsocket ~/ipcsocket
+  - cd ~/jline2
+  - JAVA_HOME=~/.jabba/jdk/adopt@1.8.0-222 sbt publishLocal
+  - cd ~/ipcsocket
+  - JAVA_HOME=~/.jabba/jdk/adopt@1.8.0-222 sbt publishLocal
+  - cd $DIR
 
 install:
   - $JABBA_HOME/bin/jabba install $TRAVIS_JDK

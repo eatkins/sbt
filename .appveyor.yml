@@ -1,29 +1,209 @@
-image: Visual Studio 2017
 build: off
+
+image:
+  - Visual Studio 2015
+  - Visual Studio 2019
+  - Ubuntu
+  - MacOS
 
 init:
   - git config --global core.autocrlf input
 
-install:
-  - SET JAVA_HOME=C:\Program Files\Java\jdk1.8.0
-  - SET PATH=%JAVA_HOME%\bin;%PATH%
-  - SET CI=true
+for:
+-
+  matrix:
+    only:
+      - image: Ubuntu
 
-  - ps: |
-      Add-Type -AssemblyName System.IO.Compression.FileSystem
-      if (!(Test-Path -Path "C:\sbt" )) {
-        (new-object System.Net.WebClient).DownloadFile(
-          'https://github.com/sbt/sbt/releases/download/v1.0.4/sbt-1.0.4.zip',
-          'C:\sbt-bin.zip'
-        )
-        [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\sbt-bin.zip", "C:\sbt")
-      }
-  - SET PATH=C:\sbt\sbt\bin;%PATH%
-  - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
-test_script:
-  - sbt "scripted actions/* classloader-cache/* nio/* watch/*" "testOnly sbt.ServerSpec"
+  branches:
+    only:
+      - build-graal
+  artifacts:
+  - path: client/target/graalcp/sbt.client.nativeclient
+    name: linux-native-sbt-client
 
-cache:
-  - '%LOCALAPPDATA%\Coursier\Cache\v1'
-  - '%USERPROFILE%\.ivy2\cache'
-  - '%USERPROFILE%\.sbt'
+  install:
+  - curl -sL https://github.com/sbt/sbt/releases/download/v1.3.10/sbt-1.3.10.tgz > ~/sbt-bin.tgz
+  - mkdir ~/sbt
+  - tar -xf ~/sbt-bin.tgz --directory ~/sbt
+  - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
+  - jabba install adopt@1.8.0-222
+  - jabba use adopt@1.8.0-222
+  - curl -sL https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-20.1.0/graalvm-ce-java8-linux-amd64-20.1.0.tar.gz > graalvm.tar.gz 
+  - tar -xf graalvm.tar.gz
+  - export PATH="~/sbt/sbt/bin:$PATH"
+  - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
+  - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
+
+  test_script:
+    - DIR="$(pwd)"
+    - git clone --single-branch --branch sbt-terminal-support https://github.com/eatkins/jline2 ~/jline2
+    - git clone --single-branch --branch master https://github.com/sbt/ipcsocket ~/ipcsocket
+    - export SBT_OPTS="-Xmx1g -Dfile.encoding=UTF8"
+    - cd ~/jline2
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222 publishLocal
+    - cd ~/ipcsocket
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222 publishLocal
+    - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
+    - export PATH="$PATH:$DIR/graalvm-ce-java8-20.1.0/bin"
+    - gu install native-image
+    - cd $DIR
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222 -Dsbt.native-image=$DIR/graalvm-ce-java8-20.1.0/bin/native-image "sbtClientProj/genNativeExecutable"
+
+-
+  matrix:
+    only:
+      - image: MacOS
+
+  branches:
+    only:
+      - build-graal
+  artifacts:
+  - path: client/target/graalcp/sbt.client.nativeclient
+    name: mac-native-sbt-client
+  - path: client/target/graalcp/sbt.client.client
+    name: mac-universal-sbt-client
+
+  install:
+  - curl -sL https://github.com/sbt/sbt/releases/download/v1.3.10/sbt-1.3.10.tgz > ~/sbt-bin.tgz
+  - mkdir ~/sbt
+  - tar -xf ~/sbt-bin.tgz --directory ~/sbt
+  - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
+  - jabba install adopt@1.8.0-222
+  - jabba use adopt@1.8.0-222
+  - curl -sL https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-20.1.0/graalvm-ce-java8-darwin-amd64-20.1.0.tar.gz > graalvm.tar.gz
+  - tar -xf graalvm.tar.gz
+  - export PATH="~/sbt/sbt/bin:$PATH"
+  - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
+  - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
+
+  test_script:
+    - DIR="$(pwd)"
+    - git clone --single-branch --branch sbt-terminal-support https://github.com/eatkins/jline2 ~/jline2
+    - git clone --single-branch --branch master https://github.com/sbt/ipcsocket ~/ipcsocket
+    - export SBT_OPTS="-Xmx1g -Dfile.encoding=UTF8"
+    - cd ~/jline2
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222/Contents/Home publishLocal
+    - cd ~/ipcsocket
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222/Contents/Home publishLocal
+    - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/Contents/Home/bin"
+    - export PATH="$PATH:$DIR/graalvm-ce-java8-20.1.0/Contents/Home/bin"
+    - gu install native-image
+    - cd $DIR
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222/Contents/Home -Dsbt.native-image=$DIR/graalvm-ce-java8-20.1.0/Contents/Home/bin/native-image "sbtClientProj/genNativeExecutable; sbtClientProj/genUniversalExecutable"
+
+-
+  matrix:
+    only:
+      - image: Visual Studio 2015
+  branches:
+    only:
+      - build-graal
+
+  artifacts:
+  - path: client\target\graalcp/sbt.client.nativeclient.exe
+    name: windows-native-sbt-client
+  install:
+    - cinst jdk8 -params 'installdir=C:\\jdk8'
+    - SET CI=true
+      #- choco install windows-sdk-7.1 kb2519277
+    - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+
+    - ps: |
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        if (!(Test-Path -Path "C:\sbt" )) {
+          (new-object System.Net.WebClient).DownloadFile(
+            'https://github.com/sbt/sbt/releases/download/v1.3.10/sbt-1.3.10.zip',
+            'C:\sbt-bin.zip'
+          )
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\sbt-bin.zip", "C:\sbt")
+        }
+        if (!(Test-Path -Path "C:\graalvm-ce-java8-20.2.0-dev" )) {
+          (new-object System.Net.WebClient).DownloadFile(
+            'https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-20.1.0/graalvm-ce-java8-windows-amd64-20.1.0.zip',
+            'C:\graalvm-ce-java8-20.1.0.zip'
+          )
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\graalvm-ce-java8-20.1.0.zip", "C:\")
+        }
+        if (!(Test-Path -Path "C:\zulu-jdk7" )) {
+          (new-object System.Net.WebClient).DownloadFile(
+            'https://cdn.azul.com/zulu/bin/zulu7.38.0.11-ca-jdk7.0.262-win_x64.zip',
+            'C:\zulu-jdk7.zip'
+          )
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\zulu-jdk7.zip", "C:\")
+        }
+    - SET PATH=C:\graalvm-ce-java8-20.1.0\bin;%PATH%
+    - SET PATH=C:\sbt\sbt\bin;%PATH%
+    - SET JAVA_HOME=C:\jdk8
+    - git clone --single-branch --branch sbt-terminal-support https://github.com/eatkins/jline2 C:\jline2
+    - git clone --single-branch --branch master https://github.com/sbt/ipcsocket C:\ipcsocket
+    - cd C:\launcher
+    - SET SBT_OPTS=-XX:MaxPermSize=1g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+    - sbt --java-home C:\zulu7.38.0.11-ca-jdk7.0.262-win_x64 publishLocal
+    - SET SBT_OPTS=-Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+    - SET PATH=C:\jdk8\bin;%PATH%
+    - cd C:\jline2
+    - sbt --java-home %JAVA_HOME% publishLocal
+    - cd C:\ipcsocket
+    - sbt --java-home %JAVA_HOME% publishLocal
+    - gu install native-image
+    - cd %APPVEYOR_BUILD_FOLDER%
+
+  cache:
+    - '%USERPROFILE%\.ivy2\cache'
+    - '%LOCALAPPDATA%\Coursier\Cache\v1'
+    - '%USERPROFILE%\.sbt'
+
+  test_script:
+    - sbt "-Dsbt.native-image=C:\graalvm-ce-java8-20.1.0\bin\native-image.cmd" "sbtClientProj/genNativeExecutable"
+-
+  matrix:
+    only:
+      - image: Visual Studio 2019
+  branches:
+    except:
+      - build-graal
+  install:
+    - cinst jdk8 -params 'installdir=C:\\jdk8'
+    - SET JAVA_HOME=C:\jdk8
+    - SET PATH=C:\jdk8\bin;%PATH%
+    - SET CI=true
+
+    - ps: |
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        if (!(Test-Path -Path "C:\sbt" )) {
+          (new-object System.Net.WebClient).DownloadFile(
+            'https://github.com/sbt/sbt/releases/download/v1.3.10/sbt-1.3.10.zip',
+            'C:\sbt-bin.zip'
+          )
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\sbt-bin.zip", "C:\sbt")
+        }
+
+        if (!(Test-Path -Path "C:\zulu-jdk7" )) {
+          (new-object System.Net.WebClient).DownloadFile(
+            'https://cdn.azul.com/zulu/bin/zulu7.38.0.11-ca-jdk7.0.262-win_x64.zip',
+            'C:\zulu-jdk7.zip'
+          )
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\zulu-jdk7.zip", "C:\")
+        }
+    - SET PATH=C:\sbt\sbt\bin;%PATH%
+    - SET SBT_OPTS=-Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+
+    - git clone --single-branch --branch sbt-terminal-support https://github.com/eatkins/jline2 C:\jline2
+    - git clone --single-branch --branch master https://github.com/sbt/ipcsocket C:\ipcsocket
+    - SET SBT_OPTS=-Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+    - SET PATH=C:\jdk8\bin;%PATH%
+    - cd C:\jline2
+    - sbt --java-home %JAVA_HOME% publishLocal
+    - cd C:\ipcsocket
+    - sbt --java-home %JAVA_HOME% publishLocal
+    - cd %APPVEYOR_BUILD_FOLDER%
+
+  cache:
+    - '%USERPROFILE%\.ivy2\cache'
+    - '%LOCALAPPDATA%\Coursier\Cache\v1'
+    - '%USERPROFILE%\.sbt'
+
+  test_script:
+    - sbt "scripted actions/* classloader-cache/* nio/* watch/*" "testOnly sbt.ServerSpec"
+

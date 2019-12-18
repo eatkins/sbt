@@ -16,6 +16,7 @@ object BasicCommandStrings {
   val Exit: String = "exit"
   val Quit: String = "quit"
   val TemplateCommand: String = "new"
+  private[sbt] val DisconnectNetworkChannel = "__disconnectNetworkChannel"
 
   /** The command name to terminate the program.*/
   val TerminateAction: String = Exit
@@ -203,11 +204,17 @@ $AliasCommand name=
     "Provides an interactive prompt from which commands can be run on a server."
   def DashClient: String = "-client"
   def DashDashClient: String = "--client"
+  def CloseIOStreams: String = "--close-io-streams"
 
   def StashOnFailure: String = "sbtStashOnFailure"
   def PopOnFailure: String = "sbtPopOnFailure"
 
   def FailureWall: String = "resumeFromFailure"
+
+  def SetTerminal = "sbtSetTerminal"
+  def ReportResult = "sbtReportResult"
+  def CompleteExec = "sbtCompleteExec"
+  def MapExec = "sbtMapExec"
 
   def ClearOnFailure: String = "sbtClearOnFailure"
   def OnFailure: String = "onFailure"

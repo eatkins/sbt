@@ -62,12 +62,13 @@ object SessionVar {
     ScopedKey(scope, key.key)
   }
 
-  def read[T](key: ScopedKey[Task[T]], state: State)(implicit f: JsonFormat[T]): Option[T] =
+  def read[T](key: ScopedKey[Task[T]], state: State)(implicit f: JsonFormat[T]): Option[T] = {
     Project.structure(state).streams(state).use(key) { s =>
       try {
         Some(s.getInput(key, DefaultDataID).read[T])
       } catch { case NonFatal(_) => None }
     }
+  }
 
   def load[T](key: ScopedKey[Task[T]], state: State)(implicit f: JsonFormat[T]): Option[T] =
     get(key, state) orElse read(key, state)(f)

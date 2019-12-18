@@ -76,6 +76,7 @@ object SysProp {
   def traces: Boolean = getOrFalse("sbt.traces")
   def client: Boolean = getOrFalse("sbt.client")
   def ci: Boolean = getOrFalse("sbt.ci")
+  def inCI: Boolean = sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI") || ci
   def allowRootDir: Boolean = getOrFalse("sbt.rootdir")
   def legacyTestReport: Boolean = getOrFalse("sbt.testing.legacyreport")
   def semanticdb: Boolean = getOrFalse("sbt.semanticdb")
