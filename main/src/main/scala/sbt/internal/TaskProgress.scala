@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger, AtomicReferen
 import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
 
 import sbt.internal.util._
-import sbt.util.Level
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -20,27 +19,29 @@ import scala.concurrent.duration._
 /**
  * implements task progress display on the shell.
  */
-private[sbt] final class TaskProgress(log: ManagedLogger)
+private[sbt] final class TaskProgress
     extends AbstractTaskExecuteProgress
     with ExecuteProgress[Task] {
+  @deprecated("Use the constructor taking an ExecID.", "1.4.0")
+  def this(log: ManagedLogger) = this()
   private[this] val lastTaskCount = new AtomicInteger(0)
   private[this] val currentProgressThread = new AtomicReference[Option[ProgressThread]](None)
   private[this] val sleepDuration = SysProp.supershellSleep.millis
   private[this] val threshold = 10.millis
+  private[this] val tasks = new LinkedBlockingQueue[Task[_]]
   private[this] final class ProgressThread
       extends Thread("task-progress-report-thread")
       with AutoCloseable {
     private[this] val isClosed = new AtomicBoolean(false)
     private[this] val firstTime = new AtomicBoolean(true)
-    private[this] val tasks = new LinkedBlockingQueue[Task[_]]
     setDaemon(true)
     start()
     @tailrec override def run(): Unit = {
       if (!isClosed.get()) {
         try {
-          report()
+          if (activeExceedingThreshold.nonEmpty) report()
           val duration =
-            if (firstTime.compareAndSet(true, activeExceedingThreshold.nonEmpty)) threshold
+            if (firstTime.compareAndSet(true, activeExceedingThreshold.isEmpty)) threshold
             else sleepDuration
           val limit = duration.fromNow
           while (Deadline.now < limit) {
@@ -55,6 +56,7 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
             isClosed.set(true)
             // One last report after close in case the last one hadn't gone through yet.
             report()
+
         }
         run()
       }
@@ -65,21 +67,22 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
     override def close(): Unit = {
       isClosed.set(true)
       interrupt()
+      report()
+      appendProgress(ProgressEvent("Info", Vector(), None, None, None))
+      ()
     }
   }
 
   override def initial(): Unit = ()
 
   override def beforeWork(task: Task[_]): Unit = {
+    maybeStartThread()
     super.beforeWork(task)
-    currentProgressThread.get match {
-      case Some(t) => t.addTask(task)
-      case _       => maybeStartThread()
-    }
+    tasks.put(task)
   }
-  override def afterReady(task: Task[_]): Unit = ()
+  override def afterReady(task: Task[_]): Unit = maybeStartThread()
 
-  override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = ()
+  override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = maybeStartThread()
 
   override def stop(): Unit = currentProgressThread.synchronized {
     currentProgressThread.getAndSet(None).foreach(_.close())
@@ -113,10 +116,8 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
       case _ =>
     }
   }
-  private[this] def appendProgress(event: ProgressEvent): Unit = {
-    import sbt.internal.util.codec.JsonProtocol._
-    log.logEvent(Level.Info, event)
-  }
+  private[this] def appendProgress(event: ProgressEvent): Unit =
+    StandardMain.exchange.updateProgress(event)
   private[this] def active: Vector[Task[_]] = activeTasks.toVector.filterNot(Def.isDummy)
   private[this] def activeExceedingThreshold: Vector[(Task[_], Long)] = active.flatMap { task =>
     val elapsed = timings.get(task).currentElapsedMicros
@@ -133,18 +134,13 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
         .sortBy(_.elapsedMicros),
       Some(ltc),
       None,
-      None
+      None,
+      None,
+      Some(containsSkipTasks(active))
     )
     if (active.nonEmpty) maybeStartThread()
-    if (containsSkipTasks(active)) {
-      if (ltc > 0) {
-        lastTaskCount.set(0)
-        appendProgress(event(Vector.empty))
-      }
-    } else {
-      lastTaskCount.set(currentTasksCount)
-      appendProgress(event(currentTasks))
-    }
+    lastTaskCount.set(currentTasksCount)
+    appendProgress(event(currentTasks))
   }
 
   private[this] def containsSkipTasks(tasks: Vector[Task[_]]): Boolean = {

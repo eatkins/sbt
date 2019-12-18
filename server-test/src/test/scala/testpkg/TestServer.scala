@@ -8,6 +8,7 @@
 package testpkg
 
 import java.io.{ File, IOException }
+import java.nio.file.Path
 import java.util.concurrent.TimeoutException
 
 import verify._
@@ -16,15 +17,22 @@ import sbt.io.IO
 import sbt.io.syntax._
 import sbt.protocol.ClientSocket
 
+import scala.annotation.tailrec
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{ Success, Try }
+import sjsonnew.support.scalajson.unsafe.Parser
+import sjsonnew.shaded.scalajson.ast.unsafe.JObject
+import sbt.protocol.TerminalPropertiesResponse
+import sbt.protocol.Serialization
+import sjsonnew.support.scalajson.unsafe.Converter
 
 trait AbstractServerTest extends TestSuite[Unit] {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   private var temp: File = _
   var svr: TestServer = _
   def testDirectory: String
+  def testPath: Path = temp.toPath.resolve(testDirectory)
 
   private val targetDir: File = {
     val p0 = new File("..").getAbsoluteFile.getCanonicalFile / "target"
@@ -186,6 +194,7 @@ case class TestServer(
         hostLog("waiting for the server...")
         nextLog = 10.seconds.fromNow
       }
+      Thread.sleep(10)
     }
     if (deadline.isOverdue) sys.error(s"Timeout. $portfile is not found.")
     if (!process.isAlive) sys.error(s"Server unexpectedly terminated.")
@@ -221,8 +230,25 @@ case class TestServer(
   def bye(): Unit = {
     hostLog("sending exit")
     sendJsonRpc(
-      """{ "jsonrpc": "2.0", "id": 9, "method": "sbt/exec", "params": { "commandLine": "exit" } }"""
+      """{ "jsonrpc": "2.0", "id": 9, "method": "sbt/exec", "params": { "commandLine": "shutdown" } }"""
     )
+    /*
+     *sendJsonRpc(
+     *  """{ "jsonrpc": "2.0", "id": 10, "method": "sbt/exec", "params": { "commandLine": "shutdown" } }"""
+     *)
+     *sendJsonRpc(
+     *  """{ "jsonrpc": "2.0", "id": 1000, "method": "sbt/exec", "params": { "commandLine": "shutdown" } }"""
+     *)
+     *sendJsonRpc(
+     *  """{ "jsonrpc": "2.0", "id": 1001, "method": "sbt/exec", "params": { "commandLine": "shutdown" } }"""
+     *)
+     *sendJsonRpc(
+     *  """{ "jsonrpc": "2.0", "id": 1002, "method": "sbt/exec", "params": { "commandLine": "shutdown" } }"""
+     *)
+     *sendJsonRpc(
+     *  """{ "jsonrpc": "2.0", "id": 1003, "method": "sbt/exec", "params": { "commandLine": "shutdown" } }"""
+     *)
+     */
     val deadline = 10.seconds.fromNow
     while (!deadline.isOverdue && process.isAlive) {
       Thread.sleep(10)
@@ -266,28 +292,60 @@ case class TestServer(
 
   final def waitForString(duration: FiniteDuration)(f: String => Boolean): Boolean = {
     val deadline = duration.fromNow
-    def impl(): Boolean = {
-      try {
-        Await.result(readFrame, deadline.timeLeft).fold(false)(f) || impl
+    @tailrec def impl(): Boolean = {
+      val res = try {
+        Await.result(readFrame, deadline.timeLeft).fold(false) { s =>
+          if (s.contains(Serialization.terminalPropertiesQuery)) sendEmptyTerminalResponse(s)
+          else f(s)
+        }
       } catch {
         case _: TimeoutException =>
           resetConnection() // create a new connection to invalidate the running readFrame future
           false
       }
+      if (!res) impl() else !deadline.isOverdue()
     }
     impl()
   }
 
+  private def sendEmptyTerminalResponse(request: String): Boolean = {
+    Parser.parseFromString(request).foreach {
+      case JObject(fields) =>
+        fields.find(_.field == "params").foreach { uuid =>
+          val response = TerminalPropertiesResponse.apply(
+            width = 0,
+            height = 0,
+            isAnsiSupported = false,
+            isColorEnabled = false,
+            isSupershellEnabled = false,
+            isEchoEnabled = false
+          )
+          val s = new String(Serialization.serializeEventMessage(response))
+          import sjsonnew.BasicJsonProtocol._
+          Converter.fromJson[String](uuid.value).foreach { id =>
+            val method = Serialization.terminalPropertiesResponse
+            val msg =
+              s"""{ "jsonrpc": "2.0", "id": "$id", "method": "$method", "params": $s }"""
+            sendJsonRpc(msg)
+          }
+        }
+      case _ =>
+    }
+    false
+  }
+
   final def neverReceive(duration: FiniteDuration)(f: String => Boolean): Boolean = {
     val deadline = duration.fromNow
+    @tailrec
     def impl(): Boolean = {
-      try {
-        Await.result(readFrame, deadline.timeLeft).fold(true)(s => !f(s)) && impl
+      val res = try {
+        Await.result(readFrame, deadline.timeLeft).fold(true)(s => !f(s))
       } catch {
         case _: TimeoutException =>
           resetConnection() // create a new connection to invalidate the running readFrame future
           true
       }
+      if (res && !deadline.isOverdue) impl else res || !deadline.isOverdue
     }
     impl()
   }

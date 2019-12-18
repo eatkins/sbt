@@ -69,14 +69,41 @@ object MainAppender {
       Int.MaxValue
     )
 
-  def defaultScreen(console: ConsoleOut): Appender =
+  def defaultScreen(console: ConsoleOut): Appender = {
     ConsoleAppender(ConsoleAppender.generateName, console)
+  }
 
   def defaultScreen(
       console: ConsoleOut,
       suppressedMessage: SuppressedTraceContext => Option[String]
+  ): Appender = {
+    ConsoleAppender(
+      ConsoleAppender.generateName,
+      Terminal.get,
+      suppressedMessage = suppressedMessage
+    )
+  }
+
+  def defaultScreen(terminal: Terminal): Appender =
+    ConsoleAppender(
+      ConsoleAppender.generateName,
+      ConsoleOut.printStreamOut(terminal.printStream),
+      terminal.isAnsiSupported,
+      terminal.isColorEnabled,
+      suppressedMessage = _ => None
+    )
+  def defaultScreen(
+      console: ConsoleOut,
+      ansiCodesSupported: Boolean,
+      useFormat: Boolean
   ): Appender =
-    ConsoleAppender(ConsoleAppender.generateName, console, suppressedMessage = suppressedMessage)
+    ConsoleAppender(
+      ConsoleAppender.generateName,
+      console,
+      ansiCodesSupported = ansiCodesSupported,
+      useFormat = useFormat,
+      suppressedMessage = _ => None
+    )
 
   def defaultScreen(
       name: String,
@@ -88,8 +115,9 @@ object MainAppender {
   def defaultBacked: PrintWriter => Appender =
     defaultBacked(generateGlobalBackingName, ConsoleAppender.formatEnabledInEnv)
 
-  def defaultBacked(loggerName: String): PrintWriter => Appender =
+  def defaultBacked(loggerName: String): PrintWriter => Appender = {
     defaultBacked(loggerName, ConsoleAppender.formatEnabledInEnv)
+  }
 
   def defaultBacked(useFormat: Boolean): PrintWriter => Appender =
     defaultBacked(generateGlobalBackingName, useFormat)

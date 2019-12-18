@@ -24,6 +24,15 @@ import sbt.internal.protocol.{
 
 object Serialization {
   private[sbt] val VsCode = "application/vscode-jsonrpc; charset=utf-8"
+  val systemIn = "sbt/systemIn"
+  val systemOut = "sbt/systemOut"
+  val terminalPropertiesQuery = "sbt/terminalPropertiesQuery"
+  val terminalPropertiesResponse = "sbt/terminalPropertiesResponse"
+  val terminalCapabilities = "sbt/terminalCapabilities"
+  val terminalCapabilitiesResponse = "sbt/terminalCapabilitiesResponse"
+  val attach = "sbt/attach"
+  val attachResponse = "sbt/attachResponse"
+  val cancelRequest = "sbt/cancelRequest"
 
   @deprecated("unused", since = "1.4.0")
   def serializeEvent[A: JsonFormat](event: A): Array[Byte] = {
@@ -44,12 +53,13 @@ object Serialization {
     command match {
       case x: InitCommand =>
         val execId = x.execId.getOrElse(UUID.randomUUID.toString)
+        val analysis = s""""skipAnalysis" : ${x.skipAnalysis.getOrElse(false)}"""
         val opt = x.token match {
           case Some(t) =>
             val json: JValue = Converter.toJson[String](t).get
             val v = CompactPrinter(json)
-            s"""{ "token": $v }"""
-          case None => "{}"
+            s"""{ "token": $v, $analysis }"""
+          case None => s"{ $analysis }"
         }
         s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "initialize", "params": { "initializationOptions": $opt } }"""
       case x: ExecCommand =>
@@ -62,6 +72,13 @@ object Serialization {
         val json: JValue = Converter.toJson[String](x.setting).get
         val v = CompactPrinter(json)
         s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "sbt/setting", "params": { "setting": $v } }"""
+
+      case x: Attach =>
+        val execId = UUID.randomUUID.toString
+        val json: JValue = Converter.toJson[Boolean](x.interactive).get
+        val v = CompactPrinter(json)
+        s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "$attach", "params": { "interactive": $v } }"""
+
     }
   }
 

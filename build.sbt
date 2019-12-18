@@ -735,7 +735,9 @@ lazy val commandProj = (project in file("main-command"))
       // internal
       exclude[ReversedMissingMethodProblem]("sbt.internal.client.ServerConnection.*"),
       exclude[MissingTypesProblem]("sbt.internal.server.ServerConnection*"),
-      exclude[IncompatibleSignatureProblem]("sbt.internal.server.ServerConnection.*")
+      exclude[IncompatibleSignatureProblem]("sbt.internal.server.ServerConnection.*"),
+      exclude[IncompatibleSignatureProblem]("sbt.internal.ConsoleUnpromptEvent.unapply"),
+      exclude[MissingTypesProblem]("sbt.internal.ConsoleUnpromptEvent$"),
     ),
     unmanagedSources in (Compile, headerCreate) := {
       val old = (unmanagedSources in (Compile, headerCreate)).value
@@ -958,6 +960,10 @@ lazy val mainProj = (project in file("main"))
       exclude[DirectMissingMethodProblem]("sbt.Classpaths.warnInsecureProtocol"),
       exclude[DirectMissingMethodProblem]("sbt.Classpaths.warnInsecureProtocolInModules"),
       exclude[MissingClassProblem]("sbt.internal.ExternalHooks*"),
+      // This seems to be a mima problem. The older constructor still exists but
+      // mima seems to incorrectly miss the secondary constructor that provides
+      // the binary compatible version.
+      exclude[IncompatibleMethTypeProblem]("sbt.internal.server.NetworkChannel.this"),
     )
   )
   .configure(

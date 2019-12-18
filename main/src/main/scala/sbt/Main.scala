@@ -9,11 +9,13 @@ package sbt
 
 import java.io.{ File, IOException }
 import java.net.URI
+import java.nio.channels.ClosedChannelException
 import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
 import java.util.Properties
 import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.atomic.AtomicBoolean
 
-import sbt.BasicCommandStrings.{ Shell, TemplateCommand }
+import sbt.BasicCommandStrings.{ SetTerminal, Shell, TemplateCommand }
 import sbt.Project.LoadAction
 import sbt.compiler.EvalImports
 import sbt.internal.Aggregation.AnyKeys
@@ -22,6 +24,7 @@ import sbt.internal._
 import sbt.internal.client.BspClient
 import sbt.internal.inc.ScalaInstance
 import sbt.internal.nio.CheckBuildSources
+import sbt.internal.server.NetworkChannel
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ Parser, SizeParser }
@@ -32,7 +35,9 @@ import xsbti.compile.CompilerCache
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
+import sbt.internal.io.Retry
 
 /** This class is the entry point for sbt. */
 final class xMain extends xsbti.AppMain {
@@ -62,11 +67,14 @@ private[sbt] object xMain {
             NetworkClient.run(configuration, args)
             Exit(0)
           } else {
-            val state = StandardMain.initialState(
-              configuration,
-              Seq(defaults, early),
-              runEarly(DefaultsCommand) :: runEarly(InitCommand) :: BootCommand :: Nil
-            )
+            val closeStreams = userCommands.exists(_ == BasicCommandStrings.CloseIOStreams)
+            val state = StandardMain
+              .initialState(
+                configuration,
+                Seq(defaults, early),
+                runEarly(DefaultsCommand) :: runEarly(InitCommand) :: BootCommand :: Nil
+              )
+              .put(BasicKeys.closeIOStreams, closeStreams)
             StandardMain.runManaged(state)
           }
         }
@@ -128,30 +136,40 @@ object StandardMain {
     pool.foreach(_.shutdownNow())
   }
 
+  private[this] val isShutdown = new AtomicBoolean(false)
   def runManaged(s: State): xsbti.MainResult = {
     val previous = TrapExit.installManager()
     try {
       val hook = ShutdownHooks.add(closeRunnable)
       try {
         MainLoop.runLogged(s)
+      } catch {
+        case _: InterruptedException if isShutdown.get =>
+          new xsbti.Exit { override def code(): Int = 0 }
       } finally {
         try DefaultBackgroundJobService.shutdown()
         finally hook.close()
         ()
       }
-    } finally TrapExit.uninstallManager(previous)
+    } finally {
+      TrapExit.uninstallManager(previous)
+    }
   }
 
   /** The common interface to standard output, used for all built-in ConsoleLoggers. */
-  val console: ConsoleOut =
-    ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
+  val console: ConsoleOut = ConsoleOut.systemOut
+  //ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
+  ConsoleOut.setGlobalProxy(console)
 
   private[this] def initialGlobalLogging(file: Option[File]): GlobalLogging = {
-    file.foreach(f => if (!f.exists()) IO.createDirectory(f))
+    def createTemp(attempt: Int = 0): File = Retry {
+      file.foreach(f => if (!f.exists()) IO.createDirectory(f))
+      File.createTempFile("sbt-global-log", ".log", file.orNull)
+    }
     GlobalLogging.initial(
-      MainAppender.globalDefault(console),
-      File.createTempFile("sbt-global-log", ".log", file.orNull),
-      console
+      MainAppender.globalDefault(ConsoleOut.globalProxy),
+      createTemp(),
+      ConsoleOut.globalProxy
     )
   }
   def initialGlobalLogging(file: File): GlobalLogging = initialGlobalLogging(Option(file))
@@ -167,7 +185,8 @@ object StandardMain {
     sys.props.put("jna.nosys", "true")
 
     import BasicCommandStrings.isEarlyCommand
-    val userCommands = configuration.arguments.map(_.trim)
+    val userCommands =
+      configuration.arguments.map(_.trim).filterNot(_ == BasicCommandStrings.CloseIOStreams)
     val (earlyCommands, normalCommands) = (preCommands ++ userCommands).partition(isEarlyCommand)
     val commands = (earlyCommands ++ normalCommands).toList map { x =>
       Exec(x, None)
@@ -248,6 +267,8 @@ object BuiltinCommands {
       act,
       continuous,
       clearCaches,
+      NetworkChannel.disconnect,
+      setTerminalCommand,
     ) ++ allBasicCommands
 
   def DefaultBootCommands: Seq[String] =
@@ -770,12 +791,11 @@ object BuiltinCommands {
   @tailrec
   private[this] def doLoadFailed(s: State, loadArg: String): State = {
     s.log.warn("Project loading failed: (r)etry, (q)uit, (l)ast, or (i)gnore? (default: r)")
-    val result = Terminal.withRawSystemIn {
-      Terminal.withEcho(toggle = true)(Terminal.wrappedSystemIn.read() match {
-        case -1 => 'q'.toInt
-        case b  => b
-      })
-    }
+    val terminal = Terminal.get
+    val result = try terminal.withRawSystemIn(terminal.inputStream.read) match {
+      case -1 => 'q'.toInt
+      case b  => b
+    } catch { case _: ClosedChannelException => 'q' }
     def retry: State = loadProjectCommand(LoadProject, loadArg) :: s.clearGlobalLog
     def ignoreMsg: String =
       if (Project.isProjectLoaded(s)) "using previously loaded project" else "no project loaded"
@@ -899,6 +919,22 @@ object BuiltinCommands {
     Command.command(ClearCaches, help)(f)
   }
 
+  def setTerminalCommand = Command.arb(_ => BasicCommands.reportParser(SetTerminal)) {
+    (s, channel) =>
+      StandardMain.exchange.channelForName(channel).foreach(c => Terminal.set(c.terminal))
+      s
+  }
+
+  private def getExec(state: State, interval: Duration): Exec = {
+    val exec: Exec =
+      StandardMain.exchange.blockUntilNextExec(interval, Some(state), state.globalLogging.full)
+    if (exec.source.fold(true)(_.channelName != "console0") && !exec.commandLine
+          .startsWith(BasicCommands.networkExecPrefix)) {
+      Terminal.consoleLog(s"received remote command: ${exec.commandLine}")
+    }
+    exec
+  }
+
   def shell: Command = Command.command(Shell, Help.more(Shell, ShellDetailed)) { s0 =>
     import sbt.internal.ConsolePromptEvent
     val exchange = StandardMain.exchange
@@ -909,18 +945,17 @@ object BuiltinCommands {
       .extract(s1)
       .getOpt(Keys.minForcegcInterval)
       .getOrElse(GCUtil.defaultMinForcegcInterval)
-    val exec: Exec = exchange.blockUntilNextExec(minGCInterval, s1.globalLogging.full)
-    if (exec.source.fold(true)(_.channelName != "console0")) {
-      s1.log.info(s"received remote command: ${exec.commandLine}")
-    }
+    val exec: Exec = getExec(s1, minGCInterval)
     val newState = s1
       .copy(
         onFailure = Some(Exec(Shell, None)),
         remainingCommands = exec +: Exec(Shell, None) +: s1.remainingCommands
       )
       .setInteractive(true)
-    if (exec.commandLine.trim.isEmpty) newState
-    else newState.clearGlobalLog
+    val res =
+      if (exec.commandLine.trim.isEmpty) newState
+      else newState.clearGlobalLog
+    res
   }
 
   def startServer: Command =

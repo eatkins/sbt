@@ -140,55 +140,52 @@ object BuildServerProtocol {
   )
 
   def handler(sbtVersion: String): ServerHandler = ServerHandler { callback =>
-    ServerIntent(
-      {
-        case r: JsonRpcRequestMessage if r.method == "build/initialize" =>
-          val _ = Converter.fromJson[InitializeBuildParams](json(r)).get
-          val response = InitializeBuildResult(
-            "sbt",
-            sbtVersion,
-            BuildServerConnection.bspVersion,
-            capabilities,
-            None
-          )
-          callback.jsonRpcRespond(response, Some(r.id)); ()
+    ServerIntent.request {
+      case r: JsonRpcRequestMessage if r.method == "build/initialize" =>
+        val _ = Converter.fromJson[InitializeBuildParams](json(r)).get
+        val response = InitializeBuildResult(
+          "sbt",
+          sbtVersion,
+          BuildServerConnection.bspVersion,
+          capabilities,
+          None
+        )
+        callback.jsonRpcRespond(response, Some(r.id)); ()
 
-        case r: JsonRpcRequestMessage if r.method == "workspace/buildTargets" =>
-          val _ = callback.appendExec(Keys.bspWorkspaceBuildTargets.key.toString, Some(r.id))
+      case r: JsonRpcRequestMessage if r.method == "workspace/buildTargets" =>
+        val _ = callback.appendExec(Keys.bspWorkspaceBuildTargets.key.toString, Some(r.id))
 
-        case r: JsonRpcRequestMessage if r.method == "build/shutdown" =>
-          ()
+      case r: JsonRpcRequestMessage if r.method == "build/shutdown" =>
+        ()
 
-        case r: JsonRpcRequestMessage if r.method == "build/exit" =>
-          val _ = callback.appendExec("shutdown", Some(r.id))
+      case r: JsonRpcRequestMessage if r.method == "build/exit" =>
+        val _ = callback.appendExec("shutdown", Some(r.id))
 
-        case r: JsonRpcRequestMessage if r.method == "buildTarget/sources" =>
-          val param = Converter.fromJson[SourcesParams](json(r)).get
-          val targets = param.targets.map(_.uri).mkString(" ")
-          val command = Keys.bspBuildTargetSources.key
-          val _ = callback.appendExec(s"$command $targets", Some(r.id))
+      case r: JsonRpcRequestMessage if r.method == "buildTarget/sources" =>
+        val param = Converter.fromJson[SourcesParams](json(r)).get
+        val targets = param.targets.map(_.uri).mkString(" ")
+        val command = Keys.bspBuildTargetSources.key
+        val _ = callback.appendExec(s"$command $targets", Some(r.id))
 
-        case r if r.method == "buildTarget/dependencySources" =>
-          val param = Converter.fromJson[DependencySourcesParams](json(r)).get
-          val targets = param.targets.map(_.uri).mkString(" ")
-          val command = Keys.bspBuildTargetDependencySources.key
-          val _ = callback.appendExec(s"$command $targets", Some(r.id))
+      case r if r.method == "buildTarget/dependencySources" =>
+        val param = Converter.fromJson[DependencySourcesParams](json(r)).get
+        val targets = param.targets.map(_.uri).mkString(" ")
+        val command = Keys.bspBuildTargetDependencySources.key
+        val _ = callback.appendExec(s"$command $targets", Some(r.id))
 
-        case r if r.method == "buildTarget/compile" =>
-          val param = Converter.fromJson[CompileParams](json(r)).get
-          callback.log.info(param.toString)
-          val targets = param.targets.map(_.uri).mkString(" ")
-          val command = Keys.bspBuildTargetCompile.key
-          val _ = callback.appendExec(s"$command $targets", Some(r.id))
+      case r if r.method == "buildTarget/compile" =>
+        val param = Converter.fromJson[CompileParams](json(r)).get
+        callback.log.info(param.toString)
+        val targets = param.targets.map(_.uri).mkString(" ")
+        val command = Keys.bspBuildTargetCompile.key
+        val _ = callback.appendExec(s"$command $targets", Some(r.id))
 
-        case r: JsonRpcRequestMessage if r.method == "buildTarget/scalacOptions" =>
-          val param = Converter.fromJson[ScalacOptionsParams](json(r)).get
-          val targets = param.targets.map(_.uri).mkString(" ")
-          val command = Keys.bspBuildTargetScalacOptions.key
-          val _ = callback.appendExec(s"$command $targets", Some(r.id))
-      },
-      PartialFunction.empty
-    )
+      case r: JsonRpcRequestMessage if r.method == "buildTarget/scalacOptions" =>
+        val param = Converter.fromJson[ScalacOptionsParams](json(r)).get
+        val targets = param.targets.map(_.uri).mkString(" ")
+        val command = Keys.bspBuildTargetScalacOptions.key
+        val _ = callback.appendExec(s"$command $targets", Some(r.id))
+    }
   }
 
   private def json(r: JsonRpcRequestMessage): JValue =

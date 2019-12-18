@@ -110,6 +110,9 @@ object Keys {
   val watchPersistFileStamps = settingKey[Boolean](
     "Toggles whether or not the continuous build will reuse the file stamps computed in previous runs. Setting this to true decrease watch startup latency but could cause inconsistent results if many source files are concurrently modified."
   ).withRank(DSetting)
+  val watchPollSystemIn = settingKey[Boolean](
+    "Toggles whether or not sbt polls System.in or performs a blocking read while monitoring for input. Set to true if the calling task uses System.in itself."
+  )
   val watchStartMessage = settingKey[(Int, ProjectRef, Seq[String]) => Option[String]](
     "The message to show when triggered execution waits for sources to change. The parameters are the current watch iteration count, the current project name and the tasks that are being run with each build."
   ).withRank(DSetting)
@@ -141,6 +144,12 @@ object Keys {
     "Provides a view into the file system that may or may not cache the tree in memory",
     Int.MaxValue
   )
+  private[sbt] val stashedGlobalFileTreeRepository =
+    AttributeKey[FileTreeRepository[FileAttributes]](
+      "stashed-global-file-tree-repository",
+      "Provides a view into the file system that may or may not cache the tree in memory",
+      Int.MaxValue
+    )
   private[sbt] val dynamicDependency = settingKey[Unit](
     "Leaves a breadcrumb that the scoped task is evaluated inside of a dynamic task"
   ).withRank(Invisible)
