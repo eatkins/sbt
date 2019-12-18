@@ -134,6 +134,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
         onReturningReponse(msg)
         lock.synchronized {
           pendingExecIds -= execId
+          lock.notifyAll()
         }
         ()
       case _ =>
@@ -216,32 +217,32 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   def batchExecute(userCommands: List[String]): Unit = {
     userCommands foreach { cmd =>
       println("> " + cmd)
-      val execId =
-        if (cmd == "shutdown") sendExecCommand("exit")
-        else sendExecCommand(cmd)
-      while (pendingExecIds contains execId) {
-        Thread.sleep(100)
-      }
+      if (cmd == "shutdown") sendAndWait("exit", Some(100.millis.fromNow))
+      else sendAndWait(cmd, None)
     }
   }
 
+  private def sendAndWait(cmd: String, limit: Option[Deadline]): Unit = {
+    val execId = sendExecCommand(cmd)
+    while (pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
+      limit match {
+        case None    => lock.synchronized(lock.wait())
+        case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
+      }
+    }
+  }
   def shell(): Unit = {
     val reader = LineReader.simple(None, LineReader.HandleCONT, injectThreadSleep = true)
     while (running.get) {
       reader.readLine("> ", None) match {
         case Some("shutdown") =>
           // `sbt -client shutdown` shuts down the server
-          sendExecCommand("exit")
-          Thread.sleep(100)
+          sendAndWait("exit", Some(100.millis.fromNow))
           running.set(false)
         case Some("exit") =>
           running.set(false)
-        case Some(s) if s.trim.nonEmpty =>
-          val execId = sendExecCommand(s)
-          while (pendingExecIds contains execId) {
-            Thread.sleep(100)
-          }
-        case _ => //
+        case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
+        case _                          => //
       }
     }
   }
