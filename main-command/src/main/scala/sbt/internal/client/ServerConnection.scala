@@ -49,13 +49,16 @@ abstract class ServerConnection(connection: Socket) {
             }
           } while (!break)
           val len = new String(numberBuffer, 0, index).toInt
-          @tailrec def drainLine(): Unit = in.read match {
-            case -1 => throw new ClosedChannelException
-            case 10 =>
-            case _  => drainLine()
+          @tailrec def drainHeaders(state: Int): Unit = in.read match {
+            case -1               => throw new ClosedChannelException
+            case 13 if state == 2 => drainHeaders(state = 3)
+            case 13               => drainHeaders(state = 1)
+            case 10 if state == 1 => drainHeaders(state = 2)
+            case 10 if state == 3 =>
+            case 10               => drainHeaders(state = 0)
+            case _                => drainHeaders(state = 0)
           }
-          drainLine()
-          drainLine()
+          drainHeaders(0)
           val readBuffer = new Array[Byte](len)
           @tailrec def fillBuffer(offset: Int): Unit =
             in.read(readBuffer, offset, len - offset) match {
