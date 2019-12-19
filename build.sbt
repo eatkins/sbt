@@ -11,8 +11,8 @@ ThisBuild / version := {
   val v = "1.4.0-SNAPSHOT"
   nightlyVersion.getOrElse(v)
 }
-ThisBuild / scalafmtOnCompile := !(Global / insideCI).value
-ThisBuild / Test / scalafmtOnCompile := !(Global / insideCI).value
+ThisBuild / scalafmtOnCompile := false
+ThisBuild / Test / scalafmtOnCompile := false
 ThisBuild / turbo := true
 
 // ThisBuild settings take lower precedence,
