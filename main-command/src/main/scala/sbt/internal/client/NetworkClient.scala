@@ -231,7 +231,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
 
   private def sendAndWait(cmd: String, limit: Option[Deadline]): Unit = {
     val execId = sendExecCommand(cmd)
-    while (pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
+    while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
       limit match {
         case None    => lock.synchronized(lock.wait())
         case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
@@ -267,13 +267,13 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     try {
       val s = Serialization.serializeCommandAsJsonMessage(command)
       connection.sendString(s)
+      lock.synchronized {
+        status.set("Processing")
+      }
     } catch {
-      case _: IOException =>
-      // log.debug(e.getMessage)
-      // toDel += client
-    }
-    lock.synchronized {
-      status.set("Processing")
+      case e: IOException =>
+        System.err.println(s"Caught exception writing command to server: $e")
+        running.set(false)
     }
   }
 }
