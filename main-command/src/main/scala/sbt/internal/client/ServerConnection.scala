@@ -9,10 +9,14 @@ package sbt
 package internal
 package client
 
-import java.net.{ SocketTimeoutException, Socket }
+import java.net.{ Socket, SocketTimeoutException }
+import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicBoolean
+
 import sbt.protocol._
 import sbt.internal.protocol._
+
+import scala.annotation.tailrec
 
 abstract class ServerConnection(connection: Socket) {
 
@@ -25,49 +29,41 @@ abstract class ServerConnection(connection: Socket) {
   val thread = new Thread(s"sbt-serverconnection-${connection.getPort}") {
     override def run(): Unit = {
       try {
-        val readBuffer = new Array[Byte](4096)
         val in = connection.getInputStream
         connection.setSoTimeout(5000)
-        var buffer: Vector[Byte] = Vector.empty
-        def readFrame: Vector[Byte] = {
-          def getContentLength: Int = {
-            readLine.drop(16).toInt
-          }
-          val l = getContentLength
-          readLine
-          readLine
-          readContentLength(l)
-        }
-
-        def readLine: String = {
-          if (buffer.isEmpty) {
-            val bytesRead = in.read(readBuffer)
-            if (bytesRead > 0) {
-              buffer = buffer ++ readBuffer.toVector.take(bytesRead)
+        def readFrame: Array[Byte] = {
+          // 'Content-Length: ' has 16 characters
+          (0 until 16).foreach(_ => in.read())
+          var break = false
+          // the content length should be less than 16 digits
+          val numberBuffer = new Array[Byte](16)
+          var index = 0
+          do {
+            in.read match {
+              case -1 => throw new ClosedChannelException
+              case 13 =>
+              case 10 => break = true
+              case i =>
+                numberBuffer(index) = i.toByte
+                index += 1
             }
+          } while (!break)
+          val len = new String(numberBuffer, 0, index).toInt
+          @tailrec def drainLine(): Unit = in.read match {
+            case -1 => throw new ClosedChannelException
+            case 10 =>
+            case _  => drainLine()
           }
-          val delimPos = buffer.indexOf(delimiter)
-          if (delimPos > 0) {
-            val chunk0 = buffer.take(delimPos)
-            buffer = buffer.drop(delimPos + 1)
-            // remove \r at the end of line.
-            val chunk1 = if (chunk0.lastOption contains retByte) chunk0.dropRight(1) else chunk0
-            new String(chunk1.toArray, "utf-8")
-          } else readLine
-        }
-
-        def readContentLength(length: Int): Vector[Byte] = {
-          if (buffer.size < length) {
-            val bytesRead = in.read(readBuffer)
-            if (bytesRead > 0) {
-              buffer = buffer ++ readBuffer.toVector.take(bytesRead)
-            } else ()
-          } else ()
-          if (length <= buffer.size) {
-            val chunk = buffer.take(length)
-            buffer = buffer.drop(length)
-            chunk
-          } else readContentLength(length)
+          drainLine()
+          drainLine()
+          val readBuffer = new Array[Byte](len)
+          @tailrec def fillBuffer(offset: Int): Unit =
+            in.read(readBuffer, offset, len - offset) match {
+              case -1        => throw new ClosedChannelException
+              case bytesRead => if (offset + bytesRead < len) fillBuffer(offset + bytesRead)
+            }
+          fillBuffer(0)
+          readBuffer
         }
 
         while (running.get) {
