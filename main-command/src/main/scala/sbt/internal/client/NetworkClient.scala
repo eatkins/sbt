@@ -50,6 +50,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
       init()
   }
 
+  private[this] val mainThread = Thread.currentThread
   start()
   private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
 
@@ -61,7 +62,14 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     val (sk, tkn) = try ClientSocket.socket(portfile)
     catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
-      override def onNotification(msg: JsonRpcNotificationMessage): Unit = self.onNotification(msg)
+      override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
+        if (msg.method == "shutdown") {
+          println("")
+          console.appendLog(Level.Info, "Remote server exited. Shutting down.")
+          running.set(false)
+          mainThread.interrupt()
+        } else self.onNotification(msg)
+      }
       override def onRequest(msg: JsonRpcRequestMessage): Unit = self.onRequest(msg)
       override def onResponse(msg: JsonRpcResponseMessage): Unit = self.onResponse(msg)
       override def onShutdown(): Unit = {
@@ -155,14 +163,15 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
           import sbt.internal.langserver.codec.JsonProtocol._
           Converter.fromJson[LogMessageParams](json) match {
             case Success(params) => splitLogMessage(params)
-            case Failure(e)      => Vector()
+            case Failure(_)      => Vector()
           }
         case ("textDocument/publishDiagnostics", Some(json)) =>
           import sbt.internal.langserver.codec.JsonProtocol._
           Converter.fromJson[PublishDiagnosticsParams](json) match {
             case Success(params) => splitDiagnostics(params)
-            case Failure(e)      => Vector()
+            case Failure(_)      => Vector()
           }
+        case ("shutdown", Some(_)) => Vector.empty
         case _ =>
           Vector(
             (
@@ -238,19 +247,44 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
       }
     }
   }
-  def shell(): Unit = {
+  private[this] class ReadThread extends Thread("sbt-client-read-thread") with AutoCloseable {
     val reader = LineReader.simple(None, LineReader.HandleCONT, injectThreadSleep = true)
+    private[this] val stopped = new AtomicBoolean(false)
+    private[this] val queue = new ArrayBlockingQueue[Unit](1)
+    private[this] val nextCommand = new ArrayBlockingQueue[Option[String]](1)
+    setDaemon(true)
+    start()
+    @tailrec override final def run(): Unit = {
+      try {
+        queue.take()
+        nextCommand.put(reader.readLine("> ", None))
+      } catch { case _: InterruptedException => stopped.set(true) }
+      if (!stopped.get()) run()
+    }
+    def readLine: Option[String] = {
+      queue.put(())
+      nextCommand.take()
+    }
+    override def close(): Unit = {
+      stopped.set(true)
+      interrupt()
+    }
+  }
+  def shell(): Unit = {
+    val thread = new ReadThread
     while (running.get) {
-      reader.readLine("> ", None) match {
-        case Some("shutdown") =>
-          // `sbt -client shutdown` shuts down the server
-          sendAndWait("exit", Some(100.millis.fromNow))
-          running.set(false)
-        case Some("exit") =>
-          running.set(false)
-        case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
-        case _                          => //
-      }
+      try {
+        thread.readLine match {
+          case Some("shutdown") =>
+            // `sbt -client shutdown` shuts down the server
+            sendAndWait("exit", Some(100.millis.fromNow))
+            running.set(false)
+          case Some("exit") =>
+            running.set(false)
+          case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
+          case _                          => //
+        }
+      } catch { case _: InterruptedException => thread.close() }
     }
   }
 
