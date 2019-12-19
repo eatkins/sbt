@@ -9,13 +9,15 @@ package sbt
 package internal
 package server
 
+import java.io.IOException
 import java.net.{ Socket, SocketTimeoutException }
 import java.util.concurrent.atomic.AtomicBoolean
 
 import sjsonnew._
+
 import scala.annotation.tailrec
 import sbt.protocol._
-import sbt.internal.langserver.{ ErrorCodes, CancelRequestParams }
+import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
 import sbt.internal.util.{ ObjectEvent, StringEvent }
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.codec.JValueFormats
@@ -25,6 +27,7 @@ import sbt.internal.protocol.{
   JsonRpcNotificationMessage
 }
 import sbt.util.Logger
+
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -493,6 +496,9 @@ final class NetworkChannel(
 
   def shutdown(): Unit = {
     log.info("Shutting down client connection")
+    import sjsonnew.BasicJsonProtocol.IntJsonFormat
+    try jsonRpcNotify("shutdown", 1)
+    catch { case _: IOException => }
     running.set(false)
     out.close()
   }
