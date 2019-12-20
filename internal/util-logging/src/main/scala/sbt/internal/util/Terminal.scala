@@ -90,6 +90,11 @@ object Terminal {
    */
   def systemInIsAttached: Boolean = attached.get
 
+  def read: Int = inputStream.get match {
+    case null => -1
+    case is   => is.read
+  }
+
   /**
    * Returns an InputStream that will throw a [[ClosedChannelException]] if read returns -1.
    * @return the wrapped InputStream.
@@ -147,6 +152,42 @@ object Terminal {
       withOut(withIn(f))
     } else f
 
+  private[sbt] def withIn[T](in: InputStream)(f: => T): T = {
+    val original = inputStream.get
+    try {
+      val wrapped = new WrappedInputStream(in)
+      inputStream.set(wrapped)
+      System.setIn(wrapped)
+      scala.Console.withIn(in)(f)
+    } finally {
+      inputStream.set(original)
+      System.setIn(original)
+    }
+  }
+  private[this] class WrappedInputStream(val in: InputStream) extends InputStream {
+    override def read(): Int = in.read
+    override def read(b: Array[Byte]): Int = in.read(b)
+    override def read(b: Array[Byte], off: Int, len: Int): Int = in.read(b, off, len)
+    override def skip(n: Long): Long = in.skip(n)
+    override def available(): Int = in.available()
+    override def close(): Unit = in.close()
+    override def mark(readlimit: Int): Unit = in.mark(readlimit)
+    override def reset(): Unit = in.reset()
+    override def markSupported(): Boolean = in.markSupported()
+  }
+
+  private[this] def isWrapped = inputStream.get.isInstanceOf[WrappedInputStream]
+
+  private[sbt] def withOut[T](out: PrintStream)(f: => T): T = {
+    val originalOut = System.out
+    try {
+      System.setOut(out)
+      scala.Console.withOut(out)(f)
+    } finally {
+      System.setOut(originalOut)
+    }
+  }
+
   /**
    * Runs a thunk ensuring that the terminal is in canonical mode:
    * [[https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html Canonical or Not]].
@@ -157,10 +198,13 @@ object Terminal {
    * @tparam T the result type of the thunk
    * @return the result of the thunk
    */
-  private[sbt] def withCanonicalIn[T](f: => T): T = withTerminal { t =>
-    t.restore()
-    f
-  }
+  private[sbt] def withCanonicalIn[T](f: => T): T =
+    if (isWrapped) f
+    else
+      withTerminal { t =>
+        t.restore()
+        f
+      }
 
   /**
    * Runs a thunk ensuring that the terminal is in in non-canonical mode:
@@ -170,10 +214,13 @@ object Terminal {
    * @tparam T the result type of the thunk
    * @return the result of the thunk
    */
-  private[sbt] def withRawSystemIn[T](f: => T): T = withTerminal { t =>
-    t.init()
-    f
-  }
+  private[sbt] def withRawSystemIn[T](f: => T): T =
+    if (isWrapped) f
+    else
+      withTerminal { t =>
+        t.init()
+        f
+      }
 
   private[this] def withTerminal[T](f: jline.Terminal => T): T = {
     val t = terminal
@@ -187,6 +234,7 @@ object Terminal {
 
   private[this] val originalOut = System.out
   private[this] val originalIn = System.in
+  private[this] val inputStream = new AtomicReference[InputStream](System.in)
   private[this] val currentLine = new AtomicReference(new ArrayBuffer[Byte])
   private[this] val lineBuffer = new LinkedBlockingQueue[Byte]
   private[this] val flushQueue = new LinkedBlockingQueue[Unit]
@@ -239,6 +287,7 @@ object Terminal {
   }
   private[this] def withIn[T](f: => T): T =
     try {
+      inputStream.set(Terminal.wrappedSystemIn)
       System.setIn(Terminal.wrappedSystemIn)
       scala.Console.withIn(Terminal.wrappedSystemIn)(f)
     } finally System.setIn(originalIn)
