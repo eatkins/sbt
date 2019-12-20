@@ -24,6 +24,7 @@ type SettingQuery implements CommandMessage {
 
 type CompletionParams {
   query: String!
+  level: Int @since("1.4.0")
 }
 
 ## Message for events.

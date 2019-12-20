@@ -12,19 +12,26 @@ package client
 import java.io.{ File, IOException, InputStream }
 import java.nio.file.Files
 import java.util.UUID
+import java.util.concurrent.{
+  ArrayBlockingQueue,
+  ConcurrentHashMap,
+  Executors,
+  LinkedBlockingQueue,
+  TimeUnit
+}
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue, TimeUnit }
 
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.nio.FileTreeRepository
 import sbt.internal.protocol._
-import sbt.internal.util.{ ConsoleAppender, LineReader, Terminal }
+import sbt.internal.util.{ ConsoleAppender, NetworkReader, Terminal }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.nio.file.Glob
 import sbt.protocol._
 import sbt.util.Level
 import sjsonnew.BasicJsonProtocol._
+import sjsonnew.shaded.scalajson.ast.unsafe.JObject
 import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.annotation.tailrec
@@ -39,6 +46,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
   private val pendingExecIds = ListBuffer.empty[String]
+  private val pendingCompletions = new ConcurrentHashMap[String, Seq[String] => Unit]
 
   private val console = ConsoleAppender("thin1")
   private def baseDirectory: File = configuration.baseDirectory
@@ -180,7 +188,21 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
           lock.notifyAll()
         }
         ()
-      case _ =>
+      case execId =>
+        pendingCompletions.remove(execId) match {
+          case null =>
+          case completions =>
+            completions(msg.result match {
+              case Some(o: JObject) =>
+                o.value
+                  .collectFirst {
+                    case i if i.field == "items" =>
+                      Converter.fromJson[Seq[String]](i.value).getOrElse(Nil)
+                  }
+                  .getOrElse(Nil)
+              case _ => Nil
+            })
+        }
     }
   }
 
@@ -253,6 +275,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   }
 
   def onRequest(msg: JsonRpcRequestMessage): Unit = {
+    println(msg)
     // ignore
   }
 
@@ -288,7 +311,16 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   }
 
   def shell(): Unit = {
-    val reader = LineReader.simple(stdin)
+    val reader = new NetworkReader(stdin, (prefix, level) => {
+      val execId = sendJson("sbt/completion", s"""{"query":"$prefix","level":$level}""")
+      val result = new LinkedBlockingQueue[Seq[String]]()
+      pendingCompletions.put(execId, result.put)
+      val completions = result.take
+      val insert = completions.collect {
+        case c if c.startsWith(prefix) => c.substring(prefix.length)
+      }
+      (insert, completions)
+    })
     while (running.get) {
       try {
         rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
@@ -328,6 +360,12 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
         running.set(false)
     }
   }
+  def sendJson(method: String, params: String): String = {
+    val uuid = UUID.randomUUID.toString
+    val msg = s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "$method", "params": $params }"""
+    connection.sendString(msg)
+    uuid
+  }
 
   private[this] class RawInputThread extends Thread("sbt-raw-input-thread") with AutoCloseable {
     setDaemon(true)
@@ -337,10 +375,8 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
       try {
         val byte = stdin.read().toByte
         if (!stopped.get) {
-          val uuid = UUID.randomUUID.toString
-          val msg =
-            s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "inputStream", "params": $byte }"""
-          connection.sendString(msg)
+          sendJson("inputStream", byte.toString)
+          ()
         } else stdinBytes.put(byte)
       } catch {
         case _: InterruptedException => stopped.set(true)
@@ -352,7 +388,6 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
       RawInputThread.this.interrupt()
     }
   }
-
 }
 
 object NetworkClient {
