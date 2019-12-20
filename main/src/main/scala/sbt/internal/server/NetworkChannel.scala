@@ -9,8 +9,9 @@ package sbt
 package internal
 package server
 
-import java.io.IOException
+import java.io.{ IOException, InputStream, OutputStream, PrintStream }
 import java.net.{ Socket, SocketTimeoutException }
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 import sjsonnew._
@@ -27,6 +28,7 @@ import sbt.internal.protocol.{
   JsonRpcNotificationMessage
 }
 import sbt.util.Logger
+import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -188,12 +190,19 @@ final class NetworkChannel(
       if (isLanguageServerProtocol) {
         Serialization.deserializeJsonMessage(chunk) match {
           case Right(req: JsonRpcRequestMessage) =>
-            try {
-              onRequestMessage(req)
-            } catch {
-              case LangServerError(code, message) =>
-                log.debug(s"sending error: $code: $message")
-                jsonRpcRespondError(Option(req.id), code, message)
+            if (req.method == "inputStream") {
+              import sjsonnew.BasicJsonProtocol._
+              val bytes =
+                req.params.flatMap(Converter.fromJson[Seq[Byte]](_).toOption).getOrElse(Nil)
+              bytes.foreach(inputBuffer.put)
+            } else {
+              try {
+                onRequestMessage(req)
+              } catch {
+                case LangServerError(code, message) =>
+                  log.debug(s"sending error: $code: $message")
+                  jsonRpcRespondError(Option(req.id), code, message)
+              }
             }
           case Right(ntf: JsonRpcNotificationMessage) =>
             try {
@@ -502,6 +511,49 @@ final class NetworkChannel(
     running.set(false)
     out.close()
   }
+
+  private[this] val inputBuffer = new LinkedBlockingQueue[Byte]()
+  private[sbt] class NetworkInputStream extends InputStream {
+    override def read(): Int =
+      try inputBuffer.take & 0xFF
+      catch { case _: InterruptedException => -1 }
+
+    override def read(b: Array[Byte]): Int = read(b, 0, b.length)
+    override def read(b: Array[Byte], off: Int, len: Int): Int =
+      try {
+        b(off) = inputBuffer.take
+        var count = 1
+        while (!inputBuffer.isEmpty && count < len) {
+          b(off + count) = inputBuffer.poll
+          count += 1
+        }
+        count
+      } catch {
+        case _: InterruptedException => 0
+      }
+    override def available(): Int = inputBuffer.size
+  }
+  override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
+
+  import scala.collection.JavaConverters._
+  import sjsonnew.BasicJsonProtocol._
+  override private[sbt] val printStream = new PrintStream(new OutputStream {
+    private[this] val buffer = new LinkedBlockingQueue[Byte]()
+    override def write(b: Int): Unit = buffer.put(b.toByte)
+    override def flush(): Unit = {
+      jsonRpcNotify("systemOut", buffer.asScala)
+      buffer.clear()
+    }
+    override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
+    override def write(b: Array[Byte], off: Int, len: Int): Unit = {
+      var i = off
+      while (i < len) {
+        buffer.put(b(i))
+        i += 1
+      }
+    }
+  }, true)
+
 }
 
 object NetworkChannel {

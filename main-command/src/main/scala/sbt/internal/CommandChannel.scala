@@ -8,6 +8,7 @@
 package sbt
 package internal
 
+import java.io.{ InputStream, PrintStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import sbt.protocol.EventMessage
@@ -29,6 +30,8 @@ abstract class CommandChannel {
     registered.remove(queue)
     ()
   }
+  private[sbt] def inputStream: InputStream = System.in
+  private[sbt] def printStream: PrintStream = System.out
   def append(exec: Exec): Boolean = {
     registered.forEach(
       q =>
