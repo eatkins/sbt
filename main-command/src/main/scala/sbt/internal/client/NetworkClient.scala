@@ -41,7 +41,9 @@ import scala.sys.process.{ BasicIO, Process, ProcessLogger }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
 
-class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[String]) { self =>
+class NetworkClient(base: File, arguments: List[String]) { self =>
+  def this(configuration: xsbti.AppConfiguration, arguments: List[String]) =
+    this(configuration.baseDirectory, arguments)
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
@@ -49,7 +51,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   private val pendingCompletions = new ConcurrentHashMap[String, Seq[String] => Unit]
 
   private val console = ConsoleAppender("thin1")
-  private def baseDirectory: File = configuration.baseDirectory
+  private def baseDirectory: File = base
   private def portfile = baseDirectory / "project" / "target" / "active.json"
 
   lazy val connection: ServerConnection = try init()
