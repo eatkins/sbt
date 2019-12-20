@@ -13,6 +13,7 @@ import java.util.Properties
 import sbt.internal.{ Aggregation, ShutdownHooks }
 import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
+import sbt.internal.server.NetworkChannel
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Terminal }
 import sbt.io.{ IO, Using }
@@ -190,7 +191,19 @@ object MainLoop {
               state.put(sbt.Keys.currentTaskProgress, new Keys.TaskProgress(progress))
             } else state
         }
-        val newState = Command.process(exec.commandLine, progressState)
+        val execSource = exec.source.map(_.channelName)
+        val newState = StandardMain.exchange.channels.collectFirst {
+          case c: NetworkChannel if execSource.contains(c.name) => c
+        } match {
+          case Some(channel) =>
+            Terminal.withIn(channel.inputStream) {
+              Terminal.withOut(channel.printStream) {
+                Command.process(exec.commandLine, progressState)
+              }
+            }
+          case _ =>
+            Command.process(exec.commandLine, progressState)
+        }
         if (exec.commandLine.contains("session"))
           newState.get(hasCheckedMetaBuild).foreach(_.set(false))
         val doneEvent = ExecStatusEvent(
