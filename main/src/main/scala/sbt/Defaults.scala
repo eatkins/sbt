@@ -1428,13 +1428,13 @@ object Defaults extends BuildCommon {
 
   def askForMainClass(classes: Seq[String]): Option[String] =
     sbt.SelectMainClass(
-      if (classes.length >= 10) Some(SimpleReader.readLine(_))
+      if (classes.length >= 10) Some(SimpleReader(System.in).readLine(_))
       else
         Some(s => {
           def print(st: String) = { scala.Console.out.print(st); scala.Console.out.flush() }
           print(s)
           Terminal.withRawSystemIn {
-            Terminal.wrappedSystemIn.read match {
+            Terminal.read match {
               case -1 => None
               case b =>
                 val res = b.toChar.toString
