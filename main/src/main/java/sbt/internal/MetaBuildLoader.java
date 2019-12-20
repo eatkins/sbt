@@ -57,19 +57,22 @@ public final class MetaBuildLoader extends URLClassLoader {
    *         scala library.
    */
   public static MetaBuildLoader makeLoader(final AppProvider appProvider) throws IOException {
-    final Pattern pattern = Pattern.compile("test-interface-[0-9.]+\\.jar");
+    final Pattern pattern = Pattern.compile("(test-interface-[0-9.]+|jline.*|jansi.*)\\.jar");
     final File[] cp = appProvider.mainClasspath();
-    final URL[] interfaceURL = new URL[1];
-    final URL[] rest = new URL[cp.length - 1];
+    final URL[] interfaceURLs = new URL[3];
+    final URL[] rest = new URL[cp.length - 3];
 
     {
+      int interfaceIndex = 0;
       int i = 0;
       int j = 0; // index into rest
       while (i < cp.length) {
         final File file = cp[i];
         if (pattern.matcher(file.getName()).find()) {
-          interfaceURL[0] = file.toURI().toURL();
+          interfaceURLs[interfaceIndex] = file.toURI().toURL();
+          interfaceIndex += 1;
         } else {
+          if (file.toString().contains("jline")) System.out.println("huh " + file);
           rest[j] = file.toURI().toURL();
           j += 1;
         }
@@ -78,7 +81,7 @@ public final class MetaBuildLoader extends URLClassLoader {
     }
     final ScalaProvider scalaProvider = appProvider.scalaProvider();
     final ClassLoader topLoader = scalaProvider.launcher().topLoader();
-    final TestInterfaceLoader interfaceLoader = new TestInterfaceLoader(interfaceURL, topLoader);
+    final TestInterfaceLoader interfaceLoader = new TestInterfaceLoader(interfaceURLs, topLoader);
     final File[] siJars = scalaProvider.jars();
     final URL[] lib = new URL[1];
     final URL[] scalaRest = new URL[siJars.length - 1];

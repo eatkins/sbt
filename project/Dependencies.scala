@@ -24,7 +24,7 @@ object Dependencies {
   private val libraryManagementCore = "org.scala-sbt" %% "librarymanagement-core" % lmVersion
   private val libraryManagementIvy = "org.scala-sbt" %% "librarymanagement-ivy" % lmVersion
 
-  val launcherVersion = "1.1.3"
+  val launcherVersion = "1.1.4-SNAPSHOT"
   val launcherInterface = "org.scala-sbt" % "launcher-interface" % launcherVersion
   val rawLauncher = "org.scala-sbt" % "launcher" % launcherVersion
   val testInterface = "org.scala-sbt" % "test-interface" % "1.0"
@@ -100,7 +100,7 @@ object Dependencies {
     "com.eed3si9n" %% "sjson-new-murmurhash" % contrabandSjsonNewVersion.value
   }
 
-  val jline = "jline" % "jline" % "2.14.6"
+  val jline = "jline" % "jline" % "2.14.7-SNAPSHOT"
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.8"
   val scalacheck = "org.scalacheck" %% "scalacheck" % "1.14.0"
   val specs2 = "org.specs2" %% "specs2-junit" % "4.0.1"
