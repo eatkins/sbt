@@ -1003,6 +1003,13 @@ lazy val serverTestProj = (project in file("server-test"))
       )
     },
   )
+lazy val sbtClientProj = (project in file("client"))
+  .dependsOn(sbtProj)
+  .enablePlugins(GraalVMNativeImagePlugin)
+  .settings(
+    name := "sbt-client",
+    crossPaths := false
+  )
 
 /*
 lazy val sbtBig = (project in file(".big"))
