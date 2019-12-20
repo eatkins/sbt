@@ -12,8 +12,8 @@ package client
 import java.io.{ File, IOException, InputStream }
 import java.nio.file.Files
 import java.util.UUID
-import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue, TimeUnit }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue, TimeUnit }
 
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.nio.FileTreeRepository
@@ -24,12 +24,11 @@ import sbt.io.syntax._
 import sbt.nio.file.Glob
 import sbt.protocol._
 import sbt.util.Level
-import sjsonnew.shaded.scalajson.ast.unsafe.JValue
-import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
 import sjsonnew.BasicJsonProtocol._
+import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.annotation.tailrec
-import scala.collection.mutable.{ ArrayBuffer, ListBuffer }
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.sys.process.{ BasicIO, Process, ProcessLogger }
 import scala.util.control.NonFatal
@@ -334,31 +333,18 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     setDaemon(true)
     start()
     val stopped = new AtomicBoolean(false)
-    @tailrec override final def run(): Unit = {
+    override final def run(): Unit = {
       try {
-        val buffer = new ArrayBuffer[Byte]
         val byte = stdin.read().toByte
         if (!stopped.get) {
-          buffer += byte
-          while (stdin.available > 0 && !stopped.get) {
-            stdin.read match {
-              case -1 =>
-              case b  => buffer += b.toByte
-            }
-          }
-          if (buffer.nonEmpty) {
-            val uuid = UUID.randomUUID.toString
-            val json: JValue = Converter.toJson[Seq[Byte]](buffer).get
-            val v = CompactPrinter(json)
-            val msg =
-              s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "inputStream", "params": $v }"""
-            connection.sendString(msg)
-          }
-        } else {
-          stdinBytes.put(byte)
-        }
-      } catch { case _: InterruptedException => stopped.set(true) }
-      if (!stopped.get()) run()
+          val uuid = UUID.randomUUID.toString
+          val msg =
+            s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "inputStream", "params": $byte }"""
+          connection.sendString(msg)
+        } else stdinBytes.put(byte)
+      } catch {
+        case _: InterruptedException => stopped.set(true)
+      } finally rawInputThread.set(null)
     }
 
     override def close(): Unit = {
