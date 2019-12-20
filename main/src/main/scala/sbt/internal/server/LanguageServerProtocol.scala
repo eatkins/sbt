@@ -39,7 +39,6 @@ private[sbt] object LanguageServerProtocol {
 
   lazy val handler: ServerHandler = ServerHandler({
     case callback: ServerCallback =>
-      import callback._
       ServerIntent(
         {
           import sbt.internal.langserver.codec.JsonProtocol._
@@ -54,7 +53,7 @@ private[sbt] object LanguageServerProtocol {
 
           {
             case r: JsonRpcRequestMessage if r.method == "initialize" =>
-              if (authOptions(ServerAuthentication.Token)) {
+              if (callback.authOptions(ServerAuthentication.Token)) {
                 val param = Converter.fromJson[InitializeParams](json(r)).get
                 val optionJson = param.initializationOptions.getOrElse(
                   throw LangServerError(
@@ -64,37 +63,41 @@ private[sbt] object LanguageServerProtocol {
                 )
                 val opt = Converter.fromJson[InitializeOption](optionJson).get
                 val token = opt.token.getOrElse(sys.error("'token' is missing."))
-                if (authenticate(token)) ()
+                if (callback.authenticate(token)) ()
                 else throw LangServerError(ErrorCodes.InvalidRequest, "invalid token")
               } else ()
-              setInitialized(true)
-              appendExec(Exec(s"collectAnalyses", None, Some(CommandSource(name))))
-              jsonRpcRespond(InitializeResult(serverCapabilities), Option(r.id))
+              callback.setInitialized(true)
+              callback.appendExec(
+                Exec(s"collectAnalyses", None, Some(CommandSource(callback.name)))
+              )
+              callback.jsonRpcRespond(InitializeResult(serverCapabilities), Option(r.id))
 
             case r: JsonRpcRequestMessage if r.method == "textDocument/definition" =>
               implicit val executionContext: ExecutionContext = StandardMain.executionContext
-              Definition.lspDefinition(json(r), r.id, CommandSource(name), log)
+              Definition.lspDefinition(json(r), r.id, CommandSource(callback.name), callback.log)
               ()
             case r: JsonRpcRequestMessage if r.method == "sbt/exec" =>
               val param = Converter.fromJson[SbtExecParams](json(r)).get
-              appendExec(Exec(param.commandLine, Some(r.id), Some(CommandSource(name))))
+              callback.appendExec(
+                Exec(param.commandLine, Some(r.id), Some(CommandSource(callback.name)))
+              )
               ()
             case r: JsonRpcRequestMessage if r.method == "sbt/setting" =>
               import sbt.protocol.codec.JsonProtocol._
               val param = Converter.fromJson[Q](json(r)).get
-              onSettingQuery(Option(r.id), param)
+              callback.onSettingQuery(Option(r.id), param)
             case r: JsonRpcRequestMessage if r.method == "sbt/cancelRequest" =>
-              import sbt.protocol.codec.JsonProtocol._
               val param = Converter.fromJson[CRP](json(r)).get
-              onCancellationRequest(Option(r.id), param)
+              callback.onCancellationRequest(Option(r.id), param)
             case r: JsonRpcRequestMessage if r.method == "sbt/completion" =>
               import sbt.protocol.codec.JsonProtocol._
               val param = Converter.fromJson[CP](json(r)).get
-              onCompletionRequest(Option(r.id), param)
+              callback.onCompletionRequest(Option(r.id), param)
           }
         }, {
           case n: JsonRpcNotificationMessage if n.method == "textDocument/didSave" =>
-            appendExec(Exec(";Test/compile; collectAnalyses", None, Some(CommandSource(name))))
+            val cmd = "Test/compile; collectAnalyses"
+            callback.appendExec(Exec(cmd, None, Some(CommandSource(callback.name))))
             ()
         }
       )

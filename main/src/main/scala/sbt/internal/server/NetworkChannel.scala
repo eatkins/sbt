@@ -385,21 +385,14 @@ final class NetworkChannel(
           case Some(sstate) =>
             val completionItems =
               Parser
-                .completions(sstate.combinedParser, cp.query, 9)
+                .completions(sstate.combinedParser, cp.query, cp.level.getOrElse(9))
                 .get
-                .map(c => {
-                  if (!c.isEmpty) Some(c.append.replaceAll("\n", " "))
+                .flatMap(c => {
+                  if (!c.isEmpty) Some(cp.query + c.append.replaceAll("\n", " "))
                   else None
                 })
-                .flatten
-                .map(c => cp.query + c.toString)
             import sbt.protocol.codec.JsonProtocol._
-            jsonRpcRespond(
-              CompletionResponse(
-                items = completionItems.toVector
-              ),
-              execId
-            )
+            jsonRpcRespond(CompletionResponse(items = completionItems.toVector), execId)
           case _ =>
             jsonRpcRespondError(
               execId,
