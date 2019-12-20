@@ -245,7 +245,8 @@ object Terminal {
     private[this] val isStopped = new AtomicBoolean(false)
     def close(): Unit = {
       isStopped.set(true)
-      flushQueue.put(())
+      try flushQueue.put(())
+      catch { case _: InterruptedException => }
       ()
     }
     @tailrec override def run(): Unit = {
