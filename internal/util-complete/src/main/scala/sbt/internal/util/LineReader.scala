@@ -11,7 +11,7 @@ import java.io._
 
 import jline.console.ConsoleReader
 import jline.console.history.{ FileHistory, MemoryHistory }
-import sbt.internal.util.complete.Parser
+import sbt.internal.util.complete.{ JLineCompletion, Parser }
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -237,6 +237,20 @@ class SimpleReader private[sbt] (
     this(historyPath, handleCONT, Terminal.wrappedSystemIn)
   protected[this] val reader: ConsoleReader =
     LineReader.createReader(historyPath, inputStream)
+}
+
+class NetworkReader(
+    inputStream: InputStream,
+    override protected val handleCONT: Boolean,
+    completer: (String, Int) => (Seq[String], Seq[String])
+) extends JLine {
+  def this(inputStream: InputStream, completer: (String, Int) => (Seq[String], Seq[String])) =
+    this(inputStream, LineReader.HandleCONT, completer)
+  override protected[this] def reader: ConsoleReader = {
+    val cr = LineReader.createReader(None, inputStream)
+    JLineCompletion.installCustomCompletor(JLineCompletion.customCompletor(completer), cr)
+    cr
+  }
 }
 
 object SimpleReader extends SimpleReader(None, LineReader.HandleCONT, false) {
