@@ -503,9 +503,9 @@ final class NetworkChannel(
     }
   }
 
+  import sjsonnew.BasicJsonProtocol.IntJsonFormat
   def shutdown(): Unit = {
     log.info("Shutting down client connection")
-    import sjsonnew.BasicJsonProtocol.IntJsonFormat
     try jsonRpcNotify("shutdown", 1)
     catch { case _: IOException => }
     running.set(false)
@@ -514,13 +514,17 @@ final class NetworkChannel(
 
   private[this] val inputBuffer = new LinkedBlockingQueue[Byte]()
   private[sbt] class NetworkInputStream extends InputStream {
-    override def read(): Int =
-      try inputBuffer.take & 0xFF
-      catch { case _: InterruptedException => -1 }
+    override def read(): Int = {
+      try {
+        jsonRpcNotify("readInput", 1)
+        inputBuffer.take & 0xFF
+      } catch { case _: InterruptedException | _: IOException => -1 }
+    }
 
     override def read(b: Array[Byte]): Int = read(b, 0, b.length)
     override def read(b: Array[Byte], off: Int, len: Int): Int =
       try {
+        jsonRpcNotify("readInput", 1)
         b(off) = inputBuffer.take
         var count = 1
         while (!inputBuffer.isEmpty && count < len) {
@@ -528,9 +532,7 @@ final class NetworkChannel(
           count += 1
         }
         count
-      } catch {
-        case _: InterruptedException => 0
-      }
+      } catch { case _: InterruptedException | _: IOException => 0 }
     override def available(): Int = inputBuffer.size
   }
   override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream

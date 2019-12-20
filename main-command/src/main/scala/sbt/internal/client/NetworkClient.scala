@@ -9,10 +9,10 @@ package sbt
 package internal
 package client
 
-import java.io.{ File, IOException }
+import java.io.{ File, IOException, InputStream }
 import java.nio.file.Files
 import java.util.UUID
-import java.util.concurrent.{ ArrayBlockingQueue, TimeUnit }
+import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue, TimeUnit }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
@@ -53,6 +53,27 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
   }
 
   private[this] val mainThread = Thread.currentThread
+  private[this] val executor =
+    Executors.newSingleThreadExecutor(r => new Thread(r, "sbt-client-read-input-thread"))
+  private[this] val stdinBytes = new LinkedBlockingQueue[Byte]
+  private[this] val stdinAlive = new AtomicBoolean(true)
+  private[this] val reading = new AtomicBoolean(false)
+  private[this] def readOne =
+    if (reading.compareAndSet(false, true)) executor.submit((() => {
+      if (stdinAlive.get) System.in.read match {
+        case -1 => stdinAlive.set(false)
+        case b  => stdinBytes.put(b.toByte)
+      }
+      reading.set(false)
+    }): Runnable)
+  private[this] val stdin: InputStream = new InputStream {
+    override def available(): Int = stdinBytes.size
+    override def read: Int = {
+      if (stdinBytes.isEmpty) readOne
+      stdinBytes.take & 0xFF
+    }
+  }
+  private[this] val rawInputThread = new AtomicReference[RawInputThread]
   start()
   private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
 
@@ -65,12 +86,18 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
-        if (msg.method == "shutdown") {
-          println("")
-          console.appendLog(Level.Info, "Remote server exited. Shutting down.")
-          running.set(false)
-          mainThread.interrupt()
-        } else self.onNotification(msg)
+        msg.method match {
+          case "shutdown" =>
+            console.appendLog(Level.Info, "Remote server exited. Shutting down.")
+            running.set(false)
+            mainThread.interrupt()
+          case "readInput" =>
+            rawInputThread.synchronized(rawInputThread.get match {
+              case null => rawInputThread.set(new RawInputThread)
+              case t    =>
+            })
+          case _ => self.onNotification(msg)
+        }
       }
       override def onRequest(msg: JsonRpcRequestMessage): Unit = self.onRequest(msg)
       override def onResponse(msg: JsonRpcResponseMessage): Unit = self.onResponse(msg)
@@ -253,57 +280,20 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
     Terminal.withRawSystemIn {
       while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
         limit match {
-          case None => {
-            lock.synchronized(lock.wait(5))
-            val buffer = new ArrayBuffer[Byte]
-            while (System.in.available > 0) {
-              System.in.read match {
-                case -1 =>
-                case b  => buffer += b.toByte
-              }
-            }
-            if (buffer.nonEmpty) {
-              val uuid = UUID.randomUUID.toString
-              val json: JValue = Converter.toJson[Seq[Byte]](buffer).get
-              val v = CompactPrinter(json)
-              val msg =
-                s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "inputStream", "params": $v }"""
-              connection.sendString(msg)
-            }
-          }
+          case None =>
+            lock.synchronized(lock.wait)
           case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
         }
       }
     }
   }
-  private[this] class ReadThread extends Thread("sbt-client-read-thread") with AutoCloseable {
-    val reader = LineReader.simple(None, LineReader.HandleCONT, injectThreadSleep = true)
-    private[this] val stopped = new AtomicBoolean(false)
-    private[this] val queue = new ArrayBlockingQueue[Unit](1)
-    private[this] val nextCommand = new ArrayBlockingQueue[Option[String]](1)
-    setDaemon(true)
-    start()
-    @tailrec override final def run(): Unit = {
-      try {
-        queue.take()
-        nextCommand.put(reader.readLine("> ", None))
-      } catch { case _: InterruptedException => stopped.set(true) }
-      if (!stopped.get()) run()
-    }
-    def readLine: Option[String] = {
-      queue.put(())
-      nextCommand.take()
-    }
-    override def close(): Unit = {
-      stopped.set(true)
-      interrupt()
-    }
-  }
+
   def shell(): Unit = {
-    val thread = new ReadThread
+    val reader = LineReader.simple(stdin)
     while (running.get) {
       try {
-        thread.readLine match {
+        rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
+        reader.readLine("> ", None) match {
           case Some("shutdown") =>
             // `sbt -client shutdown` shuts down the server
             sendAndWait("exit", Some(100.millis.fromNow))
@@ -313,7 +303,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
           case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
           case _                          => //
         }
-      } catch { case _: InterruptedException => thread.close() }
+      } catch { case _: InterruptedException => running.set(false) }
     }
   }
 
@@ -339,6 +329,44 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
         running.set(false)
     }
   }
+
+  private[this] class RawInputThread extends Thread("sbt-raw-input-thread") with AutoCloseable {
+    setDaemon(true)
+    start()
+    val stopped = new AtomicBoolean(false)
+    @tailrec override final def run(): Unit = {
+      try {
+        val buffer = new ArrayBuffer[Byte]
+        val byte = stdin.read().toByte
+        if (!stopped.get) {
+          buffer += byte
+          while (stdin.available > 0 && !stopped.get) {
+            stdin.read match {
+              case -1 =>
+              case b  => buffer += b.toByte
+            }
+          }
+          if (buffer.nonEmpty) {
+            val uuid = UUID.randomUUID.toString
+            val json: JValue = Converter.toJson[Seq[Byte]](buffer).get
+            val v = CompactPrinter(json)
+            val msg =
+              s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "inputStream", "params": $v }"""
+            connection.sendString(msg)
+          }
+        } else {
+          stdinBytes.put(byte)
+        }
+      } catch { case _: InterruptedException => stopped.set(true) }
+      if (!stopped.get()) run()
+    }
+
+    override def close(): Unit = {
+      stopped.set(true)
+      RawInputThread.this.interrupt()
+    }
+  }
+
 }
 
 object NetworkClient {
@@ -347,6 +375,6 @@ object NetworkClient {
       new NetworkClient(configuration, arguments)
       ()
     } catch {
-      case NonFatal(e) => println(e.getMessage)
+      case NonFatal(e) => e.printStackTrace()
     }
 }
