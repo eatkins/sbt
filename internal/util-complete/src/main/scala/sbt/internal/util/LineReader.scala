@@ -238,4 +238,7 @@ class SimpleReader private[sbt] (
     LineReader.createReader(historyPath, inputStream)
 }
 
-object SimpleReader extends SimpleReader(None, LineReader.HandleCONT, false)
+object SimpleReader extends SimpleReader(None, LineReader.HandleCONT, false) {
+  def apply(inputStream: InputStream): SimpleReader =
+    new SimpleReader(None, LineReader.HandleCONT, inputStream)
+}
