@@ -18,16 +18,18 @@ import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.nio.FileTreeRepository
 import sbt.internal.protocol._
-import sbt.internal.util.{ ConsoleAppender, LineReader }
+import sbt.internal.util.{ ConsoleAppender, LineReader, Terminal }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.nio.file.Glob
 import sbt.protocol._
 import sbt.util.Level
-import sjsonnew.support.scalajson.unsafe.Converter
+import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
+import sjsonnew.BasicJsonProtocol._
 
 import scala.annotation.tailrec
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ ArrayBuffer, ListBuffer }
 import scala.concurrent.duration._
 import scala.sys.process.{ BasicIO, Process, ProcessLogger }
 import scala.util.control.NonFatal
@@ -165,6 +167,14 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
             case Success(params) => splitLogMessage(params)
             case Failure(_)      => Vector()
           }
+        case ("systemOut", Some(json)) =>
+          Converter.fromJson[Seq[Byte]](json) match {
+            case Success(params) =>
+              System.out.write(params.toArray)
+              System.out.flush()
+            case Failure(_) =>
+          }
+          Vector.empty
         case ("textDocument/publishDiagnostics", Some(json)) =>
           import sbt.internal.langserver.codec.JsonProtocol._
           Converter.fromJson[PublishDiagnosticsParams](json) match {
@@ -240,10 +250,29 @@ class NetworkClient(configuration: xsbti.AppConfiguration, arguments: List[Strin
 
   private def sendAndWait(cmd: String, limit: Option[Deadline]): Unit = {
     val execId = sendExecCommand(cmd)
-    while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
-      limit match {
-        case None    => lock.synchronized(lock.wait())
-        case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
+    Terminal.withRawSystemIn {
+      while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
+        limit match {
+          case None => {
+            lock.synchronized(lock.wait(5))
+            val buffer = new ArrayBuffer[Byte]
+            while (System.in.available > 0) {
+              System.in.read match {
+                case -1 =>
+                case b  => buffer += b.toByte
+              }
+            }
+            if (buffer.nonEmpty) {
+              val uuid = UUID.randomUUID.toString
+              val json: JValue = Converter.toJson[Seq[Byte]](buffer).get
+              val v = CompactPrinter(json)
+              val msg =
+                s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "inputStream", "params": $v }"""
+              connection.sendString(msg)
+            }
+          }
+          case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
+        }
       }
     }
   }
