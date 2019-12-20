@@ -188,9 +188,8 @@ final class NetworkChannel(
           case Right(req: JsonRpcRequestMessage) =>
             if (req.method == "inputStream") {
               import sjsonnew.BasicJsonProtocol._
-              val bytes =
-                req.params.flatMap(Converter.fromJson[Seq[Byte]](_).toOption).getOrElse(Nil)
-              bytes.foreach(inputBuffer.put)
+              val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
+              byte.foreach(inputBuffer.put)
             } else {
               try {
                 onRequestMessage(req)
@@ -496,19 +495,6 @@ final class NetworkChannel(
         inputBuffer.take & 0xFF
       } catch { case _: InterruptedException | _: IOException => -1 }
     }
-
-    override def read(b: Array[Byte]): Int = read(b, 0, b.length)
-    override def read(b: Array[Byte], off: Int, len: Int): Int =
-      try {
-        jsonRpcNotify("readInput", 1)
-        b(off) = inputBuffer.take
-        var count = 1
-        while (!inputBuffer.isEmpty && count < len) {
-          b(off + count) = inputBuffer.poll
-          count += 1
-        }
-        count
-      } catch { case _: InterruptedException | _: IOException => 0 }
     override def available(): Int = inputBuffer.size
   }
   override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
