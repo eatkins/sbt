@@ -39,6 +39,7 @@ object LineReader {
     cr
   }
 
+  def simple(inputStream: InputStream): LineReader = new SimpleReader(None, HandleCONT, inputStream)
   def simple(
       historyPath: Option[File],
       handleCONT: Boolean = HandleCONT,
