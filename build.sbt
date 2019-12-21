@@ -990,12 +990,56 @@ lazy val sbtProj = (project in file("sbt"))
   )
   .configure(addSbtIO, addSbtCompilerBridge)
 
+val generateReflectionConfig = taskKey[Unit]("generate the graalvm reflection config")
 lazy val sbtClientProj = (project in file("client"))
   .dependsOn(sbtProj)
   .enablePlugins(GraalVMNativeImagePlugin)
   .settings(
     name := "sbt-client",
-    crossPaths := false
+    crossPaths := false,
+    exportJars := true,
+    graalVMNativeImageOptions += "--initialize-at-run-time=org.scalasbt.ipcsocket,org.scalasbt.ipcsocket.UnixDomainSocket,org.scalasbt.ipcsocket.UnixDomainSocketLibrary,sbt.client,sbt.client.Client,sbt.internal.client.SimpleClient",
+    graalVMNativeImageOptions += "--verbose",
+    generateReflectionConfig := {
+      val cp =
+        ((Compile / run / fullClasspath).value
+          .map(_.data) :+ (sbtLaunchJar in bundledLauncherProj).value)
+          .mkString(java.io.File.pathSeparator)
+      val javabin = "/Users/ethanatkins/.jabba/jdk/graalvm@19.3.0/Contents/Home/bin/java"
+      val base = file("/Users/ethanatkins/work/scratch/scala-compile")
+      val agent = "-agentlib:native-image-agent=config-output-dir=META-INF/native-image"
+      println(s"$javabin $agent -cp $cp sbt.client.Client")
+      val proc = new ProcessBuilder(
+        javabin,
+        agent,
+        "-cp",
+        cp,
+        "sbt.client.Client",
+        "/Users/ethanatkins/work/scratch/scala-compile"
+      ).directory(base).start()
+      val os = proc.getOutputStream
+      "compile\n".getBytes.foreach(b => os.write(b & 0xFF))
+      os.flush()
+      "exit\n".getBytes.foreach(b => os.write(b & 0xFF))
+      os.flush()
+      import scala.concurrent.duration._
+      val limit = 15.seconds.fromNow
+      val is = proc.getInputStream
+      val es = proc.getErrorStream
+      while (proc.isAlive && Deadline.now < limit) {
+        while (is.available > 0) {
+          System.out.write(is.read)
+        }
+        System.out.flush()
+        while (es.available > 0) {
+          System.err.write(es.read)
+        }
+        System.err.flush()
+        Thread.sleep(2)
+      }
+      proc.destroy
+      ()
+    },
   )
 
 /*
