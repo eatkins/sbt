@@ -25,6 +25,18 @@
         ]
     },
     {
+        "name" : "com.sun.jna.Native",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true,
+        "methods" : [
+            {"name" :  "register", "parameterTypes" :  ["java.lang.String"] },
+            {"name" :  "loadNativeDispatchLibrary", "parameterTypes" :  [] },
+            {"name" :  "loadNativeDispatchLibraryFromClasspath", "parameterTypes" :  [] }
+            ]
+    },
+    {
         "name" : "org.scalasbt.ipcsocket.UnixDomainSocket",
         "allDeclaredConstructors" : true,
         "allPublicConstructors" : true,
@@ -34,14 +46,6 @@
             { "name" : "fd" },
             { "name" : "is" },
             { "name" : "os" }
-        ],
-        "methods" : [
-            { "name" : "getInputStream", "parameterTypes": [] },
-            { "name" : "getOutputStream", "parameterTypes": [] },
-            { "name" : "shutdownInput", "parameterTypes": [] },
-            { "name" : "shutdownOutput", "parameterTypes": [] },
-            { "name" : "doShutdown", "parameterTypes": ["int"] },
-            { "name" : "close", "parameterTypes": [""] }
         ]
     },
     {
