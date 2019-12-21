@@ -1,0 +1,8 @@
+{
+  "resources":[
+    {"pattern":"com/sun/jna/darwin/libjnidispatch.jnilib"}, 
+    {"pattern":"jline/console/completer/CandidateListCompletionHandler.properties"}, 
+    {"pattern":"library.properties"}, 
+    {"pattern":"native/x86_64/libswoval-files0.dylib"}
+  ]
+}

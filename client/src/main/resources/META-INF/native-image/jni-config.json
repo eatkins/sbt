@@ -1,0 +1,55 @@
+[
+    {
+        "name" : "org.scalasbt.ipcsocket.UnixDomainSocketLibrary",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true,
+        "fields" : [
+            { "name" : "PF_LOCAL" },
+            { "name" : "AF_LOCAL" },
+            { "name" : "SOCK_STREAM" },
+            { "name" : "SHUT_RD" },
+            { "name" : "SHUT_WR" }
+        ],
+        "methods" : [
+            { "name" : "socket", "parameterTypes": ["int", "int", "int"] },
+            { "name" : "bind", "parameterTypes": ["int", "org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn", "int"] },
+            { "name" : "listen", "parameterTypes": ["int", "int"] },
+            { "name" : "accept", "parameterTypes": ["int", "org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn", "com.sun.jna.ptr.IntByReference"] },
+            { "name" : "connect", "parameterTypes": ["int", "org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn", "int"] },
+            { "name" : "read", "parameterTypes": ["int", "java.nio.ByteBuffer", "int"] },
+            { "name" : "write", "parameterTypes": ["int", "java.nio.ByteBuffer", "int"] },
+            { "name" : "close", "parameterTypes": ["int"] },
+            { "name" : "shutdown", "parameterTypes": ["int", "int"] }
+        ]
+    },
+    {
+        "name" : "org.scalasbt.ipcsocket.UnixDomainSocket",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true,
+        "fields" : [
+            { "name" : "fd" },
+            { "name" : "is" },
+            { "name" : "os" }
+        ],
+        "methods" : [
+            { "name" : "getInputStream", "parameterTypes": [] },
+            { "name" : "getOutputStream", "parameterTypes": [] },
+            { "name" : "shutdownInput", "parameterTypes": [] },
+            { "name" : "shutdownOutput", "parameterTypes": [] },
+            { "name" : "doShutdown", "parameterTypes": ["int"] },
+            { "name" : "close", "parameterTypes": [""] }
+        ]
+    },
+    {
+        "name":"com.swoval.files.apple.FileEvent",
+        "methods":[{"name":"<init>","parameterTypes":["java.lang.String","int"] }]
+    },
+    {
+        "name":"com.swoval.files.apple.FileEventMonitorImpl$WrappedConsumer",
+        "methods":[{"name":"accept","parameterTypes":["java.lang.Object"] }]
+    }
+]
