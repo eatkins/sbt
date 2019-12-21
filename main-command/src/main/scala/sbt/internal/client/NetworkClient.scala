@@ -347,7 +347,6 @@ trait NetworkClientImpl { self =>
           case _                          => //
         }
       } catch { case _: InterruptedException => running.set(false) }
-      println(s"should exit shell")
     }
   }
 
