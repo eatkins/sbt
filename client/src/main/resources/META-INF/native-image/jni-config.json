@@ -55,5 +55,32 @@
     {
         "name":"com.swoval.files.apple.FileEventMonitorImpl$WrappedConsumer",
         "methods":[{"name":"accept","parameterTypes":["java.lang.Object"] }]
+    },
+    {
+        "name":"java.nio.ByteBuffer",
+        "methods":[{"name":"array","parameterTypes":[] }]
+    },
+    {
+        "name":"java.nio.HeapByteBuffer",
+        "methods":[{"name":"put","parameterTypes":["byte"] }]
+    },
+    {
+        "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn",
+        "fields":[
+            {"name":"sunFamily"},
+            {"name":"sunPath"}
+        ]
+    },
+    {
+        "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn$SunFamily",
+        "fields":[{"name":"sunLenAndFamily"}]
+    },
+    {
+        "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn$SunLenAndFamily",
+        "fields":[
+            {"name":"sunFamily"},
+            {"name":"sunLen"}
+        ]
     }
+
 ]
