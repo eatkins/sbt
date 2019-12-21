@@ -27,6 +27,7 @@ abstract class ServerConnection(connection: Socket) {
   private val out = connection.getOutputStream
 
   val thread = new Thread(s"sbt-serverconnection-${connection.getPort}") {
+    setDaemon(true)
     override def run(): Unit = {
       try {
         val in = connection.getInputStream

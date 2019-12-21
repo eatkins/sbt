@@ -41,18 +41,23 @@ import scala.sys.process.{ BasicIO, Process, ProcessLogger }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
 
-class NetworkClient(base: File, arguments: List[String]) { self =>
-  def this(configuration: xsbti.AppConfiguration, arguments: List[String]) =
-    this(configuration.baseDirectory, arguments)
+trait ConsoleInterface {
+  def appendLog(level: Level.Value, message: => String): Unit
+  def success(msg: String): Unit
+}
+
+trait NetworkClientImpl { self =>
+  def baseDirectory: File
+  def arguments: List[String]
+  def console: ConsoleInterface
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
   private val pendingExecIds = ListBuffer.empty[String]
   private val pendingCompletions = new ConcurrentHashMap[String, Seq[String] => Unit]
 
-  private val console = ConsoleAppender("thin1")
-  private def baseDirectory: File = base
   private def portfile = baseDirectory / "project" / "target" / "active.json"
+  println(portfile)
 
   lazy val connection: ServerConnection = try init()
   catch {
@@ -133,21 +138,24 @@ class NetworkClient(base: File, arguments: List[String]) { self =>
       case Some(cp) =>
         cp.split(File.pathSeparator)
           .toList
-          .headOption
-          .getOrElse(sys.error("launcher JAR classpath not found"))
+          .find(_.contains("sbt-launch"))
+          .getOrElse(
+            "/Users/ethanatkins/.ivy2/local/org.scala-sbt/sbt-launch/1.4.0-SNAPSHOT/jars/sbt-launch.jar"
+          )
       case _ => sys.error("property java.class.path expected")
     }
     val cmd = "java" :: launchOpts ::: "-jar" :: launcherJarString :: args
     // val cmd = "sbt"
-    val io = BasicIO(false, ProcessLogger(_ => ()))
-    val _ = Process(cmd, baseDirectory).run(io)
+    val io = BasicIO(false, ProcessLogger(x => println(x)))
+    val p = Process(cmd, baseDirectory).run(io)
     val buffer = new ArrayBlockingQueue[Unit](1)
     @tailrec def waitForPortfile(limit: Deadline, n: Int): Unit =
       if (portfile.exists) {
         console.appendLog(Level.Info, "server found")
       } else {
-        if (limit.isOverdue) sys.error(s"timeout. $portfile is not found.")
-        else {
+        if (limit.isOverdue || !p.isAlive) {
+          sys.error(s"timeout. $portfile is not found.")
+        } else {
           buffer.poll(1, TimeUnit.SECONDS)
           if (n % 10 == 0) console.appendLog(Level.Info, "waiting for the server...")
           waitForPortfile(limit, n + 1)
@@ -331,12 +339,15 @@ class NetworkClient(base: File, arguments: List[String]) { self =>
             // `sbt -client shutdown` shuts down the server
             sendAndWait("exit", Some(100.millis.fromNow))
             running.set(false)
+            executor.shutdownNow()
           case Some("exit") =>
             running.set(false)
+            executor.shutdownNow()
           case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
           case _                          => //
         }
       } catch { case _: InterruptedException => running.set(false) }
+      println(s"should exit shell")
     }
   }
 
@@ -391,6 +402,27 @@ class NetworkClient(base: File, arguments: List[String]) { self =>
     }
   }
 }
+class NetworkClient(configuration: xsbti.AppConfiguration, override val arguments: List[String])
+    extends {
+  override val console: ConsoleInterface = {
+    val appender = ConsoleAppender("thin")
+    new ConsoleInterface {
+      override def appendLog(level: Level.Value, message: => String): Unit =
+        appender.appendLog(level, message)
+      override def success(msg: String): Unit = appender.success(msg)
+    }
+  }
+} with NetworkClientImpl {
+  override def baseDirectory: File = configuration.baseDirectory
+}
+
+class SimpleClient(override val baseDirectory: File, override val arguments: List[String]) extends {
+  override val console: ConsoleInterface = new ConsoleInterface {
+    override def appendLog(level: Level.Value, message: => String): Unit =
+      println(s"[$level] $message")
+    override def success(msg: String): Unit = println(s"[success] $msg")
+  }
+} with NetworkClientImpl {}
 
 object NetworkClient {
   def run(configuration: xsbti.AppConfiguration, arguments: List[String]): Unit =
