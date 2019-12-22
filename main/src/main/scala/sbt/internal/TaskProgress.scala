@@ -41,7 +41,7 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
             if (firstTime.compareAndSet(true, activeExceedingThreshold.isEmpty)) threshold
             else sleepDuration
           Thread.sleep(duration.toMillis)
-          if (!firstTime.get && active.isEmpty) isClosed.set(true)
+          //if (!firstTime.get && active.isEmpty) isClosed.set(true)
         } catch { case _: InterruptedException => isClosed.set(true) }
         run()
       }
