@@ -1,18 +1,67 @@
 [
-{
-  "name":"java.lang.ProcessBuilder",
-  "methods":[{"name":"redirectInput","parameterTypes":["java.lang.ProcessBuilder$Redirect"] }]
-},
-{
-  "name":"java.lang.ProcessBuilder$Redirect",
-  "fields":[{"name":"INHERIT"}]
-},
-{
-  "name":"java.lang.System",
-  "methods":[{"name":"console","parameterTypes":[] }]
-},
-{
-  "name":"jline.UnixTerminal",
-  "methods":[{"name":"<init>","parameterTypes":[] }]
-}
+  {
+    "name": "org.scalasbt.ipcsocket.JNAUnixDomainSocketLibrary",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true
+  },
+  {
+    "name": "org.scalasbt.ipcsocket.UnixDomainSocketLibrary",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true
+  },
+  {
+    "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true,
+    "methods":[{"name":"<init>","parameterTypes":[] }],
+    "fields":[{"name":"sunFamily" }, {"name":"sunPath" }]
+  },
+  {
+    "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn$SunFamily",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true,
+    "methods":[{"name":"<init>","parameterTypes":[] }],
+    "fields":[{"name":"sunLenAndFamily" }, {"name":"sunFamily" }]
+  },
+  {
+    "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn$SunLenAndFamily",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true,
+    "methods":[{"name":"<init>","parameterTypes":[] }],
+    "fields":[{"name":"sunLen" }, {"name":"sunFamily" }]
+  },
+  {
+    "name":"com.sun.jna.ptr.IntByReference",
+    "allDeclaredConstructors" : true,
+    "allPublicConstructors" : true,
+    "allDeclaredMethods" : true,
+    "allPublicMethods" : true,
+    "methods":[{"name":"<init>","parameterTypes":[] }]
+  },
+  {
+    "name":"java.lang.ProcessBuilder",
+    "methods":[{"name":"redirectInput","parameterTypes":["java.lang.ProcessBuilder$Redirect"] }]
+  },
+  {
+    "name":"java.lang.ProcessBuilder$Redirect",
+    "fields":[{"name":"INHERIT"}]
+  },
+  {
+    "name":"java.lang.System",
+    "methods":[{"name":"console","parameterTypes":[] }]
+  },
+  {
+    "name":"jline.UnixTerminal",
+    "methods":[{"name":"<init>","parameterTypes":[] }]
+  }
 ]
