@@ -417,11 +417,27 @@ class NetworkClient(configuration: xsbti.AppConfiguration, override val argument
 
 class SimpleClient(override val baseDirectory: File, val arguments: List[String]) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
-    override def appendLog(level: Level.Value, message: => String): Unit =
-      println(s"[$level] $message")
-    override def success(msg: String): Unit = println(s"[success] $msg")
+    import scala.Console.{ BLUE, GREEN, RED, YELLOW, RESET }
+    override def appendLog(level: Level.Value, message: => String): Unit = {
+      val prefix = level match {
+        case Level.Warn | Level.Error => s"[$RED$level$RESET]"
+        case Level.Debug              => s"[$YELLOW$level$RESET]"
+        case _                        => s"[$level]"
+      }
+      println(s"$prefix $message")
+    }
+
+    override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
   }
 } with NetworkClientImpl {}
+object SimpleClient {
+  def apply(args: Array[String]): SimpleClient = {
+    val file =
+      if (args.length == 0) new File("").getCanonicalFile
+      else new File(args(0)).getCanonicalFile
+    new SimpleClient(file, args.tail.toList)
+  }
+}
 
 object NetworkClient {
   def run(configuration: xsbti.AppConfiguration, arguments: List[String]): Unit =
