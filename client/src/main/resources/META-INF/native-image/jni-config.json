@@ -1,56 +1,11 @@
 [
     {
-        "name" : "org.scalasbt.ipcsocket.UnixDomainSocketLibrary",
-        "allDeclaredConstructors" : true,
-        "allPublicConstructors" : true,
-        "allDeclaredMethods" : true,
-        "allPublicMethods" : true,
-        "fields" : [
-            { "name" : "PF_LOCAL" },
-            { "name" : "AF_LOCAL" },
-            { "name" : "SOCK_STREAM" },
-            { "name" : "SHUT_RD" },
-            { "name" : "SHUT_WR" }
-        ],
-        "methods" : [
-            { "name" : "socket", "parameterTypes": ["int", "int", "int"] },
-            { "name" : "bind", "parameterTypes": ["int", "org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn", "int"] },
-            { "name" : "listen", "parameterTypes": ["int", "int"] },
-            { "name" : "accept", "parameterTypes": ["int", "org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn", "com.sun.jna.ptr.IntByReference"] },
-            { "name" : "connect", "parameterTypes": ["int", "org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn", "int"] },
-            { "name" : "read", "parameterTypes": ["int", "java.nio.ByteBuffer", "int"] },
-            { "name" : "write", "parameterTypes": ["int", "java.nio.ByteBuffer", "int"] },
-            { "name" : "close", "parameterTypes": ["int"] },
-            { "name" : "shutdown", "parameterTypes": ["int", "int"] }
-        ]
-    },
-    {
-        "name" : "com.sun.jna.Native",
-        "allDeclaredConstructors" : true,
-        "allPublicConstructors" : true,
-        "allDeclaredMethods" : true,
-        "allPublicMethods" : true,
-        "methods" : [
-            {"name" :  "register", "parameterTypes" :  ["java.lang.String"] },
-            {"name" :  "loadNativeDispatchLibrary", "parameterTypes" :  [] },
-            {"name" :  "loadNativeDispatchLibraryFromClasspath", "parameterTypes" :  [] }
-            ]
-    },
-    {
-        "name" : "org.scalasbt.ipcsocket.UnixDomainSocket",
-        "allDeclaredConstructors" : true,
-        "allPublicConstructors" : true,
-        "allDeclaredMethods" : true,
-        "allPublicMethods" : true,
-        "fields" : [
-            { "name" : "fd" },
-            { "name" : "is" },
-            { "name" : "os" }
-        ]
-    },
-    {
         "name":"com.swoval.files.apple.FileEvent",
         "methods":[{"name":"<init>","parameterTypes":["java.lang.String","int"] }]
+    },
+    {
+        "name":"org.scalasbt.ipcsocket.NativeErrorException",
+        "methods":[{"name":"<init>","parameterTypes":["int"] }]
     },
     {
         "name":"com.swoval.files.apple.FileEventMonitorImpl$WrappedConsumer",
@@ -63,24 +18,5 @@
     {
         "name":"java.nio.HeapByteBuffer",
         "methods":[{"name":"put","parameterTypes":["byte"] }]
-    },
-    {
-        "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn",
-        "fields":[
-            {"name":"sunFamily"},
-            {"name":"sunPath"}
-        ]
-    },
-    {
-        "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn$SunFamily",
-        "fields":[{"name":"sunLenAndFamily"}]
-    },
-    {
-        "name":"org.scalasbt.ipcsocket.UnixDomainSocketLibrary$SockaddrUn$SunLenAndFamily",
-        "fields":[
-            {"name":"sunFamily"},
-            {"name":"sunLen"}
-        ]
     }
-
 ]

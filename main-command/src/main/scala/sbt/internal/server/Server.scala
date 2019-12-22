@@ -199,6 +199,7 @@ private[sbt] object Server {
           IO.delete(socketfile)
         }
         IO.createDirectory(socketfile.getParentFile)
+        assert(!socketfile.exists)
       }
     }
 }
