@@ -8,7 +8,7 @@
 package sbt
 package internal
 
-import java.io.File
+import java.io.{ File, InputStream, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicReference
 
@@ -17,46 +17,52 @@ import sbt.internal.util._
 import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
 
-private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel {
-  private[this] val askUserThread = new AtomicReference[AskUserThread]
+private[sbt] class AskUserThread(
+    s: State,
+    in: InputStream,
+    out: OutputStream,
+    onLine: String => Unit,
+    onClose: () => Unit
+) extends Thread("ask-user-thread") {
+  private[this] val writer = new PrintStream(out, true)
   private[this] def getPrompt(s: State): String = s.get(shellPrompt) match {
     case Some(pf) => pf(s)
     case None =>
       def ansi(s: String): String = if (ConsoleAppender.formatEnabledInEnv) s"$s" else ""
       s"${ansi(ConsoleAppender.DeleteLine)}> ${ansi(ConsoleAppender.clearScreen(0))}"
   }
-  private[this] class AskUserThread(s: State) extends Thread("ask-user-thread") {
-    private val history = s.get(historyPath).getOrElse(Some(new File(s.baseDir, ".history")))
-    private val prompt = getPrompt(s)
-    private val reader =
-      new FullReader(
-        history,
-        s.combinedParser,
-        LineReader.HandleCONT,
-        Terminal.throwOnClosedSystemIn
-      )
-    setDaemon(true)
-    start()
-    override def run(): Unit =
-      try {
-        reader.readLine(prompt) match {
-          case Some(cmd) => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
-          case None =>
-            println("") // Prevents server shutdown log lines from appearing on the prompt line
-            append(Exec("exit", Some(Exec.newExecId), Some(CommandSource(name))))
-        }
-        ()
-      } catch {
-        case _: ClosedChannelException =>
-      } finally askUserThread.synchronized(askUserThread.set(null))
-    def redraw(): Unit = {
-      System.out.print(ConsoleAppender.clearLine(0))
-      reader.redraw()
-      System.out.print(ConsoleAppender.clearScreen(0))
-      System.out.flush()
-    }
+  private val history = s.get(historyPath).getOrElse(Some(new File(s.baseDir, ".history")))
+  private val prompt = getPrompt(s)
+  private val reader =
+    new FullReader(history, s.combinedParser, LineReader.HandleCONT, in, out)
+  setDaemon(true)
+  start()
+  override def run(): Unit =
+    try {
+      reader.readLine(prompt) match {
+        case Some(cmd) => onLine(cmd)
+        case None =>
+          writer.println("") // Prevents server shutdown log lines from appearing on the prompt line
+          onLine("exit")
+      }
+    } catch { case _: ClosedChannelException => } finally onClose()
+  def redraw(): Unit = {
+    writer.print(ConsoleAppender.clearLine(0))
+    reader.redraw()
+    writer.print(ConsoleAppender.clearScreen(0))
+    out.flush()
   }
-  private[this] def makeAskUserThread(s: State): AskUserThread = new AskUserThread(s)
+}
+private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel {
+  private[this] val askUserThread = new AtomicReference[AskUserThread]
+  private[this] def makeAskUserThread(s: State): AskUserThread =
+    new AskUserThread(
+      s,
+      Terminal.throwOnClosedSystemIn,
+      System.out,
+      cmd => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))),
+      () => askUserThread.synchronized(askUserThread.set(null))
+    )
 
   def run(s: State): State = s
 

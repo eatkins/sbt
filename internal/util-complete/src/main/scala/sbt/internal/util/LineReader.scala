@@ -26,8 +26,8 @@ object LineReader {
     !java.lang.Boolean.getBoolean("sbt.disable.cont") && Signals.supported(Signals.CONT)
   val MaxHistorySize = 500
 
-  def createReader(historyPath: Option[File], in: InputStream): ConsoleReader = {
-    val cr = Terminal.createReader(in)
+  def createReader(historyPath: Option[File], in: InputStream, out: OutputStream): ConsoleReader = {
+    val cr = Terminal.createReader(in, out)
     cr.setExpandEvents(false) // https://issues.scala-lang.org/browse/SI-7650
     cr.setBellEnabled(false)
     val h = historyPath match {
@@ -39,7 +39,8 @@ object LineReader {
     cr
   }
 
-  def simple(inputStream: InputStream): LineReader = new SimpleReader(None, HandleCONT, inputStream)
+  def simple(inputStream: InputStream, outputStream: OutputStream): LineReader =
+    new SimpleReader(None, HandleCONT, inputStream, outputStream)
   def simple(
       historyPath: Option[File],
       handleCONT: Boolean = HandleCONT,
@@ -154,7 +155,7 @@ private[sbt] object JLine {
 
   @deprecated("Use LineReader.createReader", "1.4.0")
   def createReader(historyPath: Option[File], in: InputStream): ConsoleReader = {
-    val cr = Terminal.createReader(in)
+    val cr = Terminal.createReader(in, System.out)
     cr.setExpandEvents(false) // https://issues.scala-lang.org/browse/SI-7650
     cr.setBellEnabled(false)
     val h = historyPath match {
@@ -213,6 +214,7 @@ final class FullReader(
     complete: Parser[_],
     val handleCONT: Boolean,
     inputStream: InputStream,
+    outputStream: OutputStream,
 ) extends JLine {
   @deprecated("Use the constructor with no injectThreadSleep parameter", "1.4.0")
   def this(
@@ -220,9 +222,9 @@ final class FullReader(
       complete: Parser[_],
       handleCONT: Boolean = LineReader.HandleCONT,
       injectThreadSleep: Boolean = false
-  ) = this(historyPath, complete, handleCONT, JLine.makeInputStream(injectThreadSleep))
+  ) = this(historyPath, complete, handleCONT, JLine.makeInputStream(injectThreadSleep), System.out)
   protected[this] val reader: ConsoleReader = {
-    val cr = LineReader.createReader(historyPath, inputStream)
+    val cr = LineReader.createReader(historyPath, inputStream, outputStream)
     sbt.internal.util.complete.JLineCompletion.installCustomCompletor(cr, complete)
     cr
   }
@@ -231,29 +233,34 @@ final class FullReader(
 class SimpleReader private[sbt] (
     historyPath: Option[File],
     val handleCONT: Boolean,
-    inputStream: InputStream
+    inputStream: InputStream,
+    outputStream: OutputStream,
 ) extends JLine {
   def this(historyPath: Option[File], handleCONT: Boolean, injectThreadSleep: Boolean) =
-    this(historyPath, handleCONT, Terminal.wrappedSystemIn)
+    this(historyPath, handleCONT, Terminal.wrappedSystemIn, System.out)
   protected[this] val reader: ConsoleReader =
-    LineReader.createReader(historyPath, inputStream)
+    LineReader.createReader(historyPath, inputStream, outputStream)
 }
 
 class NetworkReader(
     inputStream: InputStream,
+    outputStream: OutputStream,
     override protected val handleCONT: Boolean,
     completer: (String, Int) => (Seq[String], Seq[String])
 ) extends JLine {
-  def this(inputStream: InputStream, completer: (String, Int) => (Seq[String], Seq[String])) =
-    this(inputStream, LineReader.HandleCONT, completer)
+  def this(
+      inputStream: InputStream,
+      outputStream: OutputStream,
+      completer: (String, Int) => (Seq[String], Seq[String])
+  ) = this(inputStream, outputStream, LineReader.HandleCONT, completer)
   override protected[this] def reader: ConsoleReader = {
-    val cr = LineReader.createReader(None, inputStream)
+    val cr = LineReader.createReader(None, inputStream, outputStream)
     JLineCompletion.installCustomCompletor(JLineCompletion.customCompletor(completer), cr)
     cr
   }
 }
 
 object SimpleReader extends SimpleReader(None, LineReader.HandleCONT, false) {
-  def apply(inputStream: InputStream): SimpleReader =
-    new SimpleReader(None, LineReader.HandleCONT, inputStream)
+  def apply(inputStream: InputStream, outputStream: OutputStream): SimpleReader =
+    new SimpleReader(None, LineReader.HandleCONT, inputStream, outputStream)
 }

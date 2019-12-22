@@ -323,7 +323,7 @@ trait NetworkClientImpl { self =>
   }
 
   def shell(): Unit = {
-    val reader = new NetworkReader(stdin, (prefix, level) => {
+    val reader = new NetworkReader(stdin, System.out, (prefix, level) => {
       val execId = sendJson("sbt/completion", s"""{"query":"$prefix","level":$level}""")
       val result = new LinkedBlockingQueue[Seq[String]]()
       pendingCompletions.put(execId, result.put)
