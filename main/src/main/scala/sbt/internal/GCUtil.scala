@@ -16,7 +16,7 @@ import sbt.util.Logger
 private[sbt] object GCUtil {
   // Returns the default force garbage collection flag,
   // as specified by system properties.
-  val defaultForceGarbageCollection: Boolean = true
+  val defaultForceGarbageCollection: Boolean = false
   val defaultMinForcegcInterval: Duration = 10.minutes
   val lastGcCheck: AtomicLong = new AtomicLong(System.currentTimeMillis)
 

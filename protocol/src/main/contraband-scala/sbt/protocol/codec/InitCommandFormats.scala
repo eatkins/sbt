@@ -13,8 +13,9 @@ implicit lazy val InitCommandFormat: JsonFormat[sbt.protocol.InitCommand] = new 
       unbuilder.beginObject(__js)
       val token = unbuilder.readField[Option[String]]("token")
       val execId = unbuilder.readField[Option[String]]("execId")
+      val collectAnalysis = unbuilder.readField[Option[Boolean]]("collectAnalysis")
       unbuilder.endObject()
-      sbt.protocol.InitCommand(token, execId)
+      sbt.protocol.InitCommand(token, execId, collectAnalysis)
       case None =>
       deserializationError("Expected JsObject but found None")
     }
@@ -23,6 +24,7 @@ implicit lazy val InitCommandFormat: JsonFormat[sbt.protocol.InitCommand] = new 
     builder.beginObject()
     builder.addField("token", obj.token)
     builder.addField("execId", obj.execId)
+    builder.addField("collectAnalysis", obj.collectAnalysis)
     builder.endObject()
   }
 }

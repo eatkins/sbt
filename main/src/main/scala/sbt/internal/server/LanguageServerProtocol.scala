@@ -10,7 +10,7 @@ package internal
 package server
 
 import sjsonnew.JsonFormat
-import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import sjsonnew.shaded.scalajson.ast.unsafe.{ JObject, JValue }
 import sjsonnew.support.scalajson.unsafe.Converter
 import sbt.protocol.Serialization
 import sbt.protocol.{ CompletionParams => CP, SettingQuery => Q }
@@ -22,6 +22,7 @@ import sbt.internal.util.ObjectEvent
 import sbt.util.Logger
 
 import scala.concurrent.ExecutionContext
+import scala.util.Success
 
 private[sbt] final case class LangServerError(code: Long, message: String)
     extends Throwable(message)
@@ -53,9 +54,9 @@ private[sbt] object LanguageServerProtocol {
 
           {
             case r: JsonRpcRequestMessage if r.method == "initialize" =>
+              val param = Converter.fromJson[InitializeParams](json(r))
               if (callback.authOptions(ServerAuthentication.Token)) {
-                val param = Converter.fromJson[InitializeParams](json(r)).get
-                val optionJson = param.initializationOptions.getOrElse(
+                val optionJson = param.get.initializationOptions.getOrElse(
                   throw LangServerError(
                     ErrorCodes.InvalidParams,
                     "initializationOptions is expected on 'initialize' param."
@@ -66,10 +67,26 @@ private[sbt] object LanguageServerProtocol {
                 if (callback.authenticate(token)) ()
                 else throw LangServerError(ErrorCodes.InvalidRequest, "invalid token")
               } else ()
+              val collectAnalyses = param match {
+                case Success(jvalue) =>
+                  jvalue.initializationOptions match {
+                    case Some(v: JObject) =>
+                      v.value
+                        .collectFirst {
+                          case m if m.field == "collectAnalyses" =>
+                            import sjsonnew.BasicJsonProtocol.BooleanJsonFormat
+                            Converter.fromJson[Boolean](m.value).getOrElse(true)
+                        }
+                        .getOrElse(true)
+                    case _ => true
+                  }
+                case _ => true
+              }
               callback.setInitialized(true)
-              callback.appendExec(
-                Exec(s"collectAnalyses", None, Some(CommandSource(callback.name)))
-              )
+              if (collectAnalyses)
+                callback.appendExec(
+                  Exec(s"collectAnalyses", None, Some(CommandSource(callback.name)))
+                )
               callback.jsonRpcRespond(InitializeResult(serverCapabilities), Option(r.id))
 
             case r: JsonRpcRequestMessage if r.method == "textDocument/definition" =>

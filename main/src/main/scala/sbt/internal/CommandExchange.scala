@@ -69,7 +69,8 @@ private[sbt] final class CommandExchange {
             commandQueue.add(x)
             slurpMessages()
         }
-      commandChannelQueue.poll(1, TimeUnit.SECONDS)
+      if (deadline.fold(true)(!_.isOverdue())) commandChannelQueue.take
+      else commandChannelQueue.poll(1, TimeUnit.SECONDS)
       slurpMessages()
       Option(commandQueue.poll) match {
         case Some(exec) =>

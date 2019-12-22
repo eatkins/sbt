@@ -42,14 +42,16 @@ object Serialization {
     command match {
       case x: InitCommand =>
         val execId = x.execId.getOrElse(UUID.randomUUID.toString)
+        val analyses = s""""collectAnalyses" : ${x.collectAnalysis.getOrElse(true)}"""
         val opt = x.token match {
           case Some(t) =>
             val json: JValue = Converter.toJson[String](t).get
             val v = CompactPrinter(json)
-            s"""{ "token": $v }"""
-          case None => "{}"
+            s"""{ "token": $v, $analyses }"""
+          case None => s"{ $analyses }"
         }
-        s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "initialize", "params": { "initializationOptions": $opt } }"""
+        val params = s"""{ "initializationOptions": $opt }"""
+        s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "initialize", "params" : $params }"""
       case x: ExecCommand =>
         val execId = x.execId.getOrElse(UUID.randomUUID.toString)
         val json: JValue = Converter.toJson[String](x.commandLine).get

@@ -22,26 +22,23 @@ import sjsonnew.JsonFormat
 abstract class CommandChannel {
   private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
   private val registered: java.util.Set[java.util.Queue[CommandChannel]] = new java.util.HashSet
-  private[sbt] final def register(queue: java.util.Queue[CommandChannel]): Unit = {
-    registered.add(queue)
-    ()
-  }
-  private[sbt] final def unregister(queue: java.util.Queue[CommandChannel]): Unit = {
-    registered.remove(queue)
-    ()
-  }
+  private[sbt] final def register(queue: java.util.Queue[CommandChannel]): Unit =
+    registered.synchronized {
+      registered.add(queue)
+      if (!commandQueue.isEmpty) queue.add(this)
+      ()
+    }
+  private[sbt] final def unregister(queue: java.util.Queue[CommandChannel]): Unit =
+    registered.synchronized {
+      registered.remove(queue)
+      ()
+    }
   private[sbt] def inputStream: InputStream = System.in
   private[sbt] def printStream: PrintStream = System.out
-  def append(exec: Exec): Boolean = {
-    registered.forEach(
-      q =>
-        q.synchronized {
-          if (!q.contains(this)) {
-            q.add(this); ()
-          }
-        }
-    )
-    commandQueue.add(exec)
+  def append(exec: Exec): Boolean = registered.synchronized {
+    val res = commandQueue.add(exec)
+    if (res) registered.forEach(q => q.synchronized { q.add(this); () })
+    res
   }
   def poll: Option[Exec] = Option(commandQueue.poll)
 

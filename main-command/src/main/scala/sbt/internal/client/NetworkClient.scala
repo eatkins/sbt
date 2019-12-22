@@ -52,6 +52,7 @@ trait NetworkClientImpl { self =>
   def arguments: List[String]
   def console: ConsoleInterface
   def provider: UnixDomainSocketLibraryProvider
+  def collectAnalyses: Boolean
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
@@ -67,7 +68,6 @@ trait NetworkClientImpl { self =>
       init()
   }
 
-  private[this] val mainThread = Thread.currentThread
   private[this] val executor =
     Executors.newSingleThreadExecutor(r => new Thread(r, "sbt-client-read-input-thread"))
   private[this] val stdinBytes = new LinkedBlockingQueue[Byte]
@@ -105,11 +105,12 @@ trait NetworkClientImpl { self =>
           case "shutdown" =>
             console.appendLog(Level.Info, "Remote server exited. Shutting down.")
             running.set(false)
-            mainThread.interrupt()
+            rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
+            "\rexit\r\n".getBytes.foreach(stdinBytes.put)
           case "readInput" =>
             rawInputThread.synchronized(rawInputThread.get match {
               case null => rawInputThread.set(new RawInputThread)
-              case t    =>
+              case _    =>
             })
           case _ => self.onNotification(msg)
         }
@@ -122,7 +123,7 @@ trait NetworkClientImpl { self =>
     }
     // initiate handshake
     val execId = UUID.randomUUID.toString
-    val initCommand = InitCommand(tkn, Option(execId))
+    val initCommand = InitCommand(tkn, Option(execId), Option(collectAnalyses))
     conn.sendString(Serialization.serializeCommandAsJsonMessage(initCommand))
     conn
   }
@@ -297,6 +298,7 @@ trait NetworkClientImpl { self =>
     val userCommands = cleaned.takeWhile(_ != "exit")
     if (cleaned.isEmpty) shell()
     else batchExecute(userCommands)
+    System.exit(0)
   }
 
   def batchExecute(userCommands: List[String]): Unit = {
@@ -331,22 +333,22 @@ trait NetworkClientImpl { self =>
       }
       (insert, completions)
     })
-    while (running.get) {
-      try {
+    try {
+      while (running.get) {
         rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
         reader.readLine("> ", None) match {
           case Some("shutdown") =>
             // `sbt -client shutdown` shuts down the server
             sendAndWait("exit", Some(100.millis.fromNow))
             running.set(false)
-            executor.shutdownNow()
-          case Some("exit") =>
-            running.set(false)
-            executor.shutdownNow()
+          case Some("exit")               => running.set(false)
           case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
           case _                          => //
         }
-      } catch { case _: InterruptedException => running.set(false) }
+      }
+    } catch { case _: InterruptedException => running.set(false) } finally {
+      executor.shutdownNow()
+      ()
     }
   }
 
@@ -404,7 +406,8 @@ trait NetworkClientImpl { self =>
 class NetworkClient(
     configuration: xsbti.AppConfiguration,
     override val arguments: List[String],
-    override val provider: UnixDomainSocketLibraryProvider
+    override val provider: UnixDomainSocketLibraryProvider,
+    override val collectAnalyses: Boolean
 ) extends {
   override val console: ConsoleInterface = {
     val appender = ConsoleAppender("thin")
@@ -416,14 +419,15 @@ class NetworkClient(
   }
 } with NetworkClientImpl {
   def this(configuration: xsbti.AppConfiguration, args: List[String]) =
-    this(configuration, args, UnixDomainSocketLibraryProvider.jna)
+    this(configuration, args, UnixDomainSocketLibraryProvider.jna, true)
   override def baseDirectory: File = configuration.baseDirectory
 }
 
 class SimpleClient(
     override val baseDirectory: File,
     val arguments: List[String],
-    override val provider: UnixDomainSocketLibraryProvider
+    override val provider: UnixDomainSocketLibraryProvider,
+    override val collectAnalyses: Boolean
 ) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
     import scala.Console.{ GREEN, RED, YELLOW, RESET }
@@ -438,9 +442,7 @@ class SimpleClient(
 
     override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
   }
-} with NetworkClientImpl {
-  println(provider)
-}
+} with NetworkClientImpl
 object SimpleClient {
   def apply(args: Array[String]): SimpleClient = {
     val file =
@@ -450,7 +452,8 @@ object SimpleClient {
     new SimpleClient(
       file,
       args.tail.toList,
-      if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
+      if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna,
+      false
     )
   }
 }
