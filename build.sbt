@@ -1020,24 +1020,31 @@ lazy val sbtClientProj = (project in file("client"))
           .map(_.data) :+ (sbtLaunchJar in bundledLauncherProj).value)
           .mkString(java.io.File.pathSeparator)
       val javabin = "/Users/ethanatkins/.jabba/jdk/graalvm@19.3.0/Contents/Home/bin/java"
-      val base = file("/Users/ethanatkins/work/scratch/scala-compile")
       val agent = "-agentlib:native-image-agent=config-output-dir=META-INF/native-image"
-      println(s"$javabin $agent -cp $cp sbt.client.Client")
+      val base = target.value / "graal"
+      val scalaSourceDir = base / "src" / "main" / "scala"
+      IO.delete(base / "target")
+      IO.createDirectory(scalaSourceDir)
+      IO.createDirectory(base / "META-INF" / "native-image")
+      IO.createDirectory(base / "project")
+      IO.write(base / "project" / "build.properties", sbtVersion.value)
+      IO.write(base / "build.sbt", "")
+      IO.write(scalaSourceDir / "A.scala", "object A")
       val proc = new ProcessBuilder(
         javabin,
         agent,
         "-cp",
         cp,
         "sbt.client.Client",
-        "/Users/ethanatkins/work/scratch/scala-compile"
+        base.toString
       ).directory(base).start()
       val os = proc.getOutputStream
       "compile\n".getBytes.foreach(b => os.write(b & 0xFF))
       os.flush()
-      "exit\n".getBytes.foreach(b => os.write(b & 0xFF))
+      "shutdown\n".getBytes.foreach(b => os.write(b & 0xFF))
       os.flush()
       import scala.concurrent.duration._
-      val limit = 15.seconds.fromNow
+      val limit = 1.minute.fromNow
       val is = proc.getInputStream
       val es = proc.getErrorStream
       while (proc.isAlive && Deadline.now < limit) {
