@@ -301,7 +301,7 @@ private[sbt] final class CommandExchange {
                 // so this is weaker than the StringMessage. We might want to double-send
                 // in case we have a better client that can utilize the knowledge.
                 import sbt.internal.langserver.codec.JsonProtocol._
-                if (entry.channelName contains c.name)
+                if (broadcastStringMessage || entry.channelName.contains(c.name))
                   c.jsonRpcNotify("window/logMessage", params)
               },
               c,

@@ -33,11 +33,32 @@ abstract class ServerConnection(connection: Socket) {
         val in = connection.getInputStream
         connection.setSoTimeout(5000)
         def readFrame: Array[Byte] = {
-          // 'Content-Length: ' has 16 characters
-          (0 until 16).foreach(_ => in.read())
-          var break = false
-          // the content length should be less than 16 digits
           val numberBuffer = new Array[Byte](16)
+          // 'Content-Length: ' has 16 characters
+          var offset = 0
+          var break = false
+          do {
+            def shift(): Unit = {
+              numberBuffer.lastIndexOf('\n') match {
+                case -1 => offset = 0
+                case i =>
+                  var j = offset
+                  while (j < numberBuffer.length - i) {
+                    numberBuffer(j) = numberBuffer(j + i)
+                    j += 1
+                  }
+                  offset = i
+              }
+            }
+            in.read(numberBuffer, offset, 16 - offset) match {
+              case j if offset + j == 16 =>
+                break = new String(numberBuffer) == "Content-Length: "
+                if (!break) shift()
+              case _ => shift()
+            }
+          } while (!break)
+          break = false
+          // the content length should be less than 16 digits
           var index = 0
           do {
             in.read match {
