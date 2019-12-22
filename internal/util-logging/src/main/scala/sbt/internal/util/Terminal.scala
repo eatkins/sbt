@@ -379,8 +379,8 @@ object Terminal {
   }
   fixTerminalProperty()
 
-  private[sbt] def createReader(in: InputStream): ConsoleReader =
-    new ConsoleReader(in, System.out, terminal)
+  private[sbt] def createReader(in: InputStream, out: OutputStream): ConsoleReader =
+    new ConsoleReader(in, out, terminal)
 
   private[this] def terminal: jline.Terminal = terminalHolder.get match {
     case null => throw new IllegalStateException("Uninitialized terminal.")

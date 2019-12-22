@@ -1487,7 +1487,7 @@ object Defaults extends BuildCommon {
 
   def askForMainClass(classes: Seq[String]): Option[String] =
     sbt.SelectMainClass(
-      if (classes.length >= 10) Some(SimpleReader(System.in).readLine(_))
+      if (classes.length >= 10) Some(SimpleReader(System.in, System.out).readLine(_))
       else
         Some(s => {
           def print(st: String) = { scala.Console.out.print(st); scala.Console.out.flush() }
