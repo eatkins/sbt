@@ -36,11 +36,12 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
     @tailrec override def run(): Unit = {
       if (!isClosed.get()) {
         try {
-          report()
+          if (activeExceedingThreshold.nonEmpty) report()
           val duration =
-            if (firstTime.compareAndSet(true, activeExceedingThreshold.nonEmpty)) threshold
+            if (firstTime.compareAndSet(true, activeExceedingThreshold.isEmpty)) threshold
             else sleepDuration
           Thread.sleep(duration.toMillis)
+          //if (!firstTime.get && active.isEmpty) isClosed.set(true)
         } catch { case _: InterruptedException => isClosed.set(true) }
         run()
       }
@@ -56,11 +57,12 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
 
   override def beforeWork(task: Task[_]): Unit = {
     super.beforeWork(task)
+    maybeStartThread()
     if (containsSkipTasks(Vector(task)) || lastTaskCount.get == 0) report()
   }
-  override def afterReady(task: Task[_]): Unit = ()
+  override def afterReady(task: Task[_]): Unit = maybeStartThread()
 
-  override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = ()
+  override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = maybeStartThread()
 
   override def stop(): Unit = currentProgressThread.synchronized {
     currentProgressThread.getAndSet(None).foreach(_.close())
