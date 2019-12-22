@@ -27,20 +27,20 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
   private[this] val currentProgressThread = new AtomicReference[Option[ProgressThread]](None)
   private[this] val sleepDuration = SysProp.supershellSleep.millis
   private[this] val threshold = 10.millis
+  private[this] val tasks = new LinkedBlockingQueue[Task[_]]
   private[this] final class ProgressThread
       extends Thread("task-progress-report-thread")
       with AutoCloseable {
     private[this] val isClosed = new AtomicBoolean(false)
     private[this] val firstTime = new AtomicBoolean(true)
-    private[this] val tasks = new LinkedBlockingQueue[Task[_]]
     setDaemon(true)
     start()
     @tailrec override def run(): Unit = {
       if (!isClosed.get()) {
         try {
-          report()
+          if (activeExceedingThreshold.nonEmpty) report()
           val duration =
-            if (firstTime.compareAndSet(true, activeExceedingThreshold.nonEmpty)) threshold
+            if (firstTime.compareAndSet(true, activeExceedingThreshold.isEmpty)) threshold
             else sleepDuration
           val limit = duration.fromNow
           while (Deadline.now < limit) {
@@ -66,15 +66,13 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
   override def initial(): Unit = ()
 
   override def beforeWork(task: Task[_]): Unit = {
+    maybeStartThread()
     super.beforeWork(task)
-    currentProgressThread.get match {
-      case Some(t) => t.addTask(task)
-      case _       => maybeStartThread()
-    }
+    tasks.put(task)
   }
-  override def afterReady(task: Task[_]): Unit = ()
+  override def afterReady(task: Task[_]): Unit = maybeStartThread()
 
-  override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = ()
+  override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = maybeStartThread()
 
   override def stop(): Unit = currentProgressThread.synchronized {
     currentProgressThread.getAndSet(None).foreach(_.close())
