@@ -21,6 +21,7 @@ import java.util.concurrent.{
 }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
+import org.scalasbt.ipcsocket.UnixDomainSocketLibraryProvider
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.nio.FileTreeRepository
 import sbt.internal.protocol._
@@ -50,6 +51,7 @@ trait NetworkClientImpl { self =>
   def baseDirectory: File
   def arguments: List[String]
   def console: ConsoleInterface
+  def provider: UnixDomainSocketLibraryProvider
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
@@ -57,7 +59,6 @@ trait NetworkClientImpl { self =>
   private val pendingCompletions = new ConcurrentHashMap[String, Seq[String] => Unit]
 
   private def portfile = baseDirectory / "project" / "target" / "active.json"
-  println(portfile)
 
   lazy val connection: ServerConnection = try init()
   catch {
@@ -96,7 +97,7 @@ trait NetworkClientImpl { self =>
     if (!portfile.exists) {
       forkServer(portfile)
     }
-    val (sk, tkn) = try ClientSocket.socket(portfile)
+    val (sk, tkn) = try ClientSocket.socket(portfile, provider)
     catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
@@ -400,8 +401,11 @@ trait NetworkClientImpl { self =>
     }
   }
 }
-class NetworkClient(configuration: xsbti.AppConfiguration, override val arguments: List[String])
-    extends {
+class NetworkClient(
+    configuration: xsbti.AppConfiguration,
+    override val arguments: List[String],
+    override val provider: UnixDomainSocketLibraryProvider
+) extends {
   override val console: ConsoleInterface = {
     val appender = ConsoleAppender("thin")
     new ConsoleInterface {
@@ -411,10 +415,16 @@ class NetworkClient(configuration: xsbti.AppConfiguration, override val argument
     }
   }
 } with NetworkClientImpl {
+  def this(configuration: xsbti.AppConfiguration, args: List[String]) =
+    this(configuration, args, UnixDomainSocketLibraryProvider.jna)
   override def baseDirectory: File = configuration.baseDirectory
 }
 
-class SimpleClient(override val baseDirectory: File, val arguments: List[String]) extends {
+class SimpleClient(
+    override val baseDirectory: File,
+    val arguments: List[String],
+    override val provider: UnixDomainSocketLibraryProvider
+) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
     import scala.Console.{ GREEN, RED, YELLOW, RESET }
     override def appendLog(level: Level.Value, message: => String): Unit = {
@@ -428,13 +438,20 @@ class SimpleClient(override val baseDirectory: File, val arguments: List[String]
 
     override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
   }
-} with NetworkClientImpl {}
+} with NetworkClientImpl {
+  println(provider)
+}
 object SimpleClient {
   def apply(args: Array[String]): SimpleClient = {
     val file =
       if (args.length == 0) new File("").getCanonicalFile
       else new File(args(0)).getCanonicalFile
-    new SimpleClient(file, args.tail.toList)
+    val jni = args.contains("--jni")
+    new SimpleClient(
+      file,
+      args.tail.toList,
+      if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
+    )
   }
 }
 

@@ -1,9 +1,9 @@
 {
     "resources":[
-        {"pattern":"darwin_x86_64/libsbtipcsocket.dylib"},
         {"pattern":"jline/console/completer/CandidateListCompletionHandler.properties"},
         {"pattern":"library.properties"},
         {"pattern":"native/x86_64/libswoval-files0.dylib"},
+        {"pattern":"darwin_x86_64/libsbtipcsocket.dylib"},
         {"pattern":"com/sun/jna/darwin/libjnidispatch.jnilib"}
     ]
 }

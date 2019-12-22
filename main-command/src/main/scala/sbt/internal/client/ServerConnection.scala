@@ -120,7 +120,8 @@ abstract class ServerConnection(connection: Socket) {
 
   def sendString(message: String): Unit = {
     val a = message.getBytes("UTF-8")
-    writeLine(s"""Content-Length: ${a.length + 2}""".getBytes("UTF-8"))
+    val len = s"""Content-Length: ${a.length + 2}""".getBytes("UTF-8")
+    writeLine(len)
     writeLine(Array())
     writeLine(a)
   }
