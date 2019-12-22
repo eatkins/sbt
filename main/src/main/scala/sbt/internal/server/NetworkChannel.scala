@@ -54,6 +54,7 @@ final class NetworkChannel(
   private val VsCode = sbt.protocol.Serialization.VsCode
   private val VsCodeOld = "application/vscode-jsonrpc; charset=utf8"
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
+  private[this] val alive = new AtomicBoolean(true)
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
   def contentType: String = _contentType
@@ -260,7 +261,7 @@ final class NetworkChannel(
     }
   }
 
-  def publishEvent[A: JsonFormat](event: A, execId: Option[String]): Unit = {
+  def publishEvent[A: JsonFormat](event: A, execId: Option[String]): Unit = if (alive.get) {
     if (isLanguageServerProtocol) {
       event match {
         case entry: StringEvent => logMessage(entry.level, entry.message)
@@ -282,7 +283,7 @@ final class NetworkChannel(
     }
   }
 
-  def publishEventMessage(event: EventMessage): Unit = {
+  def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
     if (isLanguageServerProtocol) {
       event match {
         case entry: LogEvent        => logMessage(entry.level, entry.message)
@@ -303,7 +304,7 @@ final class NetworkChannel(
    * This publishes object events. The type information has been
    * erased because it went through logging.
    */
-  private[sbt] def publishObjectEvent(event: ObjectEvent[_]): Unit = {
+  private[sbt] def publishObjectEvent(event: ObjectEvent[_]): Unit = if (alive.get) {
     import sjsonnew.shaded.scalajson.ast.unsafe._
     if (isLanguageServerProtocol) onObjectEvent(event)
     else {
@@ -324,13 +325,19 @@ final class NetworkChannel(
 
   def publishBytes(event: Array[Byte]): Unit = publishBytes(event, false)
 
-  def publishBytes(event: Array[Byte], delimit: Boolean): Unit = {
-    out.write(event)
-    if (delimit) {
-      out.write(delimiter.toInt)
-    }
-    out.flush()
-  }
+  def publishBytes(event: Array[Byte], delimit: Boolean): Unit =
+    if (alive.get)
+      try {
+        out.write(event)
+        if (delimit) {
+          out.write(delimiter.toInt)
+        }
+        out.flush()
+      } catch {
+        case _: IOException =>
+          alive.set(false)
+          shutdown()
+      }
 
   def onCommand(command: CommandMessage): Unit = command match {
     case x: InitCommand  => onInitCommand(x)

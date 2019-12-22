@@ -292,10 +292,9 @@ trait NetworkClientImpl { self =>
   def start(): Unit = {
     console.appendLog(Level.Info, "entering *experimental* thin client - BEEP WHIRR")
     val _ = connection
-    val userCommands = arguments filterNot { cmd =>
-      cmd.startsWith("-")
-    }
-    if (userCommands.isEmpty) shell()
+    val cleaned = arguments.collect { case c if !c.startsWith("-") => c.trim }
+    val userCommands = cleaned.takeWhile(_ != "exit")
+    if (cleaned.isEmpty) shell()
     else batchExecute(userCommands)
   }
 
@@ -417,7 +416,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, override val argument
 
 class SimpleClient(override val baseDirectory: File, val arguments: List[String]) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
-    import scala.Console.{ BLUE, GREEN, RED, YELLOW, RESET }
+    import scala.Console.{ GREEN, RED, YELLOW, RESET }
     override def appendLog(level: Level.Value, message: => String): Unit = {
       val prefix = level match {
         case Level.Warn | Level.Error => s"[$RED$level$RESET]"
