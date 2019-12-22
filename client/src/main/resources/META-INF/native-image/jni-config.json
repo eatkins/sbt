@@ -13,7 +13,10 @@
     },
     {
         "name":"java.nio.ByteBuffer",
-        "methods":[{"name":"array","parameterTypes":[] }]
+        "methods":[
+            {"name":"array","parameterTypes":[] },
+            {"name":"put","parameterTypes":["byte"] }
+        ]
     },
     {
         "name":"java.nio.HeapByteBuffer",

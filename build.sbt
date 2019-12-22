@@ -1011,6 +1011,7 @@ lazy val sbtClientProj = (project in file("client"))
     name := "sbt-client",
     crossPaths := false,
     exportJars := true,
+    graalVMNativeImageOptions += "-H:IncludeResourceBundles=jline.console.completer.CandidateListCompletionHandler",
     graalVMNativeImageOptions += "--initialize-at-run-time=org.scalasbt.ipcsocket.JNIUnixDomainSocket,org.scalasbt.ipcsocket,org.scalasbt.ipcsocket.UnixDomainSocket,org.scalasbt.ipcsocket.UnixDomainSocketLibrary,sbt.client,sbt.client.Client,sbt.internal.client.SimpleClient",
     graalVMNativeImageOptions += "--verbose",
     generateReflectionConfig := {

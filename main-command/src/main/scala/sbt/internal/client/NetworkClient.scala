@@ -415,7 +415,7 @@ class NetworkClient(configuration: xsbti.AppConfiguration, override val argument
   override def baseDirectory: File = configuration.baseDirectory
 }
 
-class SimpleClient(override val baseDirectory: File, override val arguments: List[String]) extends {
+class SimpleClient(override val baseDirectory: File, val arguments: List[String]) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
     override def appendLog(level: Level.Value, message: => String): Unit =
       println(s"[$level] $message")
