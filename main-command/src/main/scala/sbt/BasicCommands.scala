@@ -376,7 +376,13 @@ object BasicCommands {
     val history = (s get historyPath) getOrElse (new File(s.baseDir, ".history")).some
     val prompt = (s get shellPrompt) match { case Some(pf) => pf(s); case None => "> " }
     val reader =
-      new FullReader(history, s.combinedParser, LineReader.HandleCONT, Terminal.wrappedSystemIn)
+      new FullReader(
+        history,
+        s.combinedParser,
+        LineReader.HandleCONT,
+        Terminal.wrappedSystemIn,
+        System.out
+      )
     val line = reader.readLine(prompt)
     line match {
       case Some(line) =>
