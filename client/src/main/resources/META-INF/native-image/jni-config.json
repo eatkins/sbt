@@ -4,6 +4,69 @@
         "methods":[{"name":"<init>","parameterTypes":["java.lang.String","int"] }]
     },
     {
+        "name":"java.lang.Object",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.lang.Class",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.lang.reflect.Method",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.nio.Buffer",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.nio.CharBuffer",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.nio.DoubleBuffer",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.nio.IntBuffer",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.nio.LongBuffer",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
+        "name":"java.nio.ShortBuffer",
+        "allDeclaredConstructors" : true,
+        "allPublicConstructors" : true,
+        "allDeclaredMethods" : true,
+        "allPublicMethods" : true
+    },
+    {
         "name":"org.scalasbt.ipcsocket.NativeErrorException",
         "methods":[{"name":"<init>","parameterTypes":["int"] }]
     },
