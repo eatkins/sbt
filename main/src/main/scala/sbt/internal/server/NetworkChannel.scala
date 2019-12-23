@@ -200,6 +200,15 @@ final class NetworkChannel(
                 import sjsonnew.BasicJsonProtocol._
                 val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
                 byte.foreach(inputBuffer.put)
+              case "sbt/terminalpropsresponse" =>
+                import sbt.protocol.codec.JsonProtocol._
+                val response =
+                  req.params.flatMap(Converter.fromJson[TerminalPropertiesResponse](_).toOption)
+                pendingTerminalProperties.remove(req.id) match {
+                  case null =>
+                  case buffer =>
+                    buffer.put(response.getOrElse(TerminalPropertiesResponse(0, 0, false, false)))
+                }
               case "attach" =>
                 append(Exec("__attach", None, Some(CommandSource(name))))
                 attached.set(true)
@@ -552,6 +561,8 @@ final class NetworkChannel(
   }
   private[this] val pendingTerminalProperties =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
+  private[this] val pendingTerminalCapability =
+    new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
   private[this] val terminal = new Terminal {
     private[this] val console = Terminal.consoleTerminal(throwOnClosed = false)
     def getProperties: TerminalPropertiesResponse = {
@@ -570,7 +581,15 @@ final class NetworkChannel(
     override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
     override def getBooleanCapability(capability: String): Boolean = false
     override def getNumericCapability(capability: String): Integer = 1
-    override def getStringCapability(capability: String): String = null
+    override def getStringCapability(capability: String): String = {
+      null
+//      val id = UUID.randomUUID.toString
+//      val queue = new ArrayBlockingQueue[TerminalCapabilitiesResponse](1)
+//      import sbt.protocol.codec.JsonProtocol._
+//      pendingTerminalProperties.put(id, queue)
+//      jsonRpcNotify("sbt/terminalcap", id)
+//      queue.take
+    }
   }
   override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
   import scala.collection.JavaConverters._
