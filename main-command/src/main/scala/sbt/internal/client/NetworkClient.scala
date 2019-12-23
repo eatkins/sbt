@@ -203,7 +203,6 @@ trait NetworkClientImpl { self =>
   }
 
   def onResponse(msg: JsonRpcResponseMessage): Unit = {
-    println(msg)
     msg.id foreach {
       case execId if pendingExecIds contains execId =>
         onReturningReponse(msg)
@@ -231,7 +230,6 @@ trait NetworkClientImpl { self =>
   }
 
   def onNotification(msg: JsonRpcNotificationMessage): Unit = {
-    println(msg)
     def splitToMessage: Vector[(Level.Value, String)] =
       (msg.method, msg.params) match {
         case ("window/logMessage", Some(json)) =>
@@ -249,7 +247,7 @@ trait NetworkClientImpl { self =>
                 Terminal.isAnsiSupported,
                 Terminal.isEchoEnabled
               )
-              sendCommand(response)
+              sendCommandResponse(response, id)
 
             case Failure(_) =>
           }
@@ -314,7 +312,6 @@ trait NetworkClientImpl { self =>
   }
 
   def onRequest(msg: JsonRpcRequestMessage): Unit = {
-    println(msg)
     // ignore
   }
 
@@ -419,10 +416,9 @@ trait NetworkClientImpl { self =>
   }
   def sendCommandResponse(command: EventMessage, id: String): Unit = {
     try {
-      val s = Serialization.serializeEventMessage(command)
+      val s = new String(Serialization.serializeEventMessage(command))
       val msg =
-        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "sbt/terminalpropsrespons", "params": $s }"""
-      println(s"send $msg")
+        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "sbt/terminalpropsresponse", "params": $s }"""
       connection.sendString(msg)
     } catch {
       case e: IOException =>

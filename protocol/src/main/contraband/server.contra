@@ -90,23 +90,14 @@ type TerminalPropertiesResponse implements EventMessage {
     isEchoEnabled: Boolean!
 }
 
-type TerminalBooleanCapabilityQuery implements CommandMessage {
+type TerminalCapabilitiesQuery implements CommandMessage {
+    boolean: String
+    numeric: String
+    string: String
 }
 
-type TerminalBooleanCapabilityResponse implements EventMessage {
-    capability: Boolean!
-}
-
-type TerminalNumericCapabilityQuery implements CommandMessage {
-}
-
-type TerminalNumericCapabilityResponse implements EventMessage {
-    capability: String!
-}
-
-type TerminalStringCapabilityQuery implements CommandMessage {
-}
-
-type TerminalStringCapabilityResponse implements EventMessage {
-    capability: String!
+type TerminalCapabilitiesResponse implements EventMessage {
+    boolean: Boolean
+    numeric: Int
+    string: String
 }
