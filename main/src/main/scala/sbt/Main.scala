@@ -896,7 +896,7 @@ object BuiltinCommands {
       .extract(s1)
       .getOpt(Keys.minForcegcInterval)
       .getOrElse(GCUtil.defaultMinForcegcInterval)
-    val exec: Exec = exchange.blockUntilNextExec(minGCInterval, s1.globalLogging.full)
+    val exec: Exec = exchange.blockUntilNextExec(minGCInterval, Some(s1), s1.globalLogging.full)
     if (exec.source.fold(true)(_.channelName != "console0")) {
       s1.log.info(s"Running remote command: ${exec.commandLine}")
     }

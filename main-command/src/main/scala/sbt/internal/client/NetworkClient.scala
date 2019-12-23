@@ -69,7 +69,12 @@ trait NetworkClientImpl { self =>
   }
 
   private[this] val executor =
-    Executors.newSingleThreadExecutor(r => new Thread(r, "sbt-client-read-input-thread"))
+    Executors.newSingleThreadExecutor(
+      r =>
+        new Thread(r, "sbt-client-read-input-thread") {
+          setDaemon(true)
+        }
+    )
   private[this] val stdinBytes = new LinkedBlockingQueue[Byte]
   private[this] val stdinAlive = new AtomicBoolean(true)
   private[this] val reading = new AtomicBoolean(false)
@@ -89,6 +94,7 @@ trait NetworkClientImpl { self =>
     }
   }
   private[this] val rawInputThread = new AtomicReference[RawInputThread]
+  private[this] val mainThread = Thread.currentThread()
   start()
   private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
 
@@ -103,10 +109,15 @@ trait NetworkClientImpl { self =>
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
         msg.method match {
           case "shutdown" =>
-            console.appendLog(Level.Info, "Remote server exited. Shutting down.")
-            running.set(false)
+            val log = msg.params match {
+              case Some(jvalue) => Converter.fromJson[Boolean](jvalue).getOrElse(true)
+              case _            => false
+            }
+            if (running.compareAndSet(true, false) && log)
+              console.appendLog(Level.Info, "Remote server exited. Shutting down.")
             rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
-            "\rexit\r\n".getBytes.foreach(stdinBytes.put)
+            stdinBytes.put(-1)
+            mainThread.interrupt()
           case "readInput" =>
             rawInputThread.synchronized(rawInputThread.get match {
               case null => rawInputThread.set(new RawInputThread)
@@ -296,8 +307,20 @@ trait NetworkClientImpl { self =>
     val _ = connection
     val cleaned = arguments.collect { case c if !c.startsWith("-") => c.trim }
     val userCommands = cleaned.takeWhile(_ != "exit")
-    if (cleaned.isEmpty) shell()
-    else batchExecute(userCommands)
+    if (cleaned.isEmpty) {
+      //shell()
+      connection.sendString(Serialization.serializeCommandAsJsonMessage(Attach()))
+      @tailrec def loop(): Unit = {
+        stdin.read match {
+          case -1 =>
+          case byte =>
+            sendJson("inputStream", byte.toString)
+            if (running.get) loop()
+        }
+      }
+      try Terminal.withRawSystemIn(loop())
+      catch { case _: InterruptedException => }
+    } else batchExecute(userCommands)
     System.exit(0)
   }
 
@@ -311,13 +334,11 @@ trait NetworkClientImpl { self =>
 
   private def sendAndWait(cmd: String, limit: Option[Deadline]): Unit = {
     val execId = sendExecCommand(cmd)
-    Terminal.withRawSystemIn {
-      while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
-        limit match {
-          case None =>
-            lock.synchronized(lock.wait)
-          case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
-        }
+    while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
+      limit match {
+        case None =>
+          lock.synchronized(lock.wait)
+        case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
       }
     }
   }
@@ -346,7 +367,9 @@ trait NetworkClientImpl { self =>
           case _                          => //
         }
       }
-    } catch { case _: InterruptedException => running.set(false) } finally {
+    } catch {
+      case _: InterruptedException => running.set(false)
+    } finally {
       executor.shutdownNow()
       ()
     }

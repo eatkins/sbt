@@ -12,7 +12,7 @@ package server
 import java.io.{ IOException, InputStream, OutputStream, PrintStream }
 import java.net.{ Socket, SocketTimeoutException }
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sjsonnew._
 
@@ -41,6 +41,9 @@ final class NetworkChannel(
     with LanguageServerProtocol {
   import NetworkChannel._
 
+  private[this] val askUserThread = new AtomicReference[AskUserThread]
+  private[this] val inputBuffer = new LinkedBlockingQueue[Byte]()
+  private[this] val attached = new AtomicBoolean(false)
   private val running = new AtomicBoolean(true)
   private val delimiter: Byte = '\n'.toByte
   private val RetByte = '\r'.toByte
@@ -187,18 +190,22 @@ final class NetworkChannel(
       if (isLanguageServerProtocol) {
         Serialization.deserializeJsonMessage(chunk) match {
           case Right(req: JsonRpcRequestMessage) =>
-            if (req.method == "inputStream") {
-              import sjsonnew.BasicJsonProtocol._
-              val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
-              byte.foreach(inputBuffer.put)
-            } else {
-              try {
-                onRequestMessage(req)
-              } catch {
-                case LangServerError(code, message) =>
-                  log.debug(s"sending error: $code: $message")
-                  jsonRpcRespondError(Option(req.id), code, message)
-              }
+            req.method match {
+              case "inputStream" =>
+                import sjsonnew.BasicJsonProtocol._
+                val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
+                byte.foreach(inputBuffer.put)
+              case "attach" =>
+                append(Exec("__attach", None, Some(CommandSource(name))))
+                attached.set(true)
+              case _ =>
+                try {
+                  onRequestMessage(req)
+                } catch {
+                  case LangServerError(code, message) =>
+                    log.debug(s"sending error: $code: $message")
+                    jsonRpcRespondError(Option(req.id), code, message)
+                }
             }
           case Right(ntf: JsonRpcNotificationMessage) =>
             try {
@@ -284,19 +291,37 @@ final class NetworkChannel(
   }
 
   def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
-    if (isLanguageServerProtocol) {
-      event match {
-        case entry: LogEvent        => logMessage(entry.level, entry.message)
-        case entry: ExecStatusEvent => logMessage("debug", entry.status)
-        case _                      => ()
-      }
-    } else {
-      contentType match {
-        case SbtX1Protocol =>
-          val bytes = Serialization.serializeEventMessage(event)
-          publishBytes(bytes, true)
-        case _ => ()
-      }
+    event match {
+      case ConsolePromptEvent(state) =>
+        askUserThread.synchronized {
+          askUserThread.get match {
+            case null =>
+              askUserThread.set(
+                new AskUserThread(
+                  name,
+                  state,
+                  inputStream,
+                  outputStream,
+                  cmd => { append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); () },
+                  () => askUserThread.synchronized(askUserThread.set(null))
+                )
+              )
+            case t => t.redraw()
+          }
+        }
+      case _ if isLanguageServerProtocol =>
+        event match {
+          case entry: LogEvent        => logMessage(entry.level, entry.message)
+          case entry: ExecStatusEvent => logMessage("debug", entry.status)
+          case _                      => ()
+        }
+      case _ =>
+        contentType match {
+          case SbtX1Protocol =>
+            val bytes = Serialization.serializeEventMessage(event)
+            publishBytes(bytes, true)
+          case _ => ()
+        }
     }
   }
 
@@ -339,10 +364,13 @@ final class NetworkChannel(
           shutdown()
       }
 
-  def onCommand(command: CommandMessage): Unit = command match {
-    case x: InitCommand  => onInitCommand(x)
-    case x: ExecCommand  => onExecCommand(x)
-    case x: SettingQuery => onSettingQuery(None, x)
+  def onCommand(command: CommandMessage): Unit = {
+    command match {
+      case x: InitCommand  => onInitCommand(x)
+      case x: ExecCommand  => onExecCommand(x)
+      case x: SettingQuery => onSettingQuery(None, x)
+      case x: Attach       => attached.set(true)
+    }
   }
 
   private def onInitCommand(cmd: InitCommand): Unit = {
@@ -478,30 +506,29 @@ final class NetworkChannel(
     }
   }
 
-  import sjsonnew.BasicJsonProtocol.IntJsonFormat
-  def shutdown(): Unit = {
+  def shutdown(): Unit = shutdown(true)
+  import sjsonnew.BasicJsonProtocol.BooleanJsonFormat
+  private[sbt] def shutdown(logShutdown: Boolean): Unit = {
     log.info("Shutting down client connection")
-    try jsonRpcNotify("shutdown", 1)
+    try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
     running.set(false)
     out.close()
   }
 
-  private[this] val inputBuffer = new LinkedBlockingQueue[Byte]()
   private[sbt] class NetworkInputStream extends InputStream {
     override def read(): Int = {
       try {
-        jsonRpcNotify("readInput", 1)
+        if (askUserThread.get == null) jsonRpcNotify("readInput", true)
         inputBuffer.take & 0xFF
       } catch { case _: InterruptedException | _: IOException => -1 }
     }
     override def available(): Int = inputBuffer.size
   }
   override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
-
   import scala.collection.JavaConverters._
   import sjsonnew.BasicJsonProtocol._
-  override private[sbt] val printStream = new PrintStream(new OutputStream {
+  private[this] val outputStream: OutputStream = new OutputStream {
     private[this] val buffer = new LinkedBlockingQueue[Byte]()
     override def write(b: Int): Unit = buffer.put(b.toByte)
     override def flush(): Unit = {
@@ -516,8 +543,9 @@ final class NetworkChannel(
         i += 1
       }
     }
-  }, true)
-
+  }
+  override private[sbt] val printStream = new PrintStream(outputStream)
+  private[sbt] def isAttached: Boolean = attached.get
 }
 
 object NetworkChannel {

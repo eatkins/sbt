@@ -62,6 +62,10 @@ object Serialization {
         val json: JValue = Converter.toJson[String](x.setting).get
         val v = CompactPrinter(json)
         s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "sbt/setting", "params": { "setting": $v } }"""
+      case x: Attach =>
+        val execId = UUID.randomUUID.toString
+        s"""{ "jsonrpc": "2.0", "id": "$execId", "method": "attach", "params": {} }"""
+
     }
   }
 

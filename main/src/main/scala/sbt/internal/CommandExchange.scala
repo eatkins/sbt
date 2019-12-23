@@ -60,7 +60,13 @@ private[sbt] final class CommandExchange {
 
   def blockUntilNextExec: Exec = blockUntilNextExec(Duration.Inf, NullLogger)
   // periodically move all messages from all the channels
-  private[sbt] def blockUntilNextExec(interval: Duration, logger: Logger): Exec = {
+  private[sbt] def blockUntilNextExec(interval: Duration, logger: Logger): Exec =
+    blockUntilNextExec(interval, None, logger)
+  private[sbt] def blockUntilNextExec(
+      interval: Duration,
+      state: Option[State],
+      logger: Logger
+  ): Exec = {
     @tailrec def impl(deadline: Option[Deadline]): Exec = {
       @tailrec def slurpMessages(): Unit =
         channels.foldLeft(Option.empty[Exec]) { _ orElse _.poll } match {
@@ -73,11 +79,33 @@ private[sbt] final class CommandExchange {
       else commandChannelQueue.poll(1, TimeUnit.SECONDS)
       slurpMessages()
       Option(commandQueue.poll) match {
+        case Some(exec) if exec.commandLine == "__attach" =>
+          val cname = exec.source.map(_.channelName)
+          channels.find(c => cname.contains(c.name)).foreach {
+            case nc: NetworkChannel =>
+              state.foreach(s => nc.publishEventMessage(ConsolePromptEvent(s)))
+            case _ =>
+          }
+          impl(deadline)
         case Some(exec) =>
           val needFinish = needToFinishPromptLine()
           if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0"))
             ConsoleOut.systemOut.println("")
-          exec
+          exec.commandLine match {
+            case "shutdown" => exec.withCommandLine("exit")
+            case "exit" if exec.source.fold(false)(_.channelName.startsWith("network")) =>
+              channels.collectFirst {
+                case c: NetworkChannel if exec.source.fold(false)(_.channelName == c.name) => c
+              } match {
+                case Some(c) if c.isAttached =>
+                  c.shutdown(false)
+                  impl(deadline)
+                case _ => exec
+              }
+
+            case _ => exec
+
+          }
         case None =>
           val newDeadline = if (deadline.fold(false)(_.isOverdue())) {
             GCUtil.forceGcWithInterval(interval, logger)
@@ -318,6 +346,8 @@ private[sbt] final class CommandExchange {
           case c: ConsoleChannel =>
             c.publishEventMessage(entry)
             activePrompt.set(Terminal.systemInIsAttached)
+          case c: NetworkChannel =>
+            c.publishEventMessage(entry)
         }
       case entry: ExecStatusEvent =>
         channels collect {
