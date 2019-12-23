@@ -18,12 +18,13 @@ import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
 
 private[sbt] class AskUserThread(
+    name: String,
     s: State,
     in: InputStream,
     out: OutputStream,
     onLine: String => Unit,
     onClose: () => Unit
-) extends Thread("ask-user-thread") {
+) extends Thread(s"ask-user-thread-$name") {
   private[this] val writer = new PrintStream(out, true)
   private[this] def getPrompt(s: State): String = s.get(shellPrompt) match {
     case Some(pf) => pf(s)
@@ -34,7 +35,14 @@ private[sbt] class AskUserThread(
   private val history = s.get(historyPath).getOrElse(Some(new File(s.baseDir, ".history")))
   private val prompt = getPrompt(s)
   private val reader =
-    new FullReader(history, s.combinedParser, LineReader.HandleCONT, in, out)
+    new FullReader(
+      history,
+      s.combinedParser,
+      LineReader.HandleCONT,
+      in,
+      out,
+      name.startsWith("network")
+    )
   setDaemon(true)
   start()
   override def run(): Unit =
@@ -57,6 +65,7 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
   private[this] val askUserThread = new AtomicReference[AskUserThread]
   private[this] def makeAskUserThread(s: State): AskUserThread =
     new AskUserThread(
+      "console",
       s,
       Terminal.throwOnClosedSystemIn,
       System.out,

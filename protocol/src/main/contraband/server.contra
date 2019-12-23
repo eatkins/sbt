@@ -22,6 +22,9 @@ type SettingQuery implements CommandMessage {
   setting: String!
 }
 
+type Attach implements CommandMessage {
+}
+
 type CompletionParams {
   query: String!
   level: Int @since("1.4.0")

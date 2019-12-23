@@ -14,6 +14,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.locks.ReentrantLock
 
+import jline.DefaultTerminal2
 import jline.console.ConsoleReader
 
 import scala.annotation.tailrec
@@ -381,6 +382,36 @@ object Terminal {
 
   private[sbt] def createReader(in: InputStream, out: OutputStream): ConsoleReader =
     new ConsoleReader(in, out, terminal)
+  private[sbt] def createVirtualReader(in: InputStream, out: OutputStream): ConsoleReader =
+    new ConsoleReader(in, out, new jline.Terminal with jline.Terminal2 {
+      override def init(): Unit = {}
+      override def restore(): Unit = {}
+      override def reset(): Unit = {}
+      override def isSupported: Boolean = true
+      override def getWidth: Int = 100
+      override def getHeight: Int = 100
+      override def isAnsiSupported: Boolean = true
+      override def wrapOutIfNeeded(out: OutputStream): OutputStream = out
+      override def wrapInIfNeeded(in: InputStream): InputStream = in
+      override def hasWeirdWrap: Boolean = false
+      override def isEchoEnabled: Boolean = false
+      override def setEchoEnabled(enabled: Boolean): Unit = {}
+      override def disableInterruptCharacter(): Unit = {}
+      override def enableInterruptCharacter(): Unit = {}
+      override def getOutputEncoding: String = terminal.getOutputEncoding
+      override def getBooleanCapability(capability: String): Boolean = {
+        println(s"boolean $capability")
+        false
+      }
+      override def getNumericCapability(capability: String): Integer = {
+        println(s"numeric $capability")
+        -1
+      }
+      override def getStringCapability(capability: String): String = {
+        val res = new DefaultTerminal2(terminal).getStringCapability(capability)
+        res
+      }
+    })
 
   private[this] def terminal: jline.Terminal = terminalHolder.get match {
     case null => throw new IllegalStateException("Uninitialized terminal.")
