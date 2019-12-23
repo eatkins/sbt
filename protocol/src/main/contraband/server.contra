@@ -81,40 +81,32 @@ type ExecutionEvent {
 }
 
 type TerminalPropertiesQuery implements CommandMessage {
-    id: String!
 }
 
 type TerminalPropertiesResponse implements EventMessage {
-    id: String!
-    length: Int!
+    width: Int!
     height: Int!
     isAnsiSupported: Boolean!
     isEchoEnabled: Boolean!
 }
 
 type TerminalBooleanCapabilityQuery implements CommandMessage {
-    id: String!
 }
 
 type TerminalBooleanCapabilityResponse implements EventMessage {
-    id: String!
     capability: Boolean!
 }
 
 type TerminalNumericCapabilityQuery implements CommandMessage {
-    id: String!
 }
 
 type TerminalNumericCapabilityResponse implements EventMessage {
-    id: String!
     capability: String!
 }
 
 type TerminalStringCapabilityQuery implements CommandMessage {
-    id: String!
 }
 
 type TerminalStringCapabilityResponse implements EventMessage {
-    id: String!
     capability: String!
 }

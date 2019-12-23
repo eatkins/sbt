@@ -136,6 +136,13 @@ object Terminal {
     catch { case NonFatal(_) => !isWindows }
 
   /**
+   * Returns true if echo is enabled on the terminal.
+   *
+   * @return true if echo is enabled on the terminal.
+   */
+  def isEchoEnabled: Boolean = terminal.isEchoEnabled
+
+  /**
    * Returns true if System.in is attached. When sbt is run as a subprocess, like in scripted or
    * as a server, System.in will not be attached and this method will return false. Otherwise
    * it will return true.

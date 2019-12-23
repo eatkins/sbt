@@ -11,21 +11,19 @@ implicit lazy val TerminalPropertiesResponseFormat: JsonFormat[sbt.protocol.Term
     __jsOpt match {
       case Some(__js) =>
       unbuilder.beginObject(__js)
-      val id = unbuilder.readField[String]("id")
-      val length = unbuilder.readField[Int]("length")
+      val width = unbuilder.readField[Int]("width")
       val height = unbuilder.readField[Int]("height")
       val isAnsiSupported = unbuilder.readField[Boolean]("isAnsiSupported")
       val isEchoEnabled = unbuilder.readField[Boolean]("isEchoEnabled")
       unbuilder.endObject()
-      sbt.protocol.TerminalPropertiesResponse(id, length, height, isAnsiSupported, isEchoEnabled)
+      sbt.protocol.TerminalPropertiesResponse(width, height, isAnsiSupported, isEchoEnabled)
       case None =>
       deserializationError("Expected JsObject but found None")
     }
   }
   override def write[J](obj: sbt.protocol.TerminalPropertiesResponse, builder: Builder[J]): Unit = {
     builder.beginObject()
-    builder.addField("id", obj.id)
-    builder.addField("length", obj.length)
+    builder.addField("width", obj.width)
     builder.addField("height", obj.height)
     builder.addField("isAnsiSupported", obj.isAnsiSupported)
     builder.addField("isEchoEnabled", obj.isEchoEnabled)

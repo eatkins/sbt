@@ -11,7 +11,8 @@ package server
 
 import java.io.{ IOException, InputStream, OutputStream, PrintStream }
 import java.net.{ Socket, SocketTimeoutException }
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.UUID
+import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sjsonnew._
@@ -389,10 +390,11 @@ final class NetworkChannel(
 
   def onCommand(command: CommandMessage): Unit = {
     command match {
-      case x: InitCommand  => onInitCommand(x)
-      case x: ExecCommand  => onExecCommand(x)
-      case x: SettingQuery => onSettingQuery(None, x)
-      case x: Attach       => attached.set(true)
+      case x: InitCommand             => onInitCommand(x)
+      case x: ExecCommand             => onExecCommand(x)
+      case x: SettingQuery            => onSettingQuery(None, x)
+      case _: Attach                  => attached.set(true)
+      case x: TerminalPropertiesQuery =>
     }
   }
 
@@ -548,14 +550,24 @@ final class NetworkChannel(
     }
     override def available(): Int = inputBuffer.size
   }
+  private[this] val pendingTerminalProperties =
+    new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
   private[this] val terminal = new Terminal {
     private[this] val console = Terminal.consoleTerminal(throwOnClosed = false)
-    override def getWidth: Int = console.getWidth
-    override def getHeight: Int = console.getHeight
+    def getProperties: TerminalPropertiesResponse = {
+      val id = UUID.randomUUID.toString
+      val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
+      import sbt.protocol.codec.JsonProtocol._
+      pendingTerminalProperties.put(id, queue)
+      jsonRpcNotify("sbt/terminalprops", id)
+      queue.take
+    }
+    override def getWidth: Int = getProperties.width
+    override def getHeight: Int = getProperties.height
     override def inputStream: InputStream = NetworkChannel.this.inputStream
     override def outputStream: OutputStream = NetworkChannel.this.outputStream
-    override def isAnsiSupported: Boolean = console.isAnsiSupported
-    override def isEchoEnabled: Boolean = console.isEchoEnabled
+    override def isAnsiSupported: Boolean = getProperties.isAnsiSupported
+    override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
     override def getBooleanCapability(capability: String): Boolean = false
     override def getNumericCapability(capability: String): Integer = 1
     override def getStringCapability(capability: String): String = null
