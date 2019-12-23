@@ -26,8 +26,14 @@ object LineReader {
     !java.lang.Boolean.getBoolean("sbt.disable.cont") && Signals.supported(Signals.CONT)
   val MaxHistorySize = 500
 
-  def createReader(historyPath: Option[File], in: InputStream, out: OutputStream): ConsoleReader = {
-    val cr = Terminal.createReader(in, out)
+  def createReader(
+      historyPath: Option[File],
+      in: InputStream,
+      out: OutputStream,
+      virtual: Boolean
+  ): ConsoleReader = {
+    val cr =
+      if (virtual) Terminal.createVirtualReader(in, out) else Terminal.createReader(in, out)
     cr.setExpandEvents(false) // https://issues.scala-lang.org/browse/SI-7650
     cr.setBellEnabled(false)
     val h = historyPath match {
@@ -58,7 +64,7 @@ abstract class JLine extends LineReader {
 
   override def readLine(prompt: String, mask: Option[Char] = None): Option[String] =
     try {
-      Terminal.withRawSystemIn(unsynchronizedReadLine(prompt, mask))
+      unsynchronizedReadLine(prompt, mask)
     } catch {
       case _: InterruptedException =>
         // println("readLine: InterruptedException")
@@ -215,6 +221,7 @@ final class FullReader(
     val handleCONT: Boolean,
     inputStream: InputStream,
     outputStream: OutputStream,
+    virtual: Boolean
 ) extends JLine {
   @deprecated("Use the constructor with no injectThreadSleep parameter", "1.4.0")
   def this(
@@ -222,9 +229,17 @@ final class FullReader(
       complete: Parser[_],
       handleCONT: Boolean = LineReader.HandleCONT,
       injectThreadSleep: Boolean = false
-  ) = this(historyPath, complete, handleCONT, JLine.makeInputStream(injectThreadSleep), System.out)
+  ) =
+    this(
+      historyPath,
+      complete,
+      handleCONT,
+      JLine.makeInputStream(injectThreadSleep),
+      System.out,
+      false
+    )
   protected[this] val reader: ConsoleReader = {
-    val cr = LineReader.createReader(historyPath, inputStream, outputStream)
+    val cr = LineReader.createReader(historyPath, inputStream, outputStream, virtual)
     sbt.internal.util.complete.JLineCompletion.installCustomCompletor(cr, complete)
     cr
   }
@@ -239,7 +254,7 @@ class SimpleReader private[sbt] (
   def this(historyPath: Option[File], handleCONT: Boolean, injectThreadSleep: Boolean) =
     this(historyPath, handleCONT, Terminal.wrappedSystemIn, System.out)
   protected[this] val reader: ConsoleReader =
-    LineReader.createReader(historyPath, inputStream, outputStream)
+    LineReader.createReader(historyPath, inputStream, outputStream, false)
 }
 
 class NetworkReader(
@@ -254,7 +269,7 @@ class NetworkReader(
       completer: (String, Int) => (Seq[String], Seq[String])
   ) = this(inputStream, outputStream, LineReader.HandleCONT, completer)
   override protected[this] def reader: ConsoleReader = {
-    val cr = LineReader.createReader(None, inputStream, outputStream)
+    val cr = LineReader.createReader(None, inputStream, outputStream, false)
     JLineCompletion.installCustomCompletor(JLineCompletion.customCompletor(completer), cr)
     cr
   }

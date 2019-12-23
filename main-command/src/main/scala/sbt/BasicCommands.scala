@@ -381,7 +381,8 @@ object BasicCommands {
         s.combinedParser,
         LineReader.HandleCONT,
         Terminal.wrappedSystemIn,
-        System.out
+        System.out,
+        false
       )
     val line = reader.readLine(prompt)
     line match {
