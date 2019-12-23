@@ -125,18 +125,18 @@ private[sbt] trait LanguageServerProtocol extends CommandChannel { self =>
   protected def onCancellationRequest(execId: Option[String], crp: CRP): Unit
 
   protected lazy val callbackImpl: ServerCallback = new ServerCallback {
-    def jsonRpcRespond[A: JsonFormat](event: A, execId: Option[String]): Unit =
+    override def jsonRpcRespond[A: JsonFormat](event: A, execId: Option[String]): Unit =
       self.jsonRpcRespond(event, execId)
 
-    def jsonRpcRespondError(execId: Option[String], code: Long, message: String): Unit =
+    override def jsonRpcRespondError(execId: Option[String], code: Long, message: String): Unit =
       self.jsonRpcRespondError(execId, code, message)
 
-    def jsonRpcNotify[A: JsonFormat](method: String, params: A): Unit =
+    override def jsonRpcNotify[A: JsonFormat](method: String, params: A): Unit =
       self.jsonRpcNotify(method, params)
 
-    def appendExec(exec: Exec): Boolean = self.append(exec)
-    def log: Logger = self.log
-    def name: String = self.name
+    override def appendExec(exec: Exec): Boolean = self.append(exec)
+    override def log: Logger = self.log
+    override def name: String = self.name
     private[sbt] def authOptions: Set[ServerAuthentication] = self.authOptions
     private[sbt] def authenticate(token: String): Boolean = self.authenticate(token)
     private[sbt] def setInitialized(value: Boolean): Unit = self.setInitialized(value)
