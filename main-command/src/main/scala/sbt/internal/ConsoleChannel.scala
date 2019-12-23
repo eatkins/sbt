@@ -20,12 +20,11 @@ import sjsonnew.JsonFormat
 private[sbt] class AskUserThread(
     name: String,
     s: State,
-    in: InputStream,
-    out: OutputStream,
+    terminal: Terminal,
     onLine: String => Unit,
     onClose: () => Unit
 ) extends Thread(s"ask-user-thread-$name") {
-  private[this] val writer = new PrintStream(out, true)
+  private[this] val writer = new PrintStream(terminal.outputStream, true)
   private[this] def getPrompt(s: State): String = s.get(shellPrompt) match {
     case Some(pf) => pf(s)
     case None =>
@@ -34,15 +33,7 @@ private[sbt] class AskUserThread(
   }
   private val history = s.get(historyPath).getOrElse(Some(new File(s.baseDir, ".history")))
   private val prompt = getPrompt(s)
-  private val reader =
-    new FullReader(
-      history,
-      s.combinedParser,
-      LineReader.HandleCONT,
-      in,
-      out,
-      name.startsWith("network")
-    )
+  private val reader = new FullReader(history, s.combinedParser, LineReader.HandleCONT, terminal)
   setDaemon(true)
   start()
   override def run(): Unit =
@@ -58,7 +49,7 @@ private[sbt] class AskUserThread(
     writer.print(ConsoleAppender.clearLine(0))
     reader.redraw()
     writer.print(ConsoleAppender.clearScreen(0))
-    out.flush()
+    terminal.outputStream.flush()
   }
 }
 private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel {
@@ -67,8 +58,7 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
     new AskUserThread(
       "console",
       s,
-      Terminal.throwOnClosedSystemIn,
-      System.out,
+      Terminal.consoleTerminal(throwOnClosed = true),
       cmd => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))),
       () => askUserThread.synchronized(askUserThread.set(null))
     )

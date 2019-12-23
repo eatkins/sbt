@@ -375,15 +375,8 @@ object BasicCommands {
   def oldshell: Command = Command.command(OldShell, Help.more(Shell, OldShellDetailed)) { s =>
     val history = (s get historyPath) getOrElse (new File(s.baseDir, ".history")).some
     val prompt = (s get shellPrompt) match { case Some(pf) => pf(s); case None => "> " }
-    val reader =
-      new FullReader(
-        history,
-        s.combinedParser,
-        LineReader.HandleCONT,
-        Terminal.wrappedSystemIn,
-        System.out,
-        false
-      )
+    val term = Terminal.consoleTerminal(throwOnClosed = false)
+    val reader = new FullReader(history, s.combinedParser, LineReader.HandleCONT, term)
     val line = reader.readLine(prompt)
     line match {
       case Some(line) =>

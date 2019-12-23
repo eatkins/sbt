@@ -19,7 +19,7 @@ import sjsonnew._
 import scala.annotation.tailrec
 import sbt.protocol._
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
-import sbt.internal.util.{ ObjectEvent, StringEvent }
+import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.protocol.{
@@ -324,8 +324,7 @@ final class NetworkChannel(
                 new AskUserThread(
                   name,
                   state,
-                  inputStream,
-                  outputStream,
+                  terminal,
                   cmd => { append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); () },
                   () => askUserThread.synchronized(askUserThread.set(null))
                 )
@@ -548,6 +547,18 @@ final class NetworkChannel(
       } catch { case _: InterruptedException | _: IOException => -1 }
     }
     override def available(): Int = inputBuffer.size
+  }
+  private[this] val terminal = new Terminal {
+    private[this] val console = Terminal.consoleTerminal(throwOnClosed = false)
+    override def getWidth: Int = console.getWidth
+    override def getHeight: Int = console.getHeight
+    override def inputStream: InputStream = NetworkChannel.this.inputStream
+    override def outputStream: OutputStream = NetworkChannel.this.outputStream
+    override def isAnsiSupported: Boolean = console.isAnsiSupported
+    override def isEchoEnabled: Boolean = console.isEchoEnabled
+    override def getBooleanCapability(capability: String): Boolean = false
+    override def getNumericCapability(capability: String): Integer = 1
+    override def getStringCapability(capability: String): String = null
   }
   override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
   import scala.collection.JavaConverters._

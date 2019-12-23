@@ -344,18 +344,19 @@ trait NetworkClientImpl { self =>
   }
 
   def shell(): Unit = {
-    val reader = new NetworkReader(stdin, System.out, (prefix, level) => {
-      val execId = sendJson("sbt/completion", s"""{"query":"$prefix","level":$level}""")
-      val result = new LinkedBlockingQueue[Seq[String]]()
-      pendingCompletions.put(execId, result.put)
-      val completions = result.take
-      val insert = completions.collect {
-        case c if c.startsWith(prefix) => c.substring(prefix.length)
-      }
-      (insert, completions)
-    })
-    while (running.get) {
-      try {
+    val reader =
+      new NetworkReader(Terminal.consoleTerminal(throwOnClosed = false), (prefix, level) => {
+        val execId = sendJson("sbt/completion", s"""{"query":"$prefix","level":$level}""")
+        val result = new LinkedBlockingQueue[Seq[String]]()
+        pendingCompletions.put(execId, result.put)
+        val completions = result.take
+        val insert = completions.collect {
+          case c if c.startsWith(prefix) => c.substring(prefix.length)
+        }
+        (insert, completions)
+      })
+    try {
+      while (running.get) {
         rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
         reader.readLine("> ", None) match {
           case Some("shutdown") =>
