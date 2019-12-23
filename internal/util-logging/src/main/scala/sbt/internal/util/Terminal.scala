@@ -21,6 +21,59 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
+trait Terminal {
+
+  /**
+   * Gets the current width of the terminal. The implementation reads a property from the jline
+   * config which is updated if it has been more than a second since the last update. It is thus
+   * possible for this value to be stale.
+   *
+   * @return the terminal width.
+   */
+  def getWidth: Int
+
+  /**
+   * Gets the current height of the terminal. The implementation reads a property from the jline
+   * config which is updated if it has been more than a second since the last update. It is thus
+   * possible for this value to be stale.
+   *
+   * @return the terminal height.
+   */
+  def getHeight: Int
+
+  /**
+   * Gets the input stream for this Terminal. This could be a wrapper around System.in for the
+   * process or it could be a remote input stream for a newtork channel.
+   * @return the input stream.
+   */
+  def inputStream: InputStream
+
+  /**
+   * Gets the input stream for this Terminal. This could be a wrapper around System.in for the
+   * process or it could be a remote input stream for a newtork channel.
+   * @return the input stream.
+   */
+  def outputStream: OutputStream
+
+  /**
+   * Returns true if the terminal supports ansi characters.
+   *
+   * @return true if the terminal supports ansi escape codes.
+   */
+  def isAnsiSupported: Boolean
+
+  /**
+   * Returns true if the terminal has echo enabled.
+   *
+   * @return true if the terminal has echo enabled.
+   */
+  def isEchoEnabled: Boolean
+
+  def getBooleanCapability(capability: String): Boolean
+  def getNumericCapability(capability: String): Integer
+  def getStringCapability(capability: String): String
+}
+
 object Terminal {
 
   /**
@@ -327,10 +380,14 @@ object Terminal {
   private[this] lazy val isWindows =
     System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH).indexOf("windows") >= 0
 
-  private[this] def wrap(terminal: jline.Terminal): jline.Terminal = {
-    val term: jline.Terminal = new jline.Terminal {
+  private[this] def wrap(terminal: jline.Terminal): jline.Terminal with jline.Terminal2 = {
+    val term: jline.Terminal with jline.Terminal2 = new jline.Terminal with jline.Terminal2 {
       private[this] val hasConsole = System.console != null
       private[this] def alive = hasConsole && attached.get
+      private[this] val term2: jline.Terminal2 = terminal match {
+        case t: jline.Terminal2 => t
+        case _                  => new DefaultTerminal2(terminal)
+      }
       override def init(): Unit = if (alive) terminal.init()
       override def restore(): Unit = if (alive) terminal.restore()
       override def reset(): Unit = if (alive) terminal.reset()
@@ -350,6 +407,12 @@ object Terminal {
       override def enableInterruptCharacter(): Unit =
         if (alive) terminal.enableInterruptCharacter()
       override def getOutputEncoding: String = terminal.getOutputEncoding
+      override def getBooleanCapability(capability: String): Boolean =
+        term2.getBooleanCapability(capability)
+      override def getNumericCapability(capability: String): Integer =
+        term2.getNumericCapability(capability)
+      override def getStringCapability(capability: String): String =
+        term2.getStringCapability(capability)
     }
     term.restore()
     term.setEchoEnabled(true)
@@ -380,44 +443,69 @@ object Terminal {
   }
   fixTerminalProperty()
 
-  private[sbt] def createReader(in: InputStream, out: OutputStream): ConsoleReader =
-    new ConsoleReader(in, out, terminal)
-  private[sbt] def createVirtualReader(in: InputStream, out: OutputStream): ConsoleReader =
-    new ConsoleReader(in, out, new jline.Terminal with jline.Terminal2 {
-      override def init(): Unit = {}
-      override def restore(): Unit = {}
-      override def reset(): Unit = {}
-      override def isSupported: Boolean = true
-      override def getWidth: Int = 100
-      override def getHeight: Int = 100
-      override def isAnsiSupported: Boolean = true
-      override def wrapOutIfNeeded(out: OutputStream): OutputStream = out
-      override def wrapInIfNeeded(in: InputStream): InputStream = in
-      override def hasWeirdWrap: Boolean = false
-      override def isEchoEnabled: Boolean = false
-      override def setEchoEnabled(enabled: Boolean): Unit = {}
-      override def disableInterruptCharacter(): Unit = {}
-      override def enableInterruptCharacter(): Unit = {}
-      override def getOutputEncoding: String = terminal.getOutputEncoding
-      override def getBooleanCapability(capability: String): Boolean = {
-        println(s"boolean $capability")
-        false
-      }
-      override def getNumericCapability(capability: String): Integer = {
-        println(s"numeric $capability")
-        -1
-      }
-      override def getStringCapability(capability: String): String = {
-        val res = new DefaultTerminal2(terminal).getStringCapability(capability)
-        res
-      }
-    })
+  private[sbt] def createReader(term: Terminal): ConsoleReader =
+    new ConsoleReader(term.inputStream, term.outputStream, term.toJLine)
 
-  private[this] def terminal: jline.Terminal = terminalHolder.get match {
+  private[sbt] def consoleTerminal(throwOnClosed: Boolean): Terminal = {
+    val in = if (throwOnClosed) throwOnClosedSystemIn else wrappedSystemIn
+    new JLineTerminal(terminal, in, System.out)
+  }
+
+  private[this] def terminal: jline.Terminal with jline.Terminal2 = terminalHolder.get match {
     case null => throw new IllegalStateException("Uninitialized terminal.")
     case term => term
   }
 
   @deprecated("For compatibility only", "1.4.0")
   private[sbt] def deprecatedTeminal: jline.Terminal = terminal
+  private[sbt] implicit class TerminalOps(private val term: Terminal) extends AnyVal {
+    def toJLine: jline.Terminal = term match {
+      case t: JLineTerminal => t.term
+      case _ =>
+        new jline.Terminal with jline.Terminal2 {
+          override def init(): Unit = {}
+          override def restore(): Unit = {}
+          override def reset(): Unit = {}
+          override def isSupported: Boolean = true
+          override def getWidth: Int = term.getWidth
+          override def getHeight: Int = term.getHeight
+          override def isAnsiSupported: Boolean = term.isAnsiSupported
+          override def wrapOutIfNeeded(out: OutputStream): OutputStream = out
+          override def wrapInIfNeeded(in: InputStream): InputStream = in
+          override def hasWeirdWrap: Boolean = false
+          override def isEchoEnabled: Boolean = term.isEchoEnabled
+          override def setEchoEnabled(enabled: Boolean): Unit = {}
+          override def disableInterruptCharacter(): Unit = {}
+          override def enableInterruptCharacter(): Unit = {}
+          override def getOutputEncoding: String = null
+          override def getBooleanCapability(capability: String): Boolean = {
+            terminal.getBooleanCapability(capability)
+          }
+          override def getNumericCapability(capability: String): Integer = {
+            terminal.getNumericCapability(capability)
+          }
+          override def getStringCapability(capability: String): String = {
+            terminal.getStringCapability(capability)
+          }
+        }
+    }
+  }
+  private[sbt] class JLineTerminal(
+      val term: jline.Terminal with jline.Terminal2,
+      val in: InputStream,
+      val out: OutputStream
+  ) extends Terminal {
+    override def getWidth: Int = term.getWidth
+    override def getHeight: Int = term.getHeight
+    override def isAnsiSupported: Boolean = term.isAnsiSupported
+    override def isEchoEnabled: Boolean = term.isEchoEnabled
+    override def inputStream: InputStream = in
+    override def outputStream: OutputStream = out
+    override def getBooleanCapability(capability: String): Boolean =
+      term.getBooleanCapability(capability)
+    override def getNumericCapability(capability: String): Integer =
+      term.getNumericCapability(capability)
+    override def getStringCapability(capability: String): String =
+      term.getStringCapability(capability)
+  }
 }
