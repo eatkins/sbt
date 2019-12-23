@@ -4,29 +4,26 @@
 
 // DO NOT EDIT MANUALLY
 package sbt.protocol
-final class TerminalNumericCapabilityQuery private (
-  val id: String) extends sbt.protocol.CommandMessage() with Serializable {
-  
-  
-  
-  override def equals(o: Any): Boolean = o match {
-    case x: TerminalNumericCapabilityQuery => (this.id == x.id)
-    case _ => false
-  }
-  override def hashCode: Int = {
-    37 * (37 * (17 + "sbt.protocol.TerminalNumericCapabilityQuery".##) + id.##)
-  }
-  override def toString: String = {
-    "TerminalNumericCapabilityQuery(" + id + ")"
-  }
-  private[this] def copy(id: String = id): TerminalNumericCapabilityQuery = {
-    new TerminalNumericCapabilityQuery(id)
-  }
-  def withId(id: String): TerminalNumericCapabilityQuery = {
-    copy(id = id)
-  }
+final class TerminalNumericCapabilityQuery private () extends sbt.protocol.CommandMessage() with Serializable {
+
+
+
+override def equals(o: Any): Boolean = o match {
+  case _: TerminalNumericCapabilityQuery => true
+  case _ => false
+}
+override def hashCode: Int = {
+  37 * (17 + "sbt.protocol.TerminalNumericCapabilityQuery".##)
+}
+override def toString: String = {
+  "TerminalNumericCapabilityQuery()"
+}
+private[this] def copy(): TerminalNumericCapabilityQuery = {
+  new TerminalNumericCapabilityQuery()
+}
+
 }
 object TerminalNumericCapabilityQuery {
   
-  def apply(id: String): TerminalNumericCapabilityQuery = new TerminalNumericCapabilityQuery(id)
+  def apply(): TerminalNumericCapabilityQuery = new TerminalNumericCapabilityQuery()
 }

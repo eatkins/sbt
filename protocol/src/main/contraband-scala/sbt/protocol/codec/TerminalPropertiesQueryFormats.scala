@@ -11,16 +11,16 @@ implicit lazy val TerminalPropertiesQueryFormat: JsonFormat[sbt.protocol.Termina
     __jsOpt match {
       case Some(__js) =>
       unbuilder.beginObject(__js)
-      val id = unbuilder.readField[String]("id")
+      
       unbuilder.endObject()
-      sbt.protocol.TerminalPropertiesQuery(id)
+      sbt.protocol.TerminalPropertiesQuery()
       case None =>
       deserializationError("Expected JsObject but found None")
     }
   }
   override def write[J](obj: sbt.protocol.TerminalPropertiesQuery, builder: Builder[J]): Unit = {
     builder.beginObject()
-    builder.addField("id", obj.id)
+    
     builder.endObject()
   }
 }

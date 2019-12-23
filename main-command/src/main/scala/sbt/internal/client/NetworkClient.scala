@@ -203,6 +203,7 @@ trait NetworkClientImpl { self =>
   }
 
   def onResponse(msg: JsonRpcResponseMessage): Unit = {
+    println(msg)
     msg.id foreach {
       case execId if pendingExecIds contains execId =>
         onReturningReponse(msg)
@@ -230,6 +231,7 @@ trait NetworkClientImpl { self =>
   }
 
   def onNotification(msg: JsonRpcNotificationMessage): Unit = {
+    println(msg)
     def splitToMessage: Vector[(Level.Value, String)] =
       (msg.method, msg.params) match {
         case ("window/logMessage", Some(json)) =>
@@ -238,6 +240,20 @@ trait NetworkClientImpl { self =>
             case Success(params) => splitLogMessage(params)
             case Failure(_)      => Vector()
           }
+        case ("sbt/terminalprops", Some(json)) =>
+          Converter.fromJson[String](json) match {
+            case Success(id) =>
+              val response = TerminalPropertiesResponse.apply(
+                Terminal.getWidth,
+                Terminal.getHeight,
+                Terminal.isAnsiSupported,
+                Terminal.isEchoEnabled
+              )
+              sendCommand(response)
+
+            case Failure(_) =>
+          }
+          Vector.empty
         case ("systemOut", Some(json)) =>
           Converter.fromJson[Seq[Byte]](json) match {
             case Success(params) =>
@@ -395,6 +411,19 @@ trait NetworkClientImpl { self =>
       lock.synchronized {
         status.set("Processing")
       }
+    } catch {
+      case e: IOException =>
+        System.err.println(s"Caught exception writing command to server: $e")
+        running.set(false)
+    }
+  }
+  def sendCommandResponse(command: EventMessage, id: String): Unit = {
+    try {
+      val s = Serialization.serializeEventMessage(command)
+      val msg =
+        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "sbt/terminalpropsrespons", "params": $s }"""
+      println(s"send $msg")
+      connection.sendString(msg)
     } catch {
       case e: IOException =>
         System.err.println(s"Caught exception writing command to server: $e")
