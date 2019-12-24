@@ -12,6 +12,7 @@ package client
 import java.io.{ File, IOException, InputStream }
 import java.nio.file.Files
 import java.util.UUID
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.{
   ArrayBlockingQueue,
   ConcurrentHashMap,
@@ -19,7 +20,6 @@ import java.util.concurrent.{
   LinkedBlockingQueue,
   TimeUnit
 }
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import org.scalasbt.ipcsocket.UnixDomainSocketLibraryProvider
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
@@ -77,23 +77,11 @@ trait NetworkClientImpl { self =>
     )
   private[this] val stdinBytes = new LinkedBlockingQueue[Byte]
   private[this] val stdinAlive = new AtomicBoolean(true)
-  private[this] val reading = new AtomicBoolean(false)
-  private[this] def readOne =
-    if (reading.compareAndSet(false, true)) executor.submit((() => {
-      if (stdinAlive.get) System.in.read match {
-        case -1 => stdinAlive.set(false)
-        case b  => stdinBytes.put(b.toByte)
-      }
-      reading.set(false)
-    }): Runnable)
   private[this] val stdin: InputStream = new InputStream {
     override def available(): Int = stdinBytes.size
-    override def read: Int = {
-      if (stdinBytes.isEmpty) readOne
-      stdinBytes.take & 0xFF
-    }
+    override def read: Int = stdinBytes.take & 0xFF
   }
-  private[this] val rawInputThread = new AtomicReference[RawInputThread]
+  private[this] val inputThread = new RawInputThread
   private[this] val mainThread = Thread.currentThread()
   start()
   private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
@@ -115,15 +103,11 @@ trait NetworkClientImpl { self =>
             }
             if (running.compareAndSet(true, false) && log)
               console.appendLog(Level.Info, "Remote server exited. Shutting down.")
-            rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
+            inputThread.close()
             stdinBytes.put(-1)
             mainThread.interrupt()
           case "readInput" =>
-            rawInputThread.synchronized(rawInputThread.get match {
-              case null => rawInputThread.set(new RawInputThread)
-              case t    =>
-            })
-          case _ => self.onNotification(msg)
+          case _           => self.onNotification(msg)
         }
       }
       override def onRequest(msg: JsonRpcRequestMessage): Unit = self.onRequest(msg)
@@ -247,8 +231,21 @@ trait NetworkClientImpl { self =>
                 Terminal.isAnsiSupported,
                 Terminal.isEchoEnabled
               )
-              sendCommandResponse(response, id)
-
+              sendCommandResponse("sbt/terminalpropsresponse", response, id)
+            case Failure(_) =>
+          }
+          Vector.empty
+        case ("sbt/terminalcap", Some(json)) =>
+          import sbt.protocol.codec.JsonProtocol._
+          Converter.fromJson[TerminalCapabilitiesQuery](json) match {
+            case Success(terminalCapabilitiesQuery) =>
+              val response = TerminalCapabilitiesResponse.apply(
+                terminalCapabilitiesQuery.id,
+                terminalCapabilitiesQuery.boolean.map(Terminal.getBooleanCapability),
+                terminalCapabilitiesQuery.numeric.map(Terminal.getNumericCapability),
+                terminalCapabilitiesQuery.string.map(Terminal.getStringCapability),
+              )
+              sendCommandResponse("sbt/terminalcapresponse", response, terminalCapabilitiesQuery.id)
             case Failure(_) =>
           }
           Vector.empty
@@ -331,7 +328,7 @@ trait NetworkClientImpl { self =>
             if (running.get) loop()
         }
       }
-      try Terminal.withRawSystemIn(loop())
+      try loop()
       catch { case _: InterruptedException => }
     } else batchExecute(userCommands)
     System.exit(0)
@@ -370,7 +367,6 @@ trait NetworkClientImpl { self =>
       })
     try {
       while (running.get) {
-        rawInputThread.synchronized(Option(rawInputThread.getAndSet(null)).foreach(_.close()))
         reader.readLine("> ", None) match {
           case Some("shutdown") =>
             // `sbt -client shutdown` shuts down the server
@@ -414,11 +410,11 @@ trait NetworkClientImpl { self =>
         running.set(false)
     }
   }
-  def sendCommandResponse(command: EventMessage, id: String): Unit = {
+  def sendCommandResponse(method: String, command: EventMessage, id: String): Unit = {
     try {
       val s = new String(Serialization.serializeEventMessage(command))
       val msg =
-        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "sbt/terminalpropsresponse", "params": $s }"""
+        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "$method", "params": $s }"""
       connection.sendString(msg)
     } catch {
       case e: IOException =>
@@ -433,20 +429,19 @@ trait NetworkClientImpl { self =>
     uuid
   }
 
-  private[this] class RawInputThread extends Thread("sbt-raw-input-thread") with AutoCloseable {
+  private[this] class RawInputThread extends Thread("sbt-read-input-thread") with AutoCloseable {
     setDaemon(true)
     start()
     val stopped = new AtomicBoolean(false)
     override final def run(): Unit = {
-      try {
-        val byte = stdin.read().toByte
-        if (!stopped.get) {
-          sendJson("inputStream", byte.toString)
-          ()
-        } else stdinBytes.put(byte)
-      } catch {
-        case _: InterruptedException => stopped.set(true)
-      } finally rawInputThread.set(null)
+      @tailrec def read(): Unit = System.in.read match {
+        case -1 =>
+        case b =>
+          stdinBytes.put(b.toByte)
+          if (!stopped.get()) read()
+      }
+      try Terminal.withRawSystemIn(read())
+      catch { case _: InterruptedException => stopped.set(true) }
     }
 
     override def close(): Unit = {
@@ -480,7 +475,7 @@ class SimpleClient(
     override val provider: UnixDomainSocketLibraryProvider
 ) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
-    import scala.Console.{ GREEN, RED, YELLOW, RESET }
+    import scala.Console.{ GREEN, RED, RESET, YELLOW }
     override def appendLog(level: Level.Value, message: => String): Unit = {
       val prefix = level match {
         case Level.Warn | Level.Error => s"[$RED$level$RESET]"

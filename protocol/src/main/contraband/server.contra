@@ -91,12 +91,14 @@ type TerminalPropertiesResponse implements EventMessage {
 }
 
 type TerminalCapabilitiesQuery implements CommandMessage {
+    id: String!
     boolean: String
     numeric: String
     string: String
 }
 
 type TerminalCapabilitiesResponse implements EventMessage {
+    id: String!
     boolean: Boolean
     numeric: Int
     string: String

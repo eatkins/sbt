@@ -70,7 +70,7 @@ trait Terminal {
   def isEchoEnabled: Boolean
 
   def getBooleanCapability(capability: String): Boolean
-  def getNumericCapability(capability: String): Integer
+  def getNumericCapability(capability: String): Int
   def getStringCapability(capability: String): String
 }
 
@@ -108,6 +108,10 @@ object Terminal {
       val count = lineCount(line)
       (count, line.length - ((count - 1) * width))
   }
+
+  def getBooleanCapability(capability: String): Boolean = terminal.getBooleanCapability(capability)
+  def getNumericCapability(capability: String): Int = terminal.getNumericCapability(capability)
+  def getStringCapability(capability: String): String = terminal.getStringCapability(capability)
 
   /**
    * Returns the number of lines that the input string will cover given the current width of the
@@ -213,6 +217,13 @@ object Terminal {
       withOut(withIn(f))
     } else f
 
+  private[sbt] def withTerminal[T](terminal: Terminal)(f: => T): T = {
+    val original = jline.TerminalFactory.get
+    try {
+      jline.TerminalFactory.set(terminal.toJLine)
+      withIn(terminal.inputStream)(withOut(new PrintStream(terminal.outputStream, true))(f))
+    } finally jline.TerminalFactory.set(original)
+  }
   private[sbt] def withIn[T](in: InputStream)(f: => T): T = {
     val original = inputStream.get
     try {
@@ -450,8 +461,9 @@ object Terminal {
   }
   fixTerminalProperty()
 
-  private[sbt] def createReader(term: Terminal): ConsoleReader =
+  private[sbt] def createReader(term: Terminal): ConsoleReader = {
     new ConsoleReader(term.inputStream, term.outputStream, term.toJLine)
+  }
 
   private[sbt] def consoleTerminal(throwOnClosed: Boolean): Terminal = {
     val in = if (throwOnClosed) throwOnClosedSystemIn else wrappedSystemIn
@@ -486,13 +498,13 @@ object Terminal {
           override def enableInterruptCharacter(): Unit = {}
           override def getOutputEncoding: String = null
           override def getBooleanCapability(capability: String): Boolean = {
-            terminal.getBooleanCapability(capability)
+            term.getBooleanCapability(capability)
           }
           override def getNumericCapability(capability: String): Integer = {
-            terminal.getNumericCapability(capability)
+            term.getNumericCapability(capability)
           }
           override def getStringCapability(capability: String): String = {
-            terminal.getStringCapability(capability)
+            term.getStringCapability(capability)
           }
         }
     }
@@ -510,7 +522,7 @@ object Terminal {
     override def outputStream: OutputStream = out
     override def getBooleanCapability(capability: String): Boolean =
       term.getBooleanCapability(capability)
-    override def getNumericCapability(capability: String): Integer =
+    override def getNumericCapability(capability: String): Int =
       term.getNumericCapability(capability)
     override def getStringCapability(capability: String): String =
       term.getStringCapability(capability)
