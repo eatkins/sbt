@@ -209,6 +209,17 @@ final class NetworkChannel(
                   case buffer =>
                     buffer.put(response.getOrElse(TerminalPropertiesResponse(0, 0, false, false)))
                 }
+              case "sbt/terminalcapresponse" =>
+                import sbt.protocol.codec.JsonProtocol._
+                val response =
+                  req.params.flatMap(Converter.fromJson[TerminalCapabilitiesResponse](_).toOption)
+                pendingTerminalCapability.remove(req.id) match {
+                  case null =>
+                  case buffer =>
+                    buffer.put(
+                      response.getOrElse(TerminalCapabilitiesResponse("", None, None, None))
+                    )
+                }
               case "attach" =>
                 append(Exec("__attach", None, Some(CommandSource(name))))
                 attached.set(true)
@@ -563,8 +574,7 @@ final class NetworkChannel(
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
   private[this] val pendingTerminalCapability =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
-  private[this] val terminal = new Terminal {
-    private[this] val console = Terminal.consoleTerminal(throwOnClosed = false)
+  override private[sbt] val terminal = new Terminal {
     def getProperties: TerminalPropertiesResponse = {
       val id = UUID.randomUUID.toString
       val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
@@ -579,17 +589,34 @@ final class NetworkChannel(
     override def outputStream: OutputStream = NetworkChannel.this.outputStream
     override def isAnsiSupported: Boolean = getProperties.isAnsiSupported
     override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
-    override def getBooleanCapability(capability: String): Boolean = false
-    override def getNumericCapability(capability: String): Integer = 1
-    override def getStringCapability(capability: String): String = {
-      null
-//      val id = UUID.randomUUID.toString
-//      val queue = new ArrayBlockingQueue[TerminalCapabilitiesResponse](1)
-//      import sbt.protocol.codec.JsonProtocol._
-//      pendingTerminalProperties.put(id, queue)
-//      jsonRpcNotify("sbt/terminalcap", id)
-//      queue.take
+    private def getCapability[T](
+        capability: String,
+        query: String => TerminalCapabilitiesQuery,
+        result: TerminalCapabilitiesResponse => T
+    ): T = {
+      val id = UUID.randomUUID.toString
+      val queue = new ArrayBlockingQueue[TerminalCapabilitiesResponse](1)
+      import sbt.protocol.codec.JsonProtocol._
+      pendingTerminalCapability.put(id, queue)
+      jsonRpcNotify("sbt/terminalcap", query(id))
+      result(queue.take)
     }
+    override def getBooleanCapability(capability: String): Boolean = getCapability(
+      capability,
+      TerminalCapabilitiesQuery(_, boolean = Some(capability), numeric = None, string = None),
+      _.boolean.getOrElse(false)
+    )
+    override def getNumericCapability(capability: String): Int = getCapability(
+      capability,
+      TerminalCapabilitiesQuery(_, boolean = None, numeric = Some(capability), string = None),
+      _.numeric.getOrElse(-1)
+    )
+    override def getStringCapability(capability: String): String =
+      getCapability(
+        capability,
+        TerminalCapabilitiesQuery(_, boolean = None, numeric = None, string = Some(capability)),
+        _.string.orNull
+      )
   }
   override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
   import scala.collection.JavaConverters._

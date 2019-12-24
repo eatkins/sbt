@@ -11,6 +11,7 @@ package internal
 import java.io.{ InputStream, PrintStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
+import sbt.internal.util.Terminal
 import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
 
@@ -22,14 +23,18 @@ import sjsonnew.JsonFormat
 abstract class CommandChannel {
   private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
   private val registered: java.util.Set[java.util.Queue[CommandChannel]] = new java.util.HashSet
-  private[sbt] final def register(queue: java.util.Queue[CommandChannel]): Unit = {
-    registered.add(queue)
-    ()
-  }
-  private[sbt] final def unregister(queue: java.util.Queue[CommandChannel]): Unit = {
-    registered.remove(queue)
-    ()
-  }
+  private[sbt] final def register(queue: java.util.Queue[CommandChannel]): Unit =
+    registered.synchronized {
+      registered.add(queue)
+      if (!commandQueue.isEmpty) queue.add(this)
+      ()
+    }
+  private[sbt] final def unregister(queue: java.util.Queue[CommandChannel]): Unit =
+    registered.synchronized {
+      registered.remove(queue)
+      ()
+    }
+  private[sbt] def terminal: Terminal = Terminal.consoleTerminal(throwOnClosed = false)
   private[sbt] def inputStream: InputStream = System.in
   private[sbt] def printStream: PrintStream = System.out
   def append(exec: Exec): Boolean = {

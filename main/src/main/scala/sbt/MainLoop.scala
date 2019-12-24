@@ -196,10 +196,8 @@ object MainLoop {
           case c: NetworkChannel if execSource.contains(c.name) => c
         } match {
           case Some(channel) =>
-            Terminal.withIn(channel.inputStream) {
-              Terminal.withOut(channel.printStream) {
-                Command.process(exec.commandLine, progressState)
-              }
+            Terminal.withTerminal(channel.terminal) {
+              Command.process(exec.commandLine, progressState)
             }
           case _ =>
             Command.process(exec.commandLine, progressState)
