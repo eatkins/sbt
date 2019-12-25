@@ -764,17 +764,16 @@ object BuiltinCommands {
   @tailrec
   private[this] def doLoadFailed(s: State, loadArg: String): State = {
     s.log.warn("Project loading failed: (r)etry, (q)uit, (l)ast, or (i)gnore? (default: r)")
-    val result = Terminal.withRawSystemIn {
-      Terminal.withEcho(toggle = true)(Terminal.wrappedSystemIn.read() match {
-        case -1 => 'q'.toInt
-        case b  => b
-      })
+    val terminal = Terminal.console
+    val result = terminal.withRawSystemIn(terminal.withEcho(terminal.inputStream.read)) match {
+      case -1 => 'q'.toInt
+      case b  => b
     }
     def retry: State = loadProjectCommand(LoadProject, loadArg) :: s.clearGlobalLog
     def ignoreMsg: String =
       if (Project.isProjectLoaded(s)) "using previously loaded project" else "no project loaded"
 
-    result.toChar match {
+    result.toChar.toLower match {
       case '\n' | '\r' => retry
       case 'r' | 'R'   => retry
       case 'q' | 'Q'   => s.exit(ok = false)
