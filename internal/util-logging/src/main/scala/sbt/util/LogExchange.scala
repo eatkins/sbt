@@ -8,7 +8,7 @@
 package sbt.util
 
 import sbt.internal.util._
-import org.apache.logging.log4j.{ LogManager => XLogManager, Level => XLevel }
+import org.apache.logging.log4j.{ LogManager => XLogManager, Level => XLevel, Logger => XLogger }
 import org.apache.logging.log4j.core._
 import org.apache.logging.log4j.core.appender.AsyncAppender
 import org.apache.logging.log4j.core.config.{ AppenderRef, LoggerConfig }
@@ -30,8 +30,10 @@ sealed abstract class LogExchange {
 
   def logger(name: String): ManagedLogger = logger(name, None, None)
   def logger(name: String, channelName: Option[String], execId: Option[String]): ManagedLogger = {
+    new ManagedLogger(name, channelName, execId, getXLogger(name))
+  }
+  private[sbt] def getXLogger(name: String): XLogger = {
     val _ = context
-    val codecs = builtInStringCodecs
     val ctx = XLogManager.getContext(false) match { case x: LoggerContext => x }
     val config = ctx.getConfiguration
     val loggerConfig = LoggerConfig.createLogger(
@@ -48,8 +50,7 @@ sealed abstract class LogExchange {
     )
     config.addLogger(name, loggerConfig)
     ctx.updateLoggers
-    val logger = ctx.getLogger(name)
-    new ManagedLogger(name, channelName, execId, logger)
+    ctx.getLogger(name)
   }
   def unbindLoggerAppenders(loggerName: String): Unit = {
     val lc = loggerConfig(loggerName)
