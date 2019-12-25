@@ -1492,8 +1492,8 @@ object Defaults extends BuildCommon {
         Some(s => {
           def print(st: String) = { scala.Console.out.print(st); scala.Console.out.flush() }
           print(s)
-          Terminal.withRawSystemIn {
-            Terminal.read match {
+          Terminal.get.withRawSystemIn {
+            Terminal.get.inputStream.read match {
               case -1 => None
               case b =>
                 val res = b.toChar.toString

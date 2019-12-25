@@ -38,10 +38,7 @@ private[sbt] class AskUserThread(
   start()
   override def run(): Unit =
     try {
-      val line =
-        if (name == "console0") Terminal.withRawSystemIn(reader.readLine(prompt))
-        else reader.readLine(prompt)
-      line match {
+      terminal.withRawSystemIn(reader.readLine(prompt)) match {
         case Some(cmd) => onLine(cmd)
         case None =>
           writer.println("") // Prevents server shutdown log lines from appearing on the prompt line

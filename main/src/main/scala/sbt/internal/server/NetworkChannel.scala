@@ -338,7 +338,7 @@ final class NetworkChannel(
 
   def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
     event match {
-      case ConsolePromptEvent(state) =>
+      case ConsolePromptEvent(state) if isAttached =>
         askUserThread.synchronized {
           askUserThread.get match {
             case null =>
@@ -347,7 +347,9 @@ final class NetworkChannel(
                   name,
                   state,
                   terminal,
-                  cmd => { append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); () },
+                  cmd => {
+                    append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
+                  },
                   () => askUserThread.synchronized(askUserThread.set(null))
                 )
               )
@@ -558,6 +560,10 @@ final class NetworkChannel(
     log.info("Shutting down client connection")
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
+    askUserThread.getAndSet(null) match {
+      case null =>
+      case t    => t.interrupt()
+    }
     running.set(false)
     out.close()
   }
@@ -607,6 +613,7 @@ final class NetworkChannel(
     override def getHeight: Int = getProperties.height
     override def isAnsiSupported: Boolean = getProperties.isAnsiSupported
     override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
+    override val inputStream = Terminal.throwOnClosedSystemIn(super.inputStream)
     private def getCapability[T](
         capability: String,
         query: String => TerminalCapabilitiesQuery,

@@ -570,26 +570,29 @@ private[sbt] object ProgressState {
    * at the info or greater level, we can decrement the padding because the console
    * line will have filled in the blank line.
    */
-  private[util] def updateProgressState(pe: ProgressEvent): Unit = Terminal.withPrintStream { ps =>
-    progressState.get match {
-      case null =>
-      case state =>
-        val info = pe.items.map { item =>
-          val elapsed = item.elapsedMicros / 1000000L
-          s"  | => ${item.name} ${elapsed}s"
-        }
+  private[util] def updateProgressState(pe: ProgressEvent): Unit = {
+    val terminal = Terminal.get
+    terminal.withPrintStream { ps =>
+      progressState.get match {
+        case null =>
+        case state =>
+          val info = pe.items.map { item =>
+            val elapsed = item.elapsedMicros / 1000000L
+            s"  | => ${item.name} ${elapsed}s"
+          }
 
-        val currentLength = info.foldLeft(0)(_ + Terminal.lineCount(_))
-        val previousLines = state.progressLines.getAndSet(info)
-        val prevLength = previousLines.foldLeft(0)(_ + Terminal.lineCount(_))
+          val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))
+          val previousLines = state.progressLines.getAndSet(info)
+          val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
 
-        val (height, width) = Terminal.getLineHeightAndWidth
-        val prevSize = prevLength + state.padding.get
+          val (height, width) = terminal.getLineHeightAndWidth
+          val prevSize = prevLength + state.padding.get
 
-        val newPadding = math.max(0, prevSize - currentLength)
-        state.padding.set(newPadding)
-        ps.print(printProgress(height, width))
-        ps.flush()
+          val newPadding = math.max(0, prevSize - currentLength)
+          state.padding.set(newPadding)
+          ps.print(printProgress(height, width))
+          ps.flush()
+      }
     }
   }
 
