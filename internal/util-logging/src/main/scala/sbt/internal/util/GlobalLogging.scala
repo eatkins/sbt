@@ -83,7 +83,7 @@ object GlobalLogging {
       console: ConsoleOut
   ): GlobalLogging = {
     val loggerName = generateName
-    val log = new ManagedLogger.ProxyLogger(loggerName)
+    val log = LogExchange.logger(loggerName)
     val appender = ConsoleAppender(ConsoleAppender.generateName, console)
     LogExchange.bindLoggerAppenders(loggerName, List(appender -> Level.Info))
     GlobalLogging(log, console, appender, GlobalLogBacking(newBackingFile), newAppender)

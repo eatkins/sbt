@@ -10,13 +10,12 @@ package sbt
 import java.io.PrintWriter
 import java.util.Properties
 
-import org.apache.logging.log4j.{ Logger => XLogger }
 import sbt.internal.{ Aggregation, ShutdownHooks }
 import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.server.NetworkChannel
 import sbt.internal.util.complete.Parser
-import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, ManagedLogger, Terminal }
+import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Terminal }
 import sbt.io.{ IO, Using }
 import sbt.protocol._
 import sbt.util.Logger
@@ -141,18 +140,7 @@ object MainLoop {
   def next(state: State): State =
     try {
       ErrorHandling.wideConvert {
-        state.globalLogging.full match {
-          case p: ManagedLogger.ProxyLogger =>
-            state.currentCommand
-              .map { e =>
-                p.withState(e.source.map(_.channelName).orNull, e.execId.orNull, null)(
-                  state.process(processCommand)
-                )
-              }
-              .getOrElse(state.process(processCommand))
-          case _ =>
-            state.process(processCommand)
-        }
+        state.process(processCommand)
       } match {
         case Right(s)                  => s
         case Left(t: xsbti.FullReload) => throw t
