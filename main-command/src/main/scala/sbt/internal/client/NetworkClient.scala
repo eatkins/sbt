@@ -75,11 +75,11 @@ trait NetworkClientImpl { self =>
           setDaemon(true)
         }
     )
-  private[this] val stdinBytes = new LinkedBlockingQueue[Byte]
+  private[this] val stdinBytes = new LinkedBlockingQueue[Int]
   private[this] val stdinAlive = new AtomicBoolean(true)
   private[this] val stdin: InputStream = new InputStream {
     override def available(): Int = stdinBytes.size
-    override def read: Int = stdinBytes.take & 0xFF
+    override def read: Int = stdinBytes.take
   }
   private[this] val inputThread = new RawInputThread
   private[this] val mainThread = Thread.currentThread()
@@ -104,7 +104,7 @@ trait NetworkClientImpl { self =>
             if (running.compareAndSet(true, false) && log)
               console.appendLog(Level.Info, "Remote server exited. Shutting down.")
             inputThread.close()
-            stdinBytes.put(-1)
+            stdinBytes.offer(-1)
             mainThread.interrupt()
           case "readInput" =>
           case _           => self.onNotification(msg)
@@ -192,6 +192,7 @@ trait NetworkClientImpl { self =>
         onReturningReponse(msg)
         lock.synchronized {
           pendingExecIds -= execId
+          stdinBytes.offer(-1)
           lock.notifyAll()
         }
         ()
@@ -317,43 +318,51 @@ trait NetworkClientImpl { self =>
     val _ = connection
     val cleaned = arguments.collect { case c if !c.startsWith("-") => c.trim }
     val userCommands = cleaned.takeWhile(_ != "exit")
+    @tailrec def loop(limit: Option[Deadline]): Unit = {
+      val byte: Int = limit match {
+        case Some(d) => stdinBytes.poll((d - Deadline.now).toMillis, TimeUnit.MILLISECONDS)
+        case _       => stdin.read
+      }
+      byte match {
+        case -1 =>
+        case byte =>
+          sendJson("inputStream", byte.toString)
+          if (running.get && !limit.fold(false)(_.isOverdue)) loop(limit)
+      }
+    }
     if (cleaned.isEmpty) {
       //shell()
       connection.sendString(Serialization.serializeCommandAsJsonMessage(Attach()))
-      @tailrec def loop(): Unit = {
-        stdin.read match {
-          case -1 =>
-          case byte =>
-            sendJson("inputStream", byte.toString)
-            if (running.get) loop()
-        }
-      }
-      try loop()
+      try loop(None)
       catch { case _: InterruptedException => }
-    } else batchExecute(userCommands)
+    } else {
+      batchExecute(userCommands, loop)
+    }
     System.exit(0)
   }
 
-  def batchExecute(userCommands: List[String]): Unit = {
+  def batchExecute(userCommands: List[String], wait: Option[Deadline] => Unit): Unit = {
     userCommands foreach { cmd =>
       println("> " + cmd)
-      if (cmd == "shutdown") sendAndWait("exit", Some(100.millis.fromNow))
-      else sendAndWait(cmd, None)
+      if (cmd == "shutdown") sendAndWait("exit", Some(100.millis.fromNow), wait)
+      else sendAndWait(cmd, None, wait)
+      System.exit(0)
     }
   }
 
-  private def sendAndWait(cmd: String, limit: Option[Deadline]): Unit = {
+  private def sendAndWait(
+      cmd: String,
+      limit: Option[Deadline],
+      wait: Option[Deadline] => Unit
+  ): Unit = {
     val execId = sendExecCommand(cmd)
     while (running.get && pendingExecIds.contains(execId) && limit.fold(true)(!_.isOverdue())) {
-      limit match {
-        case None =>
-          lock.synchronized(lock.wait)
-        case Some(l) => lock.synchronized(lock.wait((l - Deadline.now).toMillis))
-      }
+      wait(limit)
     }
   }
 
-  def shell(): Unit = {
+  def shell(): Unit = shell(_.foreach(d => Thread.sleep((d - Deadline.now).toMillis)))
+  def shell(wait: Option[Deadline] => Unit): Unit = {
     val reader =
       new NetworkReader(Terminal.console, (prefix, level) => {
         val execId = sendJson("sbt/completion", s"""{"query":"$prefix","level":$level}""")
@@ -370,13 +379,10 @@ trait NetworkClientImpl { self =>
         reader.readLine("> ", None) match {
           case Some("shutdown") =>
             // `sbt -client shutdown` shuts down the server
-            sendAndWait("exit", Some(100.millis.fromNow))
+            sendAndWait("exit", Some(100.millis.fromNow), wait)
             running.set(false)
-            executor.shutdownNow()
-          case Some("exit") =>
-            running.set(false)
-            executor.shutdownNow()
-          case Some(s) if s.trim.nonEmpty => sendAndWait(s, None)
+          case Some("exit")               => running.set(false)
+          case Some(s) if s.trim.nonEmpty => sendAndWait(s, None, wait)
           case _                          => //
         }
       }
@@ -437,7 +443,7 @@ trait NetworkClientImpl { self =>
       @tailrec def read(): Unit = System.in.read match {
         case -1 =>
         case b =>
-          stdinBytes.put(b.toByte)
+          stdinBytes.offer(b)
           if (!stopped.get()) read()
       }
       try Terminal.withRawSystemIn(read())

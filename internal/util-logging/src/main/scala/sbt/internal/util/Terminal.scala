@@ -50,6 +50,26 @@ trait Terminal extends AutoCloseable {
   def getLineHeightAndWidth: (Int, Int)
 
   /**
+   * Returns the number of lines that the input string will cover given the current width of the
+   * terminal.
+   *
+   * @param line the input line
+   * @return the number of lines that the line will cover on the terminal
+   */
+  def lineCount(line: String): Int = {
+    val width = getWidth
+    val lines = EscHelpers.removeEscapeSequences(line).split('\n')
+    def count(l: String): Int = {
+      val len = l.length
+      if (width > 0 && len > 0) (len - 1 + width) / width else 0
+    }
+    lines.tail.foldLeft(lines.headOption.fold(0)(count))(_ + count(_))
+  }
+
+  /**
+   *
+   */
+  /**
    * Gets the input stream for this Terminal. This could be a wrapper around System.in for the
    * process or it could be a remote input stream for a network channel.
    * @return the input stream.
