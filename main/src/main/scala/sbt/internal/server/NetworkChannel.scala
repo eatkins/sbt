@@ -42,7 +42,7 @@ final class NetworkChannel(
     auth: Set[ServerAuthentication],
     instance: ServerInstance,
     handlers: Seq[ServerHandler],
-    mkLogger: Terminal => Logger
+    mkLogger: (Boolean, Boolean) => Logger
 ) extends CommandChannel
     with NetworkChannel.ProxyLog
     with LanguageServerProtocol {
@@ -54,7 +54,7 @@ final class NetworkChannel(
       instance: ServerInstance,
       handlers: Seq[ServerHandler],
       log: Logger
-  ) = this(name, connection, structure, auth, instance, handlers, _ => log)
+  ) = this(name, connection, structure, auth, instance, handlers, (_, _) => log)
   import NetworkChannel._
 
   private[this] val askUserThread = new AtomicReference[AskUserThread]
@@ -75,7 +75,15 @@ final class NetworkChannel(
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val alive = new AtomicBoolean(true)
 
-  setLogger(mkLogger(terminal))
+  override val terminal: Terminal = new NetworkTerminal
+  new Thread(() => {
+    println(s"${terminal.isAnsiSupported}, ${terminal.isColorEnabled}")
+    setLogger(mkLogger(terminal.isAnsiSupported, terminal.isColorEnabled))
+    println(s"set logger")
+  }) {
+    setDaemon(true)
+    start()
+  }
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
   def contentType: String = _contentType
@@ -578,11 +586,11 @@ final class NetworkChannel(
     running.set(false)
     out.close()
   }
-  private[this] val pendingTerminalProperties =
+  private[this] lazy val pendingTerminalProperties =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
-  private[this] val pendingTerminalCapability =
+  private[this] lazy val pendingTerminalCapability =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
-  private[this] val inputStream: InputStream = new InputStream {
+  private[this] lazy val inputStream: InputStream = new InputStream {
     override def read(): Int =
       try {
         if (askUserThread.get == null) jsonRpcNotify("readInput", true)
@@ -592,7 +600,7 @@ final class NetworkChannel(
   }
   import scala.collection.JavaConverters._
   import sjsonnew.BasicJsonProtocol._
-  private[this] val outputStream: OutputStream = new OutputStream {
+  private[this] lazy val outputStream: OutputStream = new OutputStream {
     private[this] val buffer = new LinkedBlockingQueue[Byte]()
     override def write(b: Int): Unit = buffer.put(b.toByte)
     override def flush(): Unit = {

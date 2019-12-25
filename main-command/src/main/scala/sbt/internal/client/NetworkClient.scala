@@ -90,7 +90,6 @@ trait NetworkClientImpl { self =>
     }
     val (sk, tkn) = try ClientSocket.socket(portfile, provider)
     catch { case e: IOException => throw new ConnectionRefusedException(e) }
-    println(s"WTF got socket")
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
         msg.method match {
@@ -105,8 +104,7 @@ trait NetworkClientImpl { self =>
             stdinBytes.offer(-1)
             mainThread.interrupt()
           case "readInput" =>
-            println(s"HUH $msg")
-          case _ => self.onNotification(msg)
+          case _           => self.onNotification(msg)
         }
       }
       override def onRequest(msg: JsonRpcRequestMessage): Unit = self.onRequest(msg)
@@ -119,7 +117,6 @@ trait NetworkClientImpl { self =>
     val execId = UUID.randomUUID.toString
     val initCommand = InitCommand(tkn, Option(execId))
     conn.sendString(Serialization.serializeCommandAsJsonMessage(initCommand))
-    println(s"initialize!")
     conn
   }
 
@@ -150,37 +147,25 @@ trait NetworkClientImpl { self =>
     val process = new ProcessBuilder(cmd: _*).directory(baseDirectory).start()
     val stdout = process.getInputStream
     val stderr = process.getErrorStream
-    val latch = new CountDownLatch(1)
-    new Thread() {
-      setDaemon(true)
-      start()
-      override def run(): Unit = {
-        @tailrec
-        def blockUntilStart(): Unit = {
-          while (stdout.available > 0) {
-            System.out.write(stdout.read)
-          }
-          while (stderr.available > 0) {
-            System.err.write(stderr.read)
-          }
-          Thread.sleep(100)
-          if (portfile.exists) latch.countDown()
-//          if (!portfile.exists) blockUntilStart()
-//          else {
-//            stdout.close()
-//            stderr.close()
-//            process.getOutputStream.close()
-//          }
-          blockUntilStart()
-        }
-
-        try blockUntilStart()
-        catch { case t: Throwable => t.printStackTrace() }
-        latch.countDown()
+    @tailrec
+    def blockUntilStart(): Unit = {
+      while (stdout.available > 0) {
+        System.out.write(stdout.read)
+      }
+      while (stderr.available > 0) {
+        System.err.write(stderr.read)
+      }
+      Thread.sleep(10)
+      if (!portfile.exists) blockUntilStart()
+      else {
+        stdout.close()
+        stderr.close()
+        process.getOutputStream.close()
       }
     }
-    latch.await()
-    println(s"finish block")
+
+    try blockUntilStart()
+    catch { case t: Throwable => t.printStackTrace() }
   }
 
   /** Called on the response for a returning message. */
@@ -350,9 +335,7 @@ trait NetworkClientImpl { self =>
     }
     if (cleaned.isEmpty) {
       //shell()
-      println(s"WTF should attach")
       connection.sendString(Serialization.serializeCommandAsJsonMessage(Attach()))
-      println(s"attached!")
       try loop(None)
       catch { case _: InterruptedException => }
     } else {

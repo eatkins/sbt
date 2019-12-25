@@ -54,6 +54,7 @@ private[sbt] class AskUserThread(
 }
 private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel {
   private[this] val askUserThread = new AtomicReference[AskUserThread]
+  override private[sbt] def terminal = Terminal.console
   private[this] def makeAskUserThread(s: State): AskUserThread =
     new AskUserThread(
       "console",
