@@ -8,7 +8,7 @@
 package sbt
 package internal
 
-import java.io.{ File, InputStream, OutputStream, PrintStream }
+import java.io.{ File, IOException, InputStream, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicReference
 
@@ -44,7 +44,7 @@ private[sbt] class AskUserThread(
           writer.println("") // Prevents server shutdown log lines from appearing on the prompt line
           onLine("exit")
       }
-    } catch { case _: ClosedChannelException => } finally onClose()
+    } catch { case _: ClosedChannelException | _: IOException => } finally onClose()
   def redraw(): Unit = {
     writer.print(ConsoleAppender.clearLine(0))
     reader.redraw()
