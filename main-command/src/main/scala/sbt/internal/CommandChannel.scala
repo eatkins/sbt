@@ -35,8 +35,6 @@ abstract class CommandChannel {
       ()
     }
   private[sbt] def terminal: Terminal = Terminal.console
-  private[sbt] def inputStream: InputStream = terminal.inputStream
-  private[sbt] def printStream: PrintStream = terminal.printStream
   def append(exec: Exec): Boolean = registered.synchronized {
     val res = commandQueue.add(exec)
     if (res) registered.forEach(q => q.synchronized { q.add(this); () })

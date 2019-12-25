@@ -29,7 +29,7 @@ import sbt.internal.protocol.{
   JsonRpcNotificationMessage
 }
 import sbt.internal.util.Terminal.TerminalImpl
-import sbt.util.Logger
+import sbt.util.{ Level, Logger }
 import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.util.Try
@@ -42,9 +42,19 @@ final class NetworkChannel(
     auth: Set[ServerAuthentication],
     instance: ServerInstance,
     handlers: Seq[ServerHandler],
-    val log: Logger
+    mkLogger: Terminal => Logger
 ) extends CommandChannel
+    with NetworkChannel.ProxyLog
     with LanguageServerProtocol {
+  def this(
+      name: String,
+      connection: Socket,
+      structure: BuildStructure,
+      auth: Set[ServerAuthentication],
+      instance: ServerInstance,
+      handlers: Seq[ServerHandler],
+      log: Logger
+  ) = this(name, connection, structure, auth, instance, handlers, _ => log)
   import NetworkChannel._
 
   private[this] val askUserThread = new AtomicReference[AskUserThread]
@@ -64,6 +74,8 @@ final class NetworkChannel(
   private val VsCodeOld = "application/vscode-jsonrpc; charset=utf8"
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val alive = new AtomicBoolean(true)
+
+  setLogger(mkLogger(terminal))
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
   def contentType: String = _contentType
@@ -566,21 +578,18 @@ final class NetworkChannel(
     running.set(false)
     out.close()
   }
-
-  private[sbt] class NetworkInputStream extends InputStream {
-    override def read(): Int = {
-      try {
-        if (askUserThread.get == null) jsonRpcNotify("readInput", true)
-        inputBuffer.take & 0xFF
-      } catch { case _: InterruptedException | _: IOException => -1 }
-    }
-    override def available(): Int = inputBuffer.size
-  }
   private[this] val pendingTerminalProperties =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
   private[this] val pendingTerminalCapability =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
-  override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
+  private[this] val inputStream: InputStream = new InputStream {
+    override def read(): Int =
+      try {
+        if (askUserThread.get == null) jsonRpcNotify("readInput", true)
+        inputBuffer.take & 0xFF
+      } catch { case _: InterruptedException | _: IOException => -1 }
+    override def available(): Int = inputBuffer.size
+  }
   import scala.collection.JavaConverters._
   import sjsonnew.BasicJsonProtocol._
   private[this] val outputStream: OutputStream = new OutputStream {
@@ -599,7 +608,7 @@ final class NetworkChannel(
       }
     }
   }
-  override private[sbt] val terminal = new TerminalImpl(inputStream, outputStream) {
+  private class NetworkTerminal extends TerminalImpl(inputStream, outputStream) {
     def getProperties: TerminalPropertiesResponse = {
       val id = UUID.randomUUID.toString
       val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
@@ -612,6 +621,8 @@ final class NetworkChannel(
     override def getHeight: Int = getProperties.height
     override def isAnsiSupported: Boolean = getProperties.isAnsiSupported
     override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
+    override def isColorEnabled: Boolean = getProperties.isColorEnabled
+    override def isSupershellEnabled: Boolean = getProperties.isSupershellEnabled
     override val inputStream = Terminal.throwOnClosedSystemIn(super.inputStream)
     private def getCapability[T](
         capability: String,
@@ -641,14 +652,20 @@ final class NetworkChannel(
         TerminalCapabilitiesQuery(_, boolean = None, numeric = None, string = Some(capability)),
         _.string.orNull
       )
-
-    override def isColorEnabled: Boolean = getProperties.isColorEnabled
-    override def isSupershellEnabled: Boolean = getProperties.isSupershellEnabled
   }
   private[sbt] def isAttached: Boolean = attached.get
 }
 
 object NetworkChannel {
+  private[sbt] trait ProxyLog {
+    private val logHolder = new AtomicReference[Logger](new Logger {
+      override def trace(t: => Throwable): Unit = {}
+      override def success(message: => String): Unit = {}
+      override def log(level: Level.Value, message: => String): Unit = {}
+    })
+    def log: Logger = logHolder.get
+    def setLogger(logger: Logger): Unit = logHolder.set(logger)
+  }
   sealed trait ChannelState
   case object SingleLine extends ChannelState
   case object InHeader extends ChannelState
