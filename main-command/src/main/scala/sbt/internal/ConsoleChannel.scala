@@ -8,7 +8,7 @@
 package sbt
 package internal
 
-import java.io.{ File, IOException, InputStream, OutputStream, PrintStream }
+import java.io.{ File, IOException, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicReference
 
@@ -25,10 +25,10 @@ private[sbt] class AskUserThread(
     onClose: () => Unit
 ) extends Thread(s"ask-user-thread-$name") {
   private[this] val writer = new PrintStream(terminal.outputStream, true)
-  private[this] def getPrompt(s: State): String = s.get(shellPrompt) match {
-    case Some(pf) => pf(s)
+  private[this] def getPrompt(s: State): String = s.get(newShellPrompt) match {
+    case Some(pf) => pf(terminal, s)
     case None =>
-      def ansi(s: String): String = if (ConsoleAppender.formatEnabledInEnv) s"$s" else ""
+      def ansi(s: String): String = if (terminal.isAnsiSupported) s"$s" else ""
       s"${ansi(ConsoleAppender.DeleteLine)}> ${ansi(ConsoleAppender.ClearScreenAfterCursor)}"
   }
   private val history = s.get(historyPath).getOrElse(Some(new File(s.baseDir, ".history")))

@@ -87,6 +87,8 @@ type TerminalPropertiesResponse implements EventMessage {
     width: Int!
     height: Int!
     isAnsiSupported: Boolean!
+    isColorEnabled: Boolean!
+    isSupershellEnabled: Boolean!
     isEchoEnabled: Boolean!
 }
 

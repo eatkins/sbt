@@ -14,9 +14,11 @@ implicit lazy val TerminalPropertiesResponseFormat: JsonFormat[sbt.protocol.Term
       val width = unbuilder.readField[Int]("width")
       val height = unbuilder.readField[Int]("height")
       val isAnsiSupported = unbuilder.readField[Boolean]("isAnsiSupported")
+      val isColorEnabled = unbuilder.readField[Boolean]("isColorEnabled")
+      val isSupershellEnabled = unbuilder.readField[Boolean]("isSupershellEnabled")
       val isEchoEnabled = unbuilder.readField[Boolean]("isEchoEnabled")
       unbuilder.endObject()
-      sbt.protocol.TerminalPropertiesResponse(width, height, isAnsiSupported, isEchoEnabled)
+      sbt.protocol.TerminalPropertiesResponse(width, height, isAnsiSupported, isColorEnabled, isSupershellEnabled, isEchoEnabled)
       case None =>
       deserializationError("Expected JsObject but found None")
     }
@@ -26,6 +28,8 @@ implicit lazy val TerminalPropertiesResponseFormat: JsonFormat[sbt.protocol.Term
     builder.addField("width", obj.width)
     builder.addField("height", obj.height)
     builder.addField("isAnsiSupported", obj.isAnsiSupported)
+    builder.addField("isColorEnabled", obj.isColorEnabled)
+    builder.addField("isSupershellEnabled", obj.isSupershellEnabled)
     builder.addField("isEchoEnabled", obj.isEchoEnabled)
     builder.endObject()
   }

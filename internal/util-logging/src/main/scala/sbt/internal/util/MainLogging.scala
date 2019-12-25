@@ -79,6 +79,19 @@ object MainAppender {
     ConsoleAppender(ConsoleAppender.generateName, console, suppressedMessage = suppressedMessage)
 
   def defaultScreen(
+      console: ConsoleOut,
+      ansiCodesSupported: Boolean,
+      useFormat: Boolean
+  ): Appender =
+    ConsoleAppender(
+      ConsoleAppender.generateName,
+      console,
+      ansiCodesSupported = ansiCodesSupported,
+      useFormat = useFormat,
+      suppressedMessage = _ => None
+    )
+
+  def defaultScreen(
       name: String,
       console: ConsoleOut,
       suppressedMessage: SuppressedTraceContext => Option[String]

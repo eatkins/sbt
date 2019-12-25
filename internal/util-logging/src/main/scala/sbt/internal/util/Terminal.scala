@@ -91,11 +91,25 @@ trait Terminal extends AutoCloseable {
   def isAnsiSupported: Boolean
 
   /**
+   * Returns true if color is enabled for this terminal.
+   *
+   * @return true if color is enabled for this terminal.
+   */
+  def isColorEnabled: Boolean
+
+  /**
    * Returns true if the terminal has echo enabled.
    *
    * @return true if the terminal has echo enabled.
    */
   def isEchoEnabled: Boolean
+
+  /**
+   * Returns true if the terminal has supershell enabled.
+   *
+   * @return true if the terminal has supershell enabled.
+   */
+  def isSupershellEnabled: Boolean
 
   def getBooleanCapability(capability: String): Boolean
   def getNumericCapability(capability: String): Int
@@ -484,6 +498,12 @@ object Terminal {
         term.setEchoEnabled(true)
       }
     }
+    override def isColorEnabled: Boolean = ConsoleAppender.formatEnabledInEnv
+
+    override def isSupershellEnabled: Boolean =
+      System.getProperty("sbt.supershell", "true") == "true" || {
+        !(sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")) && isColorEnabled
+      }
   }
   private[sbt] abstract class TerminalImpl(val in: InputStream, val out: OutputStream)
       extends Terminal {
