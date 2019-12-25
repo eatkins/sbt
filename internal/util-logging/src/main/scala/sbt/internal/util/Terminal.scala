@@ -501,7 +501,7 @@ object Terminal {
     override def isColorEnabled: Boolean = ConsoleAppender.formatEnabledInEnv
 
     override def isSupershellEnabled: Boolean =
-      System.getProperty("sbt.supershell", "true") == "true" || {
+      System.getProperty("sbt.supershell", "") == "true" || {
         !(sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")) && isColorEnabled
       }
   }
