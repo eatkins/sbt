@@ -38,7 +38,10 @@ private[sbt] class AskUserThread(
   start()
   override def run(): Unit =
     try {
-      reader.readLine(prompt) match {
+      val line =
+        if (name == "console0") Terminal.withRawSystemIn(reader.readLine(prompt))
+        else reader.readLine(prompt)
+      line match {
         case Some(cmd) => onLine(cmd)
         case None =>
           writer.println("") // Prevents server shutdown log lines from appearing on the prompt line
@@ -58,7 +61,7 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
     new AskUserThread(
       "console",
       s,
-      Terminal.consoleTerminal(throwOnClosed = true),
+      Terminal.console,
       cmd => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))),
       () => askUserThread.synchronized(askUserThread.set(null))
     )

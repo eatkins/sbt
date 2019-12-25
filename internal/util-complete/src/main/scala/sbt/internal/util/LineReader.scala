@@ -157,7 +157,7 @@ private[sbt] object JLine {
 
   @deprecated("Use LineReader.createReader", "1.4.0")
   def createReader(historyPath: Option[File], in: InputStream): ConsoleReader = {
-    val cr = Terminal.createReader(Terminal.consoleTerminal(throwOnClosed = false))
+    val cr = Terminal.createReader(Terminal.console)
     cr.setExpandEvents(false) // https://issues.scala-lang.org/browse/SI-7650
     cr.setBellEnabled(false)
     val h = historyPath match {
@@ -228,7 +228,7 @@ final class FullReader(
       historyPath,
       complete,
       handleCONT,
-      Terminal.consoleTerminal(throwOnClosed = false)
+      Terminal.console
     )
   protected[this] val reader: ConsoleReader = {
     val cr = LineReader.createReader(historyPath, terminal)
@@ -243,7 +243,7 @@ class SimpleReader private[sbt] (
     terminal: Terminal
 ) extends JLine {
   def this(historyPath: Option[File], handleCONT: Boolean, injectThreadSleep: Boolean) =
-    this(historyPath, handleCONT, Terminal.consoleTerminal(throwOnClosed = false))
+    this(historyPath, handleCONT, Terminal.console)
   protected[this] val reader: ConsoleReader =
     LineReader.createReader(historyPath, terminal)
 }

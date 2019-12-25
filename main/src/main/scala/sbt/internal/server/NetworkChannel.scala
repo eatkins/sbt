@@ -28,6 +28,7 @@ import sbt.internal.protocol.{
   JsonRpcRequestMessage,
   JsonRpcNotificationMessage
 }
+import sbt.internal.util.Terminal.TerminalImpl
 import sbt.util.Logger
 import sjsonnew.support.scalajson.unsafe.Converter
 
@@ -574,7 +575,26 @@ final class NetworkChannel(
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
   private[this] val pendingTerminalCapability =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
-  override private[sbt] val terminal = new Terminal {
+  override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
+  import scala.collection.JavaConverters._
+  import sjsonnew.BasicJsonProtocol._
+  private[this] val outputStream: OutputStream = new OutputStream {
+    private[this] val buffer = new LinkedBlockingQueue[Byte]()
+    override def write(b: Int): Unit = buffer.put(b.toByte)
+    override def flush(): Unit = {
+      jsonRpcNotify("systemOut", buffer.asScala)
+      buffer.clear()
+    }
+    override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
+    override def write(b: Array[Byte], off: Int, len: Int): Unit = {
+      var i = off
+      while (i < len) {
+        buffer.put(b(i))
+        i += 1
+      }
+    }
+  }
+  override private[sbt] val terminal = new TerminalImpl(inputStream, outputStream) {
     def getProperties: TerminalPropertiesResponse = {
       val id = UUID.randomUUID.toString
       val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
@@ -585,8 +605,6 @@ final class NetworkChannel(
     }
     override def getWidth: Int = getProperties.width
     override def getHeight: Int = getProperties.height
-    override def inputStream: InputStream = NetworkChannel.this.inputStream
-    override def outputStream: OutputStream = NetworkChannel.this.outputStream
     override def isAnsiSupported: Boolean = getProperties.isAnsiSupported
     override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
     private def getCapability[T](
@@ -618,26 +636,6 @@ final class NetworkChannel(
         _.string.orNull
       )
   }
-  override private[sbt] val inputStream: NetworkInputStream = new NetworkInputStream
-  import scala.collection.JavaConverters._
-  import sjsonnew.BasicJsonProtocol._
-  private[this] val outputStream: OutputStream = new OutputStream {
-    private[this] val buffer = new LinkedBlockingQueue[Byte]()
-    override def write(b: Int): Unit = buffer.put(b.toByte)
-    override def flush(): Unit = {
-      jsonRpcNotify("systemOut", buffer.asScala)
-      buffer.clear()
-    }
-    override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
-    override def write(b: Array[Byte], off: Int, len: Int): Unit = {
-      var i = off
-      while (i < len) {
-        buffer.put(b(i))
-        i += 1
-      }
-    }
-  }
-  override private[sbt] val printStream = new PrintStream(outputStream)
   private[sbt] def isAttached: Boolean = attached.get
 }
 
