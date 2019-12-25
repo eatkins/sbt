@@ -148,14 +148,20 @@ trait NetworkClientImpl { self =>
     val stderr = process.getErrorStream
     @tailrec
     def blockUntilStart(): Unit = {
-      System.out.write(stdout.read)
+      while (stdout.available > 0) {
+        System.out.write(stdout.read)
+      }
       while (stderr.available > 0) {
         System.err.write(stderr.read)
       }
-      blockUntilStart()
+      Thread.sleep(10)
+      if (!portfile.exists) blockUntilStart()
+      else {
+        stdout.close()
+        stderr.close()
+        process.getOutputStream.close()
+      }
     }
-    stdout.close()
-    stderr.close()
     try blockUntilStart()
     catch { case t: Throwable => t.printStackTrace() }
   }
