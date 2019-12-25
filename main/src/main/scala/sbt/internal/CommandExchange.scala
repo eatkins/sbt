@@ -167,7 +167,7 @@ private[sbt] final class CommandExchange {
       val logger: Logger = {
         val log = LogExchange.logger(name, None, None)
         LogExchange.unbindLoggerAppenders(name)
-        val appender = MainAppender.defaultScreen(s.globalLogging.console)
+        val appender = MainAppender.defaultScreen(s.globalLogging.console, true, true)
         LogExchange.bindLoggerAppenders(name, List(appender -> level))
         log
       }

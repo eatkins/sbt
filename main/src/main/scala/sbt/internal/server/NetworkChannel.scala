@@ -206,9 +206,8 @@ final class NetworkChannel(
                 val response =
                   req.params.flatMap(Converter.fromJson[TerminalPropertiesResponse](_).toOption)
                 pendingTerminalProperties.remove(req.id) match {
-                  case null =>
-                  case buffer =>
-                    buffer.put(response.getOrElse(TerminalPropertiesResponse(0, 0, false, false)))
+                  case null   =>
+                  case buffer => response.foreach(buffer.put)
                 }
               case "sbt/terminalcapresponse" =>
                 import sbt.protocol.codec.JsonProtocol._
@@ -642,6 +641,9 @@ final class NetworkChannel(
         TerminalCapabilitiesQuery(_, boolean = None, numeric = None, string = Some(capability)),
         _.string.orNull
       )
+
+    override def isColorEnabled: Boolean = getProperties.isColorEnabled
+    override def isSupershellEnabled: Boolean = getProperties.isSupershellEnabled
   }
   private[sbt] def isAttached: Boolean = attached.get
 }

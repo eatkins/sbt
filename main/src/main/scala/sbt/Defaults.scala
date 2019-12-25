@@ -338,10 +338,7 @@ object Defaults extends BuildCommon {
         val rs = EvaluateTask.taskTimingProgress.toVector ++ EvaluateTask.taskTraceEvent.toVector
         rs map { Keys.TaskProgress(_) }
       },
-      progressState := {
-        if ((ThisBuild / useSuperShell).value) Some(new ProgressState(SysProp.supershellBlankZone))
-        else None
-      },
+      progressState := Some(new ProgressState(SysProp.supershellBlankZone)),
       Previous.cache := new Previous(
         Def.streamsManagerKey.value,
         Previous.references.value.getReferences
@@ -2340,6 +2337,9 @@ object Classpaths {
           CrossVersion(scalaVersion, binVersion)(base).withCrossVersion(Disabled())
         },
         shellPrompt := shellPromptFromState,
+        newShellPrompt := { (t, s) =>
+          shellPromptFromState(t)(s)
+        },
         dynamicDependency := { (): Unit },
         transitiveClasspathDependency := { (): Unit },
         transitiveDynamicInputs :== Nil,
@@ -3796,11 +3796,18 @@ object Classpaths {
     }
   }
 
-  def shellPromptFromState: State => String = { s: State =>
+  def shellPromptFromState: State => String = shellPromptFromState(Terminal.console)
+  def shellPromptFromState(terminal: Terminal): State => String = { s: State =>
     val extracted = Project.extract(s)
+    def ansi(s: String): String = if (terminal.isAnsiSupported) s"$s" else ""
+    def wrap(s: String) =
+      s"${ansi(ConsoleAppender.DeleteLine)}$s${ansi(ConsoleAppender.clearScreen(0))}"
     (name in extracted.currentRef).get(extracted.structure.data) match {
-      case Some(name) => s"sbt:$name" + Def.withColor("> ", Option(scala.Console.CYAN))
-      case _          => "> "
+      case Some(name) =>
+        val prompt =
+          s"sbt:$name" + Def.withColor(s"> ", Option(scala.Console.CYAN), terminal.isColorEnabled)
+        wrap(prompt)
+      case _ => wrap("> ")
     }
   }
 }

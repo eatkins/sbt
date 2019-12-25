@@ -13,22 +13,14 @@ import java.io.{ File, IOException, InputStream }
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.util.concurrent.{
-  ArrayBlockingQueue,
-  ConcurrentHashMap,
-  Executors,
-  LinkedBlockingQueue,
-  TimeUnit
-}
+import java.util.concurrent.{ ConcurrentHashMap, Executors, LinkedBlockingQueue, TimeUnit }
 
 import org.scalasbt.ipcsocket.UnixDomainSocketLibraryProvider
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
-import sbt.internal.nio.FileTreeRepository
 import sbt.internal.protocol._
 import sbt.internal.util.{ ConsoleAppender, NetworkReader, Terminal }
 import sbt.io.IO
 import sbt.io.syntax._
-import sbt.nio.file.Glob
 import sbt.protocol._
 import sbt.util.Level
 import sjsonnew.BasicJsonProtocol._
@@ -38,7 +30,6 @@ import sjsonnew.support.scalajson.unsafe.Converter
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import scala.sys.process.{ BasicIO, Process, ProcessLogger }
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success }
 
@@ -141,7 +132,11 @@ trait NetworkClientImpl { self =>
           )
       case _ => sys.error("property java.class.path expected")
     }
-    val cmd = "java" :: launchOpts ::: "-jar" :: launcherJarString :: args
+    import scala.collection.JavaConverters._
+    val properties = System.getProperties.asScala.collect {
+      case (key, value) if key.startsWith("sbt.") => s"-D$key=$value"
+    }.toList
+    val cmd = "java" :: launchOpts ::: properties ::: "-jar" :: launcherJarString :: args
     // val cmd = "sbt"
     val process = new ProcessBuilder(cmd: _*).directory(baseDirectory).start()
     val stdout = process.getInputStream
@@ -226,10 +221,12 @@ trait NetworkClientImpl { self =>
           Converter.fromJson[String](json) match {
             case Success(id) =>
               val response = TerminalPropertiesResponse.apply(
-                Terminal.getWidth,
-                Terminal.getHeight,
-                Terminal.isAnsiSupported,
-                Terminal.isEchoEnabled
+                width = Terminal.console.getWidth,
+                height = Terminal.console.getHeight,
+                isAnsiSupported = Terminal.console.isAnsiSupported,
+                isColorEnabled = Terminal.console.isColorEnabled,
+                isSupershellEnabled = Terminal.console.isSupershellEnabled,
+                isEchoEnabled = Terminal.console.isEchoEnabled
               )
               sendCommandResponse("sbt/terminalpropsresponse", response, id)
             case Failure(_) =>
