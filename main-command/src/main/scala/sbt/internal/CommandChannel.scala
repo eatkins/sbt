@@ -8,7 +8,6 @@
 package sbt
 package internal
 
-import java.io.{ InputStream, PrintStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import sbt.internal.util.Terminal
@@ -34,7 +33,7 @@ abstract class CommandChannel {
       registered.remove(queue)
       ()
     }
-  private[sbt] def terminal: Terminal = Terminal.console
+  private[sbt] def terminal: Terminal
   def append(exec: Exec): Boolean = registered.synchronized {
     val res = commandQueue.add(exec)
     if (res) registered.forEach(q => q.synchronized { q.add(this); () })

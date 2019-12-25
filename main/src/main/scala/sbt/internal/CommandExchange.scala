@@ -162,17 +162,13 @@ private[sbt] final class CommandExchange {
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
-      println(s"WTF got new socket $name")
       if (needToFinishPromptLine()) ConsoleOut.systemOut.println("")
       s.log.info(s"new client connected: $name")
-      val mkLogger: Terminal => Logger = terminal => {
+      val mkLogger: (Boolean, Boolean) => Logger = (isAnsiSupported, isColorEnabled) => {
         val log = LogExchange.logger(name, None, None)
         LogExchange.unbindLoggerAppenders(name)
-        val appender = MainAppender.defaultScreen(
-          s.globalLogging.console,
-          terminal.isAnsiSupported,
-          terminal.isColorEnabled
-        )
+        val appender =
+          MainAppender.defaultScreen(s.globalLogging.console, isAnsiSupported, isColorEnabled)
         LogExchange.bindLoggerAppenders(name, List(appender -> level))
         log
       }
@@ -221,7 +217,7 @@ private[sbt] final class CommandExchange {
           server = None
           firstInstance.set(false)
       }
-      //Terminal.close()
+      Terminal.close()
     }
     s
   }

@@ -126,9 +126,11 @@ trait Terminal extends AutoCloseable {
 object Terminal {
 
   def close(): Unit = {
-    originalOut.close()
-    originalIn.close()
-    System.err.close()
+    if (System.console == null) {
+      originalOut.close()
+      originalIn.close()
+      System.err.close()
+    }
   }
 
   /**
