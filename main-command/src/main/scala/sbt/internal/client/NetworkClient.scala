@@ -143,28 +143,21 @@ trait NetworkClientImpl { self =>
     }
     val cmd = "java" :: launchOpts ::: "-jar" :: launcherJarString :: args
     // val cmd = "sbt"
-    val io = BasicIO(false, ProcessLogger(x => println(x)))
-    val p = Process(cmd, baseDirectory).run(io)
-    val buffer = new ArrayBlockingQueue[Unit](1)
-    @tailrec def waitForPortfile(limit: Deadline, n: Int): Unit =
-      if (portfile.exists) {
-        console.appendLog(Level.Info, "server found")
-      } else {
-        if (limit.isOverdue || !p.isAlive) {
-          sys.error(s"timeout. $portfile is not found.")
-        } else {
-          buffer.poll(1, TimeUnit.SECONDS)
-          if (n % 10 == 0) console.appendLog(Level.Info, "waiting for the server...")
-          waitForPortfile(limit, n + 1)
-        }
+    val process = new ProcessBuilder(cmd: _*).directory(baseDirectory).start()
+    val stdout = process.getInputStream
+    val stderr = process.getErrorStream
+    @tailrec
+    def blockUntilStart(): Unit = {
+      System.out.write(stdout.read)
+      while (stderr.available > 0) {
+        System.err.write(stderr.read)
       }
-    val repo = FileTreeRepository.default
-    repo.register(Glob(portfile)) match {
-      case Left(e)  => throw e
-      case Right(o) => o.addObserver(t => if (t.exists) buffer.put(()))
+      blockUntilStart()
     }
-    try waitForPortfile(90.seconds.fromNow, 0)
-    finally repo.close()
+    stdout.close()
+    stderr.close()
+    try blockUntilStart()
+    catch { case t: Throwable => t.printStackTrace() }
   }
 
   /** Called on the response for a returning message. */

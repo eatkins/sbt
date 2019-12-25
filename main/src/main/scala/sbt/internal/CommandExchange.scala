@@ -216,6 +216,7 @@ private[sbt] final class CommandExchange {
           server = None
           firstInstance.set(false)
       }
+      Terminal.close()
     }
     s
   }

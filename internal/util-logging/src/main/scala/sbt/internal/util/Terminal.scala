@@ -111,6 +111,12 @@ trait Terminal extends AutoCloseable {
 
 object Terminal {
 
+  def close(): Unit = {
+    originalOut.close()
+    originalIn.close()
+    System.err.close()
+  }
+
   /**
    * Gets the current width of the terminal. The implementation reads a property from the jline
    * config which is updated if it has been more than a second since the last update. It is thus
