@@ -65,21 +65,12 @@ trait NetworkClientImpl { self =>
   }
 
   private[this] val mainThread = Thread.currentThread
-  private[this] val executor =
-    Executors.newSingleThreadExecutor(
-      r =>
-        new Thread(r, "sbt-client-read-input-thread") {
-          setDaemon(true)
-        }
-    )
   private[this] val stdinBytes = new LinkedBlockingQueue[Int]
-  private[this] val stdinAlive = new AtomicBoolean(true)
   private[this] val stdin: InputStream = new InputStream {
     override def available(): Int = stdinBytes.size
     override def read: Int = stdinBytes.take
   }
   private[this] val inputThread = new RawInputThread
-  private[this] val mainThread = Thread.currentThread()
   start()
   private class ConnectionRefusedException(t: Throwable) extends Throwable(t)
 
@@ -389,12 +380,7 @@ trait NetworkClientImpl { self =>
           case _                          => //
         }
       }
-    } catch {
-      case _: InterruptedException => running.set(false)
-    } finally {
-      executor.shutdownNow()
-      ()
-    }
+    } catch { case _: InterruptedException => running.set(false) }
   }
 
   def sendExecCommand(commandLine: String): String = {
