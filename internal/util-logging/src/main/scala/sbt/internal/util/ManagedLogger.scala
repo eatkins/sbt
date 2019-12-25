@@ -7,13 +7,10 @@
 
 package sbt.internal.util
 
-import java.util.concurrent.atomic.AtomicReference
-
 import sbt.util._
 import org.apache.logging.log4j.{ Logger => XLogger }
 import org.apache.logging.log4j.message.ObjectMessage
 import sjsonnew.JsonFormat
-
 import scala.reflect.runtime.universe.TypeTag
 import sbt.internal.util.codec.JsonProtocol._
 
@@ -22,18 +19,14 @@ import sbt.internal.util.codec.JsonProtocol._
  */
 class ManagedLogger(
     val name: String,
-    getChannelName: () => Option[String],
-    getExecID: () => Option[String],
-    getXlogger: () => XLogger
+    val channelName: Option[String],
+    val execId: Option[String],
+    xlogger: XLogger
 ) extends Logger {
-  def this(name: String, channelName: Option[String], execID: Option[String], logger: XLogger) =
-    this(name, () => channelName, () => execID, () => logger)
-  def channelName: Option[String] = getChannelName()
-  def execId: Option[String] = getExecID()
   override def trace(t: => Throwable): Unit =
     logEvent(Level.Error, TraceEvent("Error", t, channelName, execId))
   override def log(level: Level.Value, message: => String): Unit = {
-    getXlogger().log(
+    xlogger.log(
       ConsoleAppender.toXLevel(level),
       new ObjectMessage(StringEvent(level.toString, message, channelName, execId))
     )
@@ -62,7 +55,7 @@ class ManagedLogger(
     LogExchange.getOrElseUpdateJsonCodec(tag.key, implicitly[JsonFormat[A]])
     // println("logEvent " + tag.key)
     val entry: ObjectEvent[A] = ObjectEvent(level, v, channelName, execId, tag.key)
-    getXlogger().log(
+    xlogger.log(
       ConsoleAppender.toXLevel(level),
       new ObjectMessage(entry)
     )
@@ -70,42 +63,4 @@ class ManagedLogger(
 
   @deprecated("No longer used.", "1.0.0")
   override def ansiCodesSupported = ConsoleAppender.formatEnabledInEnv
-}
-
-private[sbt] object ManagedLogger {
-  private[sbt] class ProxyLogger(
-      name: String,
-      channelName: AtomicReference[String],
-      execID: AtomicReference[String],
-      logger: AtomicReference[XLogger]
-  ) extends ManagedLogger(
-        name,
-        () => Option(channelName.get),
-        () => Option(execID.get),
-        () => logger.get
-      ) {
-    def this(name: String) =
-      this(
-        name,
-        new AtomicReference[String],
-        new AtomicReference[String],
-        new AtomicReference(LogExchange.getXLogger(name))
-      )
-    def setChannelName(name: String): Unit = channelName.set(name)
-    def setExecID(id: String): Unit = execID.set(name)
-    def setLogger(xl: XLogger): Unit = logger.set(xl)
-    def withState[T](cn: String, eid: String, xlog: XLogger)(f: => T): T = {
-      val (c, e, l) = (channelName.get, execID.get, logger.get)
-      try {
-        channelName.set(cn)
-        execID.set(eid)
-        logger.set(xlog)
-        f
-      } finally {
-        channelName.set(c)
-        execID.set(e)
-        logger.set(l)
-      }
-    }
-  }
 }
