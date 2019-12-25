@@ -223,12 +223,18 @@ object Terminal {
       withOut(withIn(f))
     } else f
 
+  private[sbt] def get: Terminal = currentTerminal.get
+
   private[sbt] def withTerminal[T](terminal: Terminal)(f: => T): T = {
-    //val original = jline.TerminalFactory.get
-    //try {
-    //jline.TerminalFactory.set(terminal.toJLine)
-    withIn(terminal.inputStream)(withOut(terminal.printStream)(f))
-    //}// finally jline.TerminalFactory.set(original)
+    val originalJLine = jline.TerminalFactory.get
+    val original = currentTerminal.getAndSet(terminal)
+    try {
+      jline.TerminalFactory.set(terminal.toJLine)
+      withIn(terminal.inputStream)(withOut(terminal.printStream)(f))
+    } finally {
+      jline.TerminalFactory.set(originalJLine)
+      currentTerminal.set(original)
+    }
   }
   private[sbt] def withIn[T](in: InputStream)(f: => T): T = {
     val original = inputStream.get
@@ -326,6 +332,7 @@ object Terminal {
   private[this] val terminalLock = new ReentrantLock()
   private[this] val attached = new AtomicBoolean(true)
   private[this] val terminalHolder = new AtomicReference(wrap(jline.TerminalFactory.get))
+  private[this] val currentTerminal = new AtomicReference[Terminal](terminalHolder.get)
   private[this] lazy val isWindows =
     System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH).indexOf("windows") >= 0
   private[this] object WrappedSystemIn extends InputStream {

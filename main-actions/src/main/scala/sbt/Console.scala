@@ -45,6 +45,15 @@ final class Console(compiler: AnalyzingCompiler) {
       initialCommands: String,
       cleanupCommands: String
   )(loader: Option[ClassLoader], bindings: Seq[(String, Any)])(implicit log: Logger): Try[Unit] = {
+    apply(classpath, options, initialCommands, cleanupCommands, Terminal.get)(loader, bindings)
+  }
+  def apply(
+      classpath: Seq[File],
+      options: Seq[String],
+      initialCommands: String,
+      cleanupCommands: String,
+      terminal: Terminal
+  )(loader: Option[ClassLoader], bindings: Seq[(String, Any)])(implicit log: Logger): Try[Unit] = {
     def console0() =
       compiler.console(classpath map { x =>
         PlainVirtualFile(x.toPath)
@@ -52,7 +61,7 @@ final class Console(compiler: AnalyzingCompiler) {
         loader,
         bindings
       )
-    Terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
+    terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
   }
 }
 
