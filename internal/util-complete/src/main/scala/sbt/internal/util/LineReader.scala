@@ -148,9 +148,9 @@ private[sbt] object JLine {
    * For accessing the JLine Terminal object.
    * This ensures synchronized access as well as re-enabling echo after getting the Terminal.
    */
-  @deprecated("Don't use jline.Terminal directly. Use Terminal.withCanonicalIn instead.", "1.4.0")
+  @deprecated("Don't use jline.Terminal directly.", "1.4.0")
   def usingTerminal[T](f: jline.Terminal => T): T =
-    Terminal.withCanonicalIn(f(Terminal.deprecatedTeminal))
+    Terminal.get.withCanonicalIn(f(Terminal.get.toJLine))
 
   @deprecated("unused", "1.4.0")
   def createReader(): ConsoleReader = createReader(None, Terminal.wrappedSystemIn)
@@ -169,8 +169,8 @@ private[sbt] object JLine {
     cr
   }
 
-  @deprecated("Avoid referencing JLine directly. Use Terminal.withRawSystemIn instead.", "1.4.0")
-  def withJLine[T](action: => T): T = Terminal.withRawSystemIn(action)
+  @deprecated("Avoid referencing JLine directly.", "1.4.0")
+  def withJLine[T](action: => T): T = Terminal.get.withRawSystemIn(action)
 
   @deprecated("Use LineReader.simple instead", "1.4.0")
   def simple(

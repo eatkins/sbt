@@ -446,7 +446,7 @@ trait NetworkClientImpl { self =>
           stdinBytes.offer(b)
           if (!stopped.get()) read()
       }
-      try Terminal.withRawSystemIn(read())
+      try Terminal.console.withRawSystemIn(read())
       catch { case _: InterruptedException => stopped.set(true) }
     }
 

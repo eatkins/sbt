@@ -103,6 +103,7 @@ trait Terminal extends AutoCloseable {
 
   private[sbt] def withRawSystemIn[T](f: => T): T = f
   private[sbt] def withCanonicalIn[T](f: => T): T = f
+  private[sbt] def withEcho[T](f: => T): T = f
   private[sbt] def printStream: PrintStream
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
   private[sbt] def restore(): Unit = {}
@@ -290,36 +291,6 @@ object Terminal {
     }
   }
 
-  /**
-   * Runs a thunk ensuring that the terminal is in canonical mode:
-   * [[https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html Canonical or Not]].
-   * Most of the time sbt should be in canonical mode except when it is explicitly set to raw mode
-   * via [[withRawSystemIn]].
-   *
-   * @param f the thunk to run
-   * @tparam T the result type of the thunk
-   * @return the result of the thunk
-   */
-  private[sbt] def withCanonicalIn[T](f: => T): T =
-    withTerminal { t =>
-      t.restore()
-      f
-    }
-
-  /**
-   * Runs a thunk ensuring that the terminal is in in non-canonical mode:
-   * [[https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html Canonical or Not]].
-   * This should be used when sbt is reading user input, e.g. in `shell` or a continuous build.
-   * @param f the thunk to run
-   * @tparam T the result type of the thunk
-   * @return the result of the thunk
-   */
-  private[sbt] def withRawSystemIn[T](f: => T): T =
-    withTerminal { t =>
-      t.init()
-      f
-    }
-
   private[this] def withTerminal[T](f: jline.Terminal => T): T = {
     val t = console.toJLine
     terminalLock.lockInterruptibly()
@@ -497,8 +468,16 @@ object Terminal {
       term.getStringCapability(capability)
     override private[sbt] def restore(): Unit = term.restore()
 
-    override def withRawSystemIn[T](f: => T): T = Terminal.withRawSystemIn(f)
-    override def withCanonicalIn[T](f: => T): T = Terminal.withCanonicalIn(f)
+    override def withRawSystemIn[T](f: => T): T = term.synchronized {
+      try {
+        term.init()
+        term.setEchoEnabled(false)
+        f
+      } finally {
+        term.restore()
+        term.setEchoEnabled(true)
+      }
+    }
   }
   private[sbt] abstract class TerminalImpl(val in: InputStream, val out: OutputStream)
       extends Terminal {
