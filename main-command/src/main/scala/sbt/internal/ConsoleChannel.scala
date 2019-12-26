@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference
 import sbt.BasicKeys._
 import sbt.internal.util._
 import sbt.protocol.EventMessage
-import sbt.util.LogExchange
+import sbt.util.Level
 import sjsonnew.JsonFormat
 
 private[sbt] class AskUserThread(
@@ -57,17 +57,20 @@ private[sbt] class AskUserThread(
     terminal.outputStream.flush()
   }
 }
-private[sbt] final class ConsoleChannel(val name: String, override val logger: ManagedLogger)
-    extends CommandChannel {
-  def this(name: String) = this(name, LogExchange.logger("console0", None, None))
+private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel {
   private[this] val askUserThread = new AtomicReference[AskUserThread]
   override private[sbt] def terminal = Terminal.console
   private[this] def makeAskUserThread(s: State): AskUserThread =
     new AskUserThread(
       "console",
       s,
-      Terminal.console,
-      cmd => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))),
+      Terminal.console, {
+        case "debug" => setLevel(Level.Debug)
+        case "info"  => setLevel(Level.Info)
+        case "error" => setLevel(Level.Error)
+        case "warn"  => setLevel(Level.Warn)
+        case cmd     => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
+      },
       () => askUserThread.synchronized(askUserThread.set(null))
     )
 
