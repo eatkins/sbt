@@ -66,12 +66,17 @@ final class NetworkChannel(
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val alive = new AtomicBoolean(true)
 
-  override def log: Logger = logger
-  override val terminal: Terminal = new NetworkTerminal
-  new Thread(() => setLogger(mkLogger(terminal))) {
-    setDaemon(true)
-    start()
+  override def log: Logger = new Logger {
+    override def trace(t: => Throwable): Unit = {}
+    override def success(message: => String): Unit = {}
+    override def log(level: Level.Value, message: => String): Unit = {}
   }
+  override val terminal: Terminal = new NetworkTerminal
+//  new Thread(() => setLogger(mkLogger(terminal))) {
+//    setDaemon(true)
+//    start()
+//  }
+  override def logger: ManagedLogger = mkLogger(terminal)
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
   def contentType: String = _contentType
@@ -656,7 +661,7 @@ object NetworkChannel {
   private[sbt] trait ProxyLog {
     private val logHolder =
       new AtomicReference[ManagedLogger](LogExchange.logger("unnamed", None, None))
-    def logger: ManagedLogger = logHolder.get
+//    def logger: ManagedLogger = logHolder.get
     def setLogger(logger: ManagedLogger): Unit = logHolder.set(logger)
   }
   sealed trait ChannelState

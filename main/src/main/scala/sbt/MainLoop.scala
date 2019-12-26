@@ -182,7 +182,7 @@ object MainLoop {
       ExecStatusEvent("Processing", channelName, exec.execId, Vector())
     try {
       def process(): State = {
-        val logger = StandardMain.exchange.getLoggerFor(exec)
+        val logger = StandardMain.exchange.getLoggerFor(exec).getOrElse(state.globalLogging.full)
         val ps = state.get(sbt.Keys.currentTaskProgress) match {
           case Some(_) => state
           case _ =>
