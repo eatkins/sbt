@@ -943,6 +943,10 @@ lazy val mainProj = (project in file("main"))
       // since we're returning the same values as before.
       exclude[IncompatibleSignatureProblem]("sbt.Classpaths.mkIvyConfiguration"),
       exclude[IncompatibleMethTypeProblem]("sbt.internal.server.Definition*"),
+      // This seems to be a mima problem. The older constructor still exists but
+      // mima seems to incorrectly miss the secondary constructor that provides
+      // the binary compatible version.
+      exclude[IncompatibleMethTypeProblem]("sbt.internal.server.NetworkChannel.this")
     )
   )
   .configure(
