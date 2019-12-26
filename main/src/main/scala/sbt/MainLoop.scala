@@ -182,7 +182,8 @@ object MainLoop {
       ExecStatusEvent("Processing", channelName, exec.execId, Vector())
     try {
       def process(): State = {
-        val logger = StandardMain.exchange.getLoggerFor(exec).getOrElse(state.globalLogging.full)
+        val originalLogger = state.globalLogging
+        val logger = StandardMain.exchange.getLoggerFor(exec).getOrElse(originalLogger.full)
         val ps = state.get(sbt.Keys.currentTaskProgress) match {
           case Some(_) => state
           case _ =>
@@ -194,7 +195,7 @@ object MainLoop {
         }
         val progressState = ps.copy(globalLogging = ps.globalLogging.copy(full = logger))
         val execSource = exec.source.map(_.channelName)
-        val newState = StandardMain.exchange.channels.collectFirst {
+        val newState = (StandardMain.exchange.channels.collectFirst {
           case c: NetworkChannel if execSource.contains(c.name) => c
         } match {
           case Some(channel) =>
@@ -203,7 +204,7 @@ object MainLoop {
             }
           case _ =>
             Command.process(exec.commandLine, progressState)
-        }
+        }).copy(globalLogging = originalLogger)
         if (exec.commandLine.contains("session"))
           newState.get(hasCheckedMetaBuild).foreach(_.set(false))
         val doneEvent = ExecStatusEvent(
