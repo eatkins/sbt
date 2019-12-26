@@ -20,7 +20,7 @@ import sjsonnew._
 import scala.annotation.tailrec
 import sbt.protocol._
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
-import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
+import sbt.internal.util.{ ManagedLogger, ObjectEvent, StringEvent, Terminal }
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.protocol.{
@@ -29,7 +29,7 @@ import sbt.internal.protocol.{
   JsonRpcNotificationMessage
 }
 import sbt.internal.util.Terminal.TerminalImpl
-import sbt.util.{ Level, Logger }
+import sbt.util.{ Level, LogExchange, Logger }
 import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.util.Try
@@ -42,19 +42,10 @@ final class NetworkChannel(
     auth: Set[ServerAuthentication],
     instance: ServerInstance,
     handlers: Seq[ServerHandler],
-    mkLogger: (Boolean, Boolean) => Logger
+    mkLogger: Terminal => ManagedLogger
 ) extends CommandChannel
     with NetworkChannel.ProxyLog
     with LanguageServerProtocol {
-  def this(
-      name: String,
-      connection: Socket,
-      structure: BuildStructure,
-      auth: Set[ServerAuthentication],
-      instance: ServerInstance,
-      handlers: Seq[ServerHandler],
-      log: Logger
-  ) = this(name, connection, structure, auth, instance, handlers, (_, _) => log)
   import NetworkChannel._
 
   private[this] val askUserThread = new AtomicReference[AskUserThread]
@@ -75,12 +66,9 @@ final class NetworkChannel(
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val alive = new AtomicBoolean(true)
 
+  override def log: Logger = logger
   override val terminal: Terminal = new NetworkTerminal
-  new Thread(() => {
-    println(s"${terminal.isAnsiSupported}, ${terminal.isColorEnabled}")
-    setLogger(mkLogger(terminal.isAnsiSupported, terminal.isColorEnabled))
-    println(s"set logger")
-  }) {
+  new Thread(() => setLogger(mkLogger(terminal))) {
     setDaemon(true)
     start()
   }
@@ -666,13 +654,10 @@ final class NetworkChannel(
 
 object NetworkChannel {
   private[sbt] trait ProxyLog {
-    private val logHolder = new AtomicReference[Logger](new Logger {
-      override def trace(t: => Throwable): Unit = {}
-      override def success(message: => String): Unit = {}
-      override def log(level: Level.Value, message: => String): Unit = {}
-    })
-    def log: Logger = logHolder.get
-    def setLogger(logger: Logger): Unit = logHolder.set(logger)
+    private val logHolder =
+      new AtomicReference[ManagedLogger](LogExchange.logger("unnamed", None, None))
+    def logger: ManagedLogger = logHolder.get
+    def setLogger(logger: ManagedLogger): Unit = logHolder.set(logger)
   }
   sealed trait ChannelState
   case object SingleLine extends ChannelState

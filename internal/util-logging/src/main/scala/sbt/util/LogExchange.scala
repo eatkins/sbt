@@ -30,8 +30,7 @@ sealed abstract class LogExchange {
 
   def logger(name: String): ManagedLogger = logger(name, None, None)
   def logger(name: String, channelName: Option[String], execId: Option[String]): ManagedLogger = {
-    val _ = context
-    val codecs = builtInStringCodecs
+    val _ = (context, builtInStringCodecs)
     val ctx = XLogManager.getContext(false) match { case x: LoggerContext => x }
     val config = ctx.getConfiguration
     val loggerConfig = LoggerConfig.createLogger(
