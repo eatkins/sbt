@@ -57,13 +57,14 @@ object ConsoleOut {
     }
   }
 
-  def printStreamOut(out: PrintStream): ConsoleOut = new ConsoleOut {
+  private class PrintStreamOut(out: PrintStream) extends ConsoleOut {
     val lockObject = out
     def print(s: String) = out.print(s)
     def println(s: String) = out.println(s)
     def println() = out.println()
     def flush() = out.flush()
   }
+  def printStreamOut(out: PrintStream): ConsoleOut = new PrintStreamOut(out)
   def printWriterOut(out: PrintWriter): ConsoleOut = new ConsoleOut {
     val lockObject = out
     def print(s: String) = out.print(s)

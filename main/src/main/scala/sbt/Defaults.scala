@@ -79,7 +79,7 @@ import sbt.std.TaskExtra._
 import sbt.testing.{ AnnotatedFingerprint, Framework, Runner, SubclassFingerprint }
 import sbt.util.CacheImplicits._
 import sbt.util.InterfaceUtil.{ toJavaFunction => f1 }
-import sbt.util._
+import sbt.util.{ Level, _ }
 import sjsonnew._
 import sjsonnew.support.scalajson.unsafe.Converter
 
@@ -1529,8 +1529,8 @@ object Defaults extends BuildCommon {
       copyClasspath: Initialize[Boolean],
       scalaRun: Initialize[Task[ScalaRun]]
   ): Initialize[InputTask[JobHandle]] = {
-    val parser = Defaults.loadForParser(discoveredMainClasses)(
-      (s, names) => Defaults.runMainParser(s, names getOrElse Nil)
+    val parser = Defaults.loadForParser(discoveredMainClasses)((s, names) =>
+      Defaults.runMainParser(s, names getOrElse Nil)
     )
     Def.inputTask {
       val service = bgJobService.value
@@ -1860,7 +1860,16 @@ object Defaults extends BuildCommon {
           case _ => ()
         }
       }
-      incCompiler.compile(i, s.log)
+      val newLog = new Logger {
+        override def trace(t: => Throwable): Unit = {}
+        override def success(message: => String): Unit = println(message)
+        override def log(level: Level.Value, message: => String): Unit = {
+          s.log.log(level, message)
+          println(s"${s.log} $level $message")
+        }
+      }
+      //incCompiler.compile(i, s.log)
+      incCompiler.compile(i, newLog)
     } finally x.close() // workaround for #937
   }
   private def compileAnalysisFileTask: Def.Initialize[Task[File]] =

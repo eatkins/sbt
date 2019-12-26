@@ -293,8 +293,8 @@ private[sbt] final class CommandExchange {
 
   private[sbt] def getLoggerFor(exec: Exec): Option[ManagedLogger] =
     channels.find(c => exec.source.map(_.channelName).contains(c.name)) match {
-      case Some(c) => println(s"fuck found $c"); Some(c.logger)
-      case None    => println(s"no channel for $exec"); None
+      case Some(c) => Some(c.logger(exec.execId))
+      case None    => None
     }
 
   // This is an interface to directly notify events.
