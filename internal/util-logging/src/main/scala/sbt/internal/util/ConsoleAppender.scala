@@ -318,7 +318,6 @@ class ConsoleAppender private[ConsoleAppender] (
     suppressedMessage: SuppressedTraceContext => Option[String]
 ) extends AbstractAppender(name, null, LogExchange.dummyLayout, true, Array.empty) {
   import scala.Console.{ BLUE, GREEN, RED, YELLOW }
-  new Exception(s"$this").printStackTrace()
 
   private val reset: String = {
     if (ansiCodesSupported && useFormat) scala.Console.RESET
@@ -450,7 +449,6 @@ class ConsoleAppender private[ConsoleAppender] (
   private def write(msg: String): Unit = {
     val toWrite =
       if (!useFormat || !ansiCodesSupported) EscHelpers.removeEscapeSequences(msg) else msg
-    System.err.println(s"aargh $this $out $toWrite")
     out.println(toWrite)
   }
 

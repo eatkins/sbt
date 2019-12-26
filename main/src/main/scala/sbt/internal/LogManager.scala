@@ -135,9 +135,7 @@ object LogManager {
     val loggerName: String = s"${task.key.label}-${generateId.incrementAndGet}"
     val channelName: Option[String] = execOpt flatMap (_.source map (_.channelName))
     val execId: Option[String] = execOpt flatMap { _.execId }
-    //val log = LogExchange.logger(loggerName, channelName, execId)
-    val execLog = execOpt.flatMap(StandardMain.exchange.getLoggerFor)
-    val log = execLog.getOrElse(LogExchange.logger(loggerName, channelName, execId))
+    val log = LogExchange.logger(loggerName, channelName, execId)
     val scope = task.scope
     val screenLevel = getOr(logLevel.key, data, scope, state, Level.Info)
     val backingLevel = getOr(persistLogLevel.key, data, scope, state, Level.Debug)
