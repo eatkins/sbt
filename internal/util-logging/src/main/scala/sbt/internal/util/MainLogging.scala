@@ -78,6 +78,14 @@ object MainAppender {
   ): Appender =
     ConsoleAppender(ConsoleAppender.generateName, console, suppressedMessage = suppressedMessage)
 
+  def defaultScreen(terminal: Terminal): Appender =
+    ConsoleAppender(
+      ConsoleAppender.generateName,
+      ConsoleOut.printStreamOut(terminal.printStream),
+      terminal.isAnsiSupported,
+      terminal.isColorEnabled,
+      suppressedMessage = _ => None
+    )
   def defaultScreen(
       console: ConsoleOut,
       ansiCodesSupported: Boolean,

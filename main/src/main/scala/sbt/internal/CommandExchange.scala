@@ -19,7 +19,14 @@ import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
 import sbt.internal.util.codec.JValueFormats
-import sbt.internal.util.{ ConsoleOut, MainAppender, ObjectEvent, StringEvent, Terminal }
+import sbt.internal.util.{
+  ConsoleOut,
+  MainAppender,
+  ManagedLogger,
+  ObjectEvent,
+  StringEvent,
+  Terminal
+}
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
 import sbt.protocol.{ EventMessage, ExecStatusEvent }
@@ -134,7 +141,7 @@ private[sbt] final class CommandExchange {
 
   def run(s: State): State = {
     if (consoleChannel.isEmpty) {
-      val console0 = new ConsoleChannel("console0")
+      val console0 = new ConsoleChannel("console0", s.globalLogging.full)
       consoleChannel = Some(console0)
       subscribe(console0)
     }
@@ -164,12 +171,11 @@ private[sbt] final class CommandExchange {
       val name = newNetworkName
       if (needToFinishPromptLine()) ConsoleOut.systemOut.println("")
       s.log.info(s"new client connected: $name")
-      val mkLogger: (Boolean, Boolean) => Logger = (isAnsiSupported, isColorEnabled) => {
+      val mkLogger: Terminal => ManagedLogger = terminal => {
         val log = LogExchange.logger(name, None, None)
         LogExchange.unbindLoggerAppenders(name)
-        val appender =
-          MainAppender.defaultScreen(s.globalLogging.console, isAnsiSupported, isColorEnabled)
-        LogExchange.bindLoggerAppenders(name, List(appender -> level))
+        val appender = MainAppender.defaultScreen(terminal)
+        LogExchange.bindLoggerAppenders(name, List(appender -> Level.Info))
         log
       }
       val channel =
@@ -291,6 +297,11 @@ private[sbt] final class CommandExchange {
     }
     removeChannels(toDel.toList)
   }
+  private[sbt] def getLoggerFor(exec: Exec): ManagedLogger =
+    channels.find(c => exec.source.map(_.channelName).contains(c.name)) match {
+      case Some(c) => c.logger
+      case None    => LogExchange.logger("unnamed", exec.source.map(_.channelName), exec.execId)
+    }
 
   // This is an interface to directly notify events.
   private[sbt] def notifyEvent[A: JsonFormat](method: String, params: A): Unit = {

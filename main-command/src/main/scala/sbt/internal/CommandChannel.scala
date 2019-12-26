@@ -10,7 +10,7 @@ package internal
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import sbt.internal.util.Terminal
+import sbt.internal.util.{ ManagedLogger, Terminal }
 import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
 
@@ -47,6 +47,7 @@ abstract class CommandChannel {
   def publishBytes(bytes: Array[Byte]): Unit
   def shutdown(): Unit
   def name: String
+  private[sbt] def logger: ManagedLogger
 }
 
 // case class Exec(commandLine: String, source: Option[CommandSource])
