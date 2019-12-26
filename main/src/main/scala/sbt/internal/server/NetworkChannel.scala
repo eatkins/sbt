@@ -42,10 +42,17 @@ final class NetworkChannel(
     auth: Set[ServerAuthentication],
     instance: ServerInstance,
     handlers: Seq[ServerHandler],
-    mkLogger: Terminal => ManagedLogger
 ) extends CommandChannel
-    with NetworkChannel.ProxyLog
     with LanguageServerProtocol {
+  def this(
+      name: String,
+      connection: Socket,
+      structure: BuildStructure,
+      auth: Set[ServerAuthentication],
+      instance: ServerInstance,
+      handlers: Seq[ServerHandler],
+      log: Logger
+  ) = this(name, connection, structure, auth, instance, handlers)
   import NetworkChannel._
 
   private[this] val askUserThread = new AtomicReference[AskUserThread]
