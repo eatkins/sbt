@@ -39,6 +39,10 @@ private[sbt] class AskUserThread(
   start()
   override def run(): Unit =
     try {
+      if (terminal.isAnsiSupported) {
+        terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
+        terminal.printStream.flush()
+      }
       terminal.withRawSystemIn(reader.readLine(prompt)) match {
         case Some(cmd) => onLine(cmd)
         case None =>
