@@ -175,7 +175,7 @@ private[sbt] final class CommandExchange {
         val log = LogExchange.logger(name, None, None)
         LogExchange.unbindLoggerAppenders(name)
         val appender = MainAppender.defaultScreen(terminal)
-        LogExchange.bindLoggerAppenders(name, List(appender -> Level.Info))
+        LogExchange.bindLoggerAppenders(name, List(appender -> level))
         log
       }
       val channel =
@@ -297,10 +297,11 @@ private[sbt] final class CommandExchange {
     }
     removeChannels(toDel.toList)
   }
-  private[sbt] def getLoggerFor(exec: Exec): ManagedLogger =
+
+  private[sbt] def getLoggerFor(exec: Exec): Option[ManagedLogger] =
     channels.find(c => exec.source.map(_.channelName).contains(c.name)) match {
-      case Some(c) => c.logger
-      case None    => LogExchange.logger("unnamed", exec.source.map(_.channelName), exec.execId)
+      case Some(c) => Some(c.logger)
+      case None    => None
     }
 
   // This is an interface to directly notify events.
