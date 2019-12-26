@@ -8,14 +8,13 @@
 package sbt
 package internal
 
-import java.io.{ File, IOException, PrintStream }
+import java.io.{File, IOException, PrintStream}
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicReference
 
 import sbt.BasicKeys._
 import sbt.internal.util._
 import sbt.protocol.EventMessage
-import sbt.util.Level
 import sjsonnew.JsonFormat
 
 private[sbt] class AskUserThread(
@@ -37,7 +36,7 @@ private[sbt] class AskUserThread(
   private val reader = new FullReader(history, s.combinedParser, LineReader.HandleCONT, terminal)
   setDaemon(true)
   start()
-  override def run(): Unit =
+  override def run(): Unit = {
     try {
       if (terminal.isAnsiSupported) {
         terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
@@ -50,6 +49,8 @@ private[sbt] class AskUserThread(
           onLine("exit")
       }
     } catch { case _: ClosedChannelException | _: IOException => } finally onClose()
+  }
+
   def redraw(): Unit = {
     writer.print(ConsoleAppender.clearLine(0))
     reader.redraw()
@@ -64,13 +65,8 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
     new AskUserThread(
       "console",
       s,
-      Terminal.console, {
-        case "debug" => setLevel(Level.Debug)
-        case "info"  => setLevel(Level.Info)
-        case "error" => setLevel(Level.Error)
-        case "warn"  => setLevel(Level.Warn)
-        case cmd     => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
-      },
+      Terminal.console,
+      onLine,
       () => askUserThread.synchronized(askUserThread.set(null))
     )
 
