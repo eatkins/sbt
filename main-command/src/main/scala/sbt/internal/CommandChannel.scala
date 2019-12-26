@@ -50,23 +50,13 @@ abstract class CommandChannel {
   def shutdown(): Unit
   def name: String
   private[this] val level = new AtomicReference[Level.Value](Level.Info)
-  private[sbt] final def onLine(cmd: String): Unit = {
-    cmd match {
-      case "debug" => setLevel(Level.Debug)
-      case "error" => setLevel(Level.Error)
-      case "warn"  => setLevel(Level.Warn)
-      case _       =>
-    }
-    append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
-  }
   private[sbt] final def setLevel(l: Level.Value): Unit = level.set(l)
   private[sbt] final def logLevel: Level.Value = level.get
-  private[sbt] final def logger(execID: Option[String]): ManagedLogger = {
-    val log = LogExchange.logger(name, Some(name), execID)
+  private[sbt] final def logger: ManagedLogger = {
+    val log = LogExchange.logger(name, None, None)
     LogExchange.unbindLoggerAppenders(name)
     val appender = MainAppender.defaultScreen(terminal)
     LogExchange.bindLoggerAppenders(name, List(appender -> logLevel))
-    println(s"made logger $name with level $logLevel $log")
     log
   }
 }
