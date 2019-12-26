@@ -9,16 +9,12 @@ package sbt
 package internal
 package server
 
-import java.io.{ IOException, InputStream, OutputStream, PrintStream }
+import java.io.{ IOException, InputStream, OutputStream }
 import java.net.{ Socket, SocketTimeoutException }
 import java.util.UUID
-import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
 
-import sjsonnew._
-
-import scala.annotation.tailrec
-import sbt.protocol._
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
 import sbt.internal.util.{ ManagedLogger, ObjectEvent, StringEvent, Terminal }
 import sbt.internal.util.complete.Parser
@@ -29,9 +25,15 @@ import sbt.internal.protocol.{
   JsonRpcNotificationMessage
 }
 import sbt.internal.util.Terminal.TerminalImpl
-import sbt.util.{ Level, LogExchange, Logger }
+import sbt.internal.util.codec.JValueFormats
+import sbt.internal.util.complete.Parser
+import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
+import sbt.protocol._
+import sbt.util.{ Level, Logger }
+import sjsonnew._
 import sjsonnew.support.scalajson.unsafe.Converter
 
+import scala.annotation.tailrec
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -72,18 +74,10 @@ final class NetworkChannel(
   private val VsCodeOld = "application/vscode-jsonrpc; charset=utf8"
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val alive = new AtomicBoolean(true)
+  private[this] val logLevelHolder = new AtomicReference[Level.Value](Level.Info)
 
-  override def log: Logger = new Logger {
-    override def trace(t: => Throwable): Unit = {}
-    override def success(message: => String): Unit = {}
-    override def log(level: Level.Value, message: => String): Unit = {}
-  }
+  override def log: Logger = logger
   override val terminal: Terminal = new NetworkTerminal
-//  new Thread(() => setLogger(mkLogger(terminal))) {
-//    setDaemon(true)
-//    start()
-//  }
-  override def logger: ManagedLogger = mkLogger(terminal)
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
   def contentType: String = _contentType
@@ -365,9 +359,13 @@ final class NetworkChannel(
                 new AskUserThread(
                   name,
                   state,
-                  terminal,
-                  cmd => {
-                    append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
+                  terminal, {
+                    case "error" => logLevelHolder.set(Level.Error)
+                    case "debug" => logLevelHolder.set(Level.Debug)
+                    case "info"  => logLevelHolder.set(Level.Info)
+                    case "warn"  => logLevelHolder.set(Level.Warn)
+                    case cmd =>
+                      append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
                   },
                   () => askUserThread.synchronized(askUserThread.set(null))
                 )
@@ -598,8 +596,9 @@ final class NetworkChannel(
       } catch { case _: InterruptedException | _: IOException => -1 }
     override def available(): Int = inputBuffer.size
   }
-  import scala.collection.JavaConverters._
   import sjsonnew.BasicJsonProtocol._
+
+  import scala.collection.JavaConverters._
   private[this] lazy val outputStream: OutputStream = new OutputStream {
     private[this] val buffer = new LinkedBlockingQueue[Byte]()
     override def write(b: Int): Unit = buffer.put(b.toByte)
@@ -665,12 +664,6 @@ final class NetworkChannel(
 }
 
 object NetworkChannel {
-  private[sbt] trait ProxyLog {
-    private val logHolder =
-      new AtomicReference[ManagedLogger](LogExchange.logger("unnamed", None, None))
-//    def logger: ManagedLogger = logHolder.get
-    def setLogger(logger: ManagedLogger): Unit = logHolder.set(logger)
-  }
   sealed trait ChannelState
   case object SingleLine extends ChannelState
   case object InHeader extends ChannelState

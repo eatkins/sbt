@@ -141,7 +141,7 @@ private[sbt] final class CommandExchange {
 
   def run(s: State): State = {
     if (consoleChannel.isEmpty) {
-      val console0 = new ConsoleChannel("console0", s.globalLogging.full)
+      val console0 = new ConsoleChannel("console0")
       consoleChannel = Some(console0)
       subscribe(console0)
     }
@@ -171,15 +171,8 @@ private[sbt] final class CommandExchange {
       val name = newNetworkName
       if (needToFinishPromptLine()) ConsoleOut.systemOut.println("")
       s.log.info(s"new client connected: $name")
-      val mkLogger: Terminal => ManagedLogger = terminal => {
-        val log = LogExchange.logger(name, None, None)
-        LogExchange.unbindLoggerAppenders(name)
-        val appender = MainAppender.defaultScreen(terminal)
-        LogExchange.bindLoggerAppenders(name, List(appender -> level))
-        log
-      }
       val channel =
-        new NetworkChannel(name, socket, Project structure s, auth, instance, handlers, mkLogger)
+        new NetworkChannel(name, socket, Project structure s, auth, instance, handlers)
       subscribe(channel)
     }
     if (server.isEmpty && firstInstance.get) {
@@ -300,8 +293,8 @@ private[sbt] final class CommandExchange {
 
   private[sbt] def getLoggerFor(exec: Exec): Option[ManagedLogger] =
     channels.find(c => exec.source.map(_.channelName).contains(c.name)) match {
-      case Some(c) => Some(c.logger)
-      case None    => None
+      case Some(c) => println(s"fuck found $c"); Some(c.logger)
+      case None    => println(s"no channel for $exec"); None
     }
 
   // This is an interface to directly notify events.

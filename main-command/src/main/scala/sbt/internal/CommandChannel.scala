@@ -9,9 +9,11 @@ package sbt
 package internal
 
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 
-import sbt.internal.util.{ ManagedLogger, Terminal }
+import sbt.internal.util.{ MainAppender, ManagedLogger, Terminal }
 import sbt.protocol.EventMessage
+import sbt.util.{ Level, LogExchange }
 import sjsonnew.JsonFormat
 
 /**
@@ -47,7 +49,16 @@ abstract class CommandChannel {
   def publishBytes(bytes: Array[Byte]): Unit
   def shutdown(): Unit
   def name: String
-  private[sbt] def logger: ManagedLogger
+  private[this] val level = new AtomicReference[Level.Value](Level.Info)
+  private[sbt] final def setLevel(l: Level.Value): Unit = level.set(l)
+  private[sbt] final def logLevel: Level.Value = level.get
+  private[sbt] final def logger: ManagedLogger = {
+    val log = LogExchange.logger(name, None, None)
+    LogExchange.unbindLoggerAppenders(name)
+    val appender = MainAppender.defaultScreen(terminal)
+    LogExchange.bindLoggerAppenders(name, List(appender -> logLevel))
+    log
+  }
 }
 
 // case class Exec(commandLine: String, source: Option[CommandSource])
