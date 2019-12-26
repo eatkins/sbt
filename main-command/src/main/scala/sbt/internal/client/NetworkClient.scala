@@ -106,7 +106,7 @@ trait NetworkClientImpl { self =>
     }
     // initiate handshake
     val execId = UUID.randomUUID.toString
-    val initCommand = InitCommand(tkn, Option(execId))
+    val initCommand = InitCommand(tkn, Option(execId), Some(true))
     conn.sendString(Serialization.serializeCommandAsJsonMessage(initCommand))
     conn
   }

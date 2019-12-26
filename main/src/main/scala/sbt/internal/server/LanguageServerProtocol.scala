@@ -51,26 +51,27 @@ private[sbt] object LanguageServerProtocol {
                   s"param is expected on '${r.method}' method."
                 )
               )
-
             {
               case r: JsonRpcRequestMessage if r.method == "initialize" =>
-                if (callback.authOptions(ServerAuthentication.Token)) {
-                  val param = Converter.fromJson[InitializeParams](json(r)).get
-                  val optionJson = param.initializationOptions.getOrElse(
-                    throw LangServerError(
-                      ErrorCodes.InvalidParams,
-                      "initializationOptions is expected on 'initialize' param."
-                    )
+                val param = Converter.fromJson[InitializeParams](json(r)).get
+                val optionJson = param.initializationOptions.getOrElse(
+                  throw LangServerError(
+                    ErrorCodes.InvalidParams,
+                    "initializationOptions is expected on 'initialize' param."
                   )
-                  val opt = Converter.fromJson[InitializeOption](optionJson).get
+                )
+                val opt = Converter.fromJson[InitializeOption](optionJson).get
+                if (callback.authOptions(ServerAuthentication.Token)) {
                   val token = opt.token.getOrElse(sys.error("'token' is missing."))
                   if (callback.authenticate(token)) ()
                   else throw LangServerError(ErrorCodes.InvalidRequest, "invalid token")
                 } else ()
                 callback.setInitialized(true)
-                callback.appendExec(
-                  Exec(s"collectAnalyses", None, Some(CommandSource(callback.name)))
-                )
+                if (!opt.skipAnalysis.getOrElse(false)) {
+                  callback.appendExec(
+                    Exec(s"collectAnalyses", None, Some(CommandSource(callback.name)))
+                  )
+                }
                 callback.jsonRpcRespond(InitializeResult(serverCapabilities), Option(r.id))
 
               case r: JsonRpcRequestMessage if r.method == "textDocument/definition" =>
