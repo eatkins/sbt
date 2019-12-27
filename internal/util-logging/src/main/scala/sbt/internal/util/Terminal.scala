@@ -266,7 +266,31 @@ object Terminal {
       withOut(withIn(f))
     } else f
 
-  private[sbt] def get: Terminal = currentTerminal.get
+  private[this] object ProxyTerminal extends Terminal {
+    private def t: Terminal = currentTerminal.get
+    override def getWidth: Int = t.getWidth
+    override def getHeight: Int = t.getHeight
+    override def getLineHeightAndWidth: (Int, Int) = t.getLineHeightAndWidth
+    override def lineCount(line: String): Int = t.lineCount(line)
+    override def inputStream: InputStream = t.inputStream
+    override def outputStream: OutputStream = t.outputStream
+    override def isAnsiSupported: Boolean = t.isAnsiSupported
+    override def isColorEnabled: Boolean = t.isColorEnabled
+    override def isEchoEnabled: Boolean = t.isEchoEnabled
+    override def isSupershellEnabled: Boolean = t.isSupershellEnabled
+    override def getBooleanCapability(capability: String): Boolean =
+      t.getBooleanCapability(capability)
+    override def getNumericCapability(capability: String): Int = t.getNumericCapability(capability)
+    override def getStringCapability(capability: String): String = t.getStringCapability(capability)
+    override def withRawSystemIn[T](f: => T): T = t.withRawSystemIn(f)
+    override def withCanonicalIn[T](f: => T): T = t.withCanonicalIn(f)
+    override def withEcho[T](f: => T): T = t.withEcho(f)
+    override def printStream: PrintStream = t.printStream
+    override def withPrintStream[T](f: PrintStream => T): T = t.withPrintStream(f)
+    override def restore(): Unit = t.restore()
+    override def close(): Unit = {}
+  }
+  private[sbt] def get: Terminal = ProxyTerminal
 
   private[sbt] def withTerminal[T](terminal: Terminal)(f: => T): T = {
     val originalJLine = jline.TerminalFactory.get
