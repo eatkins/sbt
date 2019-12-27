@@ -239,7 +239,7 @@ object ConsoleAppender {
    * @return A new `ConsoleAppender` that writes to `out`.
    */
   def apply(name: String, out: ConsoleOut, useFormat: Boolean): ConsoleAppender =
-    apply(name, out, formatEnabledInEnv, useFormat, noSuppressedMessage)
+    apply(name, out, useFormat || formatEnabledInEnv, useFormat, noSuppressedMessage)
 
   /**
    * A new `ConsoleAppender` identified by `name`, and that writes to `out`.

@@ -61,7 +61,13 @@ final class Console(compiler: AnalyzingCompiler) {
         loader,
         bindings
       )
-    terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
+    val previous = sys.props.get("scala.color").getOrElse("auto")
+    try {
+      sys.props("scala.color") = if (terminal.isColorEnabled) "true" else "false"
+      terminal.withRawSystemIn(Run.executeTrapExit(console0, log))
+    } finally {
+      sys.props("scala.color") = previous
+    }
   }
 }
 

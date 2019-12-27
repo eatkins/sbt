@@ -69,8 +69,9 @@ object MainAppender {
       Int.MaxValue
     )
 
-  def defaultScreen(console: ConsoleOut): Appender =
-    ConsoleAppender(ConsoleAppender.generateName, console)
+  def defaultScreen(console: ConsoleOut): Appender = {
+    ConsoleAppender(ConsoleAppender.generateName, console, Terminal.get.isColorEnabled)
+  }
 
   def defaultScreen(
       console: ConsoleOut,
