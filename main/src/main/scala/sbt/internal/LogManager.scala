@@ -164,7 +164,6 @@ object LogManager {
         x.source match {
           // TODO: Fix this stringliness
           case Some(x: CommandSource) if x.channelName == "console0" => Option(console)
-          case Some(_: CommandSource)                                => None
           case _                                                     => Option(console)
         }
       case _ => Option(console)

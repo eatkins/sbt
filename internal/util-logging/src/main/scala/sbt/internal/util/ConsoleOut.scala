@@ -8,6 +8,7 @@
 package sbt.internal.util
 
 import java.io.{ BufferedWriter, PrintStream, PrintWriter }
+import java.util.concurrent.atomic.AtomicReference
 
 sealed trait ConsoleOut {
   val lockObject: AnyRef
@@ -18,7 +19,20 @@ sealed trait ConsoleOut {
 }
 
 object ConsoleOut {
-  def systemOut: ConsoleOut = printStreamOut(System.out)
+  def systemOut: ConsoleOut = terminalOut
+  private[sbt] def globalProxy: ConsoleOut = Proxy
+  private[sbt] def setGlobalProxy(out: ConsoleOut): Unit = Proxy.set(out)
+  private[sbt] def getGlobalProxy: ConsoleOut = Proxy.proxy.get
+  private object Proxy extends ConsoleOut {
+    private[ConsoleOut] val proxy = new AtomicReference[ConsoleOut](systemOut)
+    private[this] def get: ConsoleOut = proxy.get
+    def set(proxy: ConsoleOut): Unit = this.proxy.set(proxy)
+    override val lockObject: AnyRef = proxy
+    override def print(s: String): Unit = get.print(s)
+    override def println(s: String): Unit = get.println(s)
+    override def println(): Unit = get.println()
+    override def flush(): Unit = get.flush()
+  }
 
   def overwriteContaining(s: String): (String, String) => Boolean =
     (cur, prev) => cur.contains(s) && prev.contains(s)
@@ -57,12 +71,20 @@ object ConsoleOut {
     }
   }
 
+  def terminalOut: ConsoleOut = new ConsoleOut {
+    override val lockObject: AnyRef = System.out
+    override def print(s: String): Unit = Terminal.get.printStream.print(s)
+    override def println(s: String): Unit = Terminal.get.printStream.println(s)
+    override def println(): Unit = Terminal.get.printStream.println()
+    override def flush(): Unit = Terminal.get.printStream.flush()
+  }
+
   def printStreamOut(out: PrintStream): ConsoleOut = new ConsoleOut {
     val lockObject = out
-    def print(s: String) = out.print(s)
-    def println(s: String) = out.println(s)
-    def println() = out.println()
-    def flush() = out.flush()
+    def print(s: String): Unit = out.print(s)
+    def println(s: String): Unit = out.println(s)
+    def println(): Unit = out.println()
+    def flush(): Unit = out.flush()
   }
   def printWriterOut(out: PrintWriter): ConsoleOut = new ConsoleOut {
     val lockObject = out

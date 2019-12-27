@@ -394,7 +394,7 @@ object Defaults extends BuildCommon {
   // TODO: This should be on the new default settings for a project.
   def projectCore: Seq[Setting[_]] = Seq(
     name := thisProject.value.id,
-    logManager := LogManager.defaults(extraLoggers.value, StandardMain.console),
+    logManager := LogManager.defaults(extraLoggers.value, ConsoleOut.terminalOut),
     onLoadMessage := (onLoadMessage or
       Def.setting {
         s"Set current project to ${name.value} (in build ${thisProjectRef.value.build})"

@@ -64,13 +64,8 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
     new AskUserThread(
       "console",
       s,
-      Terminal.console, {
-        case "debug" => setLevel(Level.Debug)
-        case "info"  => setLevel(Level.Info)
-        case "error" => setLevel(Level.Error)
-        case "warn"  => setLevel(Level.Warn)
-        case cmd     => append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
-      },
+      Terminal.console,
+      onLine,
       () => askUserThread.synchronized(askUserThread.set(null))
     )
 

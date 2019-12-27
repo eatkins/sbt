@@ -305,10 +305,13 @@ object Terminal {
 
   private[sbt] def withOut[T](out: PrintStream)(f: => T): T = {
     val originalOut = System.out
+    val originalProxyOut = ConsoleOut.getGlobalProxy
     try {
+      ConsoleOut.setGlobalProxy(ConsoleOut.printStreamOut(out))
       System.setOut(out)
       scala.Console.withOut(out)(f)
     } finally {
+      ConsoleOut.setGlobalProxy(originalProxyOut)
       System.setOut(originalOut)
     }
   }
