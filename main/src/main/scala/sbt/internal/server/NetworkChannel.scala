@@ -76,7 +76,11 @@ final class NetworkChannel(
   private[this] val alive = new AtomicBoolean(true)
   private[this] val logLevelHolder = new AtomicReference[Level.Value](Level.Info)
 
-  override def log: Logger = logger
+  override def log: Logger = new Logger {
+    override def trace(t: => Throwable): Unit = {}
+    override def success(message: => String): Unit = {}
+    override def log(level: Level.Value, message: => String): Unit = {}
+  }
   override val terminal: Terminal = new NetworkTerminal
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
@@ -359,14 +363,8 @@ final class NetworkChannel(
                 new AskUserThread(
                   name,
                   state,
-                  terminal, {
-                    case "error" => logLevelHolder.set(Level.Error)
-                    case "debug" => logLevelHolder.set(Level.Debug)
-                    case "info"  => logLevelHolder.set(Level.Info)
-                    case "warn"  => logLevelHolder.set(Level.Warn)
-                    case cmd =>
-                      append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
-                  },
+                  terminal,
+                  onLine,
                   () => askUserThread.synchronized(askUserThread.set(null))
                 )
               )

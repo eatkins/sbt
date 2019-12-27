@@ -50,14 +50,37 @@ abstract class CommandChannel {
   def shutdown(): Unit
   def name: String
   private[this] val level = new AtomicReference[Level.Value](Level.Info)
-  private[sbt] final def setLevel(l: Level.Value): Unit = level.set(l)
+  private[this] val loggerHolder = new AtomicReference[Option[(ManagedLogger, Level.Value)]](None)
+  private[sbt] final def setLevel(l: Level.Value): Unit = loggerHolder.get match {
+    case Some((_, level)) if l == level =>
+    case _ =>
+      level.set(l)
+      mkLogger
+  }
   private[sbt] final def logLevel: Level.Value = level.get
+  private[this] lazy val appender = MainAppender.defaultScreen(terminal)
+  private[this] def mkLogger = loggerHolder.get match {
+    case Some((l, level)) if level == logLevel => l
+    case _ =>
+      val log = LogExchange.logger(name, None, None)
+      LogExchange.unbindLoggerAppenders(name)
+      LogExchange.bindLoggerAppenders(name, List(appender -> Level.Info))
+      loggerHolder.set(Some(log -> logLevel))
+      log
+  }
   private[sbt] final def logger: ManagedLogger = {
-    val log = LogExchange.logger(name, None, None)
-    LogExchange.unbindLoggerAppenders(name)
-    val appender = MainAppender.defaultScreen(terminal)
-    LogExchange.bindLoggerAppenders(name, List(appender -> logLevel))
-    log
+    loggerHolder.get match {
+      case Some((l, _)) => l
+      case None         => mkLogger
+    }
+  }
+  private[sbt] def onLine: String => Unit = {
+    case "error" => level.set(Level.Error); append(Exec("error", None, None))
+    case "debug" => level.set(Level.Debug); append(Exec("debug", None, None))
+    case "info"  => level.set(Level.Info); append(Exec("info", None, None))
+    case "warn"  => level.set(Level.Warn); append(Exec("warn", None, None))
+    case cmd =>
+      append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
   }
 }
 

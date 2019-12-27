@@ -139,13 +139,14 @@ object StandardMain {
   /** The common interface to standard output, used for all built-in ConsoleLoggers. */
   val console: ConsoleOut =
     ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
+  ConsoleOut.setGlobalProxy(console)
 
   private[this] def initialGlobalLogging(file: Option[File]): GlobalLogging = {
     file.foreach(f => if (!f.exists()) IO.createDirectory(f))
     GlobalLogging.initial(
-      MainAppender.globalDefault(console),
+      MainAppender.globalDefault(ConsoleOut.globalProxy),
       File.createTempFile("sbt-global-log", ".log", file.orNull),
-      console
+      ConsoleOut.globalProxy
     )
   }
   def initialGlobalLogging(file: File): GlobalLogging = initialGlobalLogging(Option(file))
