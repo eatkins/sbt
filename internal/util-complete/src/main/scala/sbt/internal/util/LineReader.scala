@@ -68,7 +68,9 @@ abstract class JLine extends LineReader {
     }
 
   override def redraw(): Unit = {
-    reader.drawLine()
+    reader.getOutput.write(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
+    if (reader.getCursorBuffer.length > 0) reader.drawLine()
+    else reader.redrawLine()
     reader.flush()
   }
 
