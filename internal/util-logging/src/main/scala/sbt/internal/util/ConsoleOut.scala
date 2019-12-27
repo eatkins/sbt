@@ -79,6 +79,13 @@ object ConsoleOut {
     override def flush(): Unit = Terminal.get.printStream.flush()
   }
 
+  def terminalOut(terminal: Terminal): ConsoleOut = new ConsoleOut {
+    override val lockObject: AnyRef = terminal
+    override def print(s: String): Unit = terminal.printStream.print(s)
+    override def println(s: String): Unit = terminal.printStream.println(s)
+    override def println(): Unit = terminal.printStream.println()
+    override def flush(): Unit = terminal.printStream.flush()
+  }
   def printStreamOut(out: PrintStream): ConsoleOut = new ConsoleOut {
     val lockObject = out
     def print(s: String): Unit = out.print(s)

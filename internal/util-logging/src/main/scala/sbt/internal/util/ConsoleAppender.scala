@@ -119,6 +119,23 @@ object ConsoleAppender {
   private[this] val showProgressHolder: AtomicBoolean = new AtomicBoolean(false)
   def setShowProgress(b: Boolean): Unit = showProgressHolder.set(b)
   def showProgress: Boolean = showProgressHolder.get
+  private[ConsoleAppender] trait Properties {
+    def isAnsiSupported: Boolean
+    def isColorEnabled: Boolean
+    def out: ConsoleOut
+  }
+  object Properties {
+    def from(terminal: Terminal): Properties = new Properties {
+      override def isAnsiSupported: Boolean = terminal.isAnsiSupported
+      override def isColorEnabled: Boolean = terminal.isColorEnabled
+      override def out = ConsoleOut.terminalOut(terminal)
+    }
+    def from(o: ConsoleOut, ansi: Boolean, color: Boolean): Properties = new Properties {
+      override def isAnsiSupported: Boolean = ansi
+      override def isColorEnabled: Boolean = color
+      override def out = o
+    }
+  }
 
   /** Hide stack trace altogether. */
   val noSuppressedMessage = (_: SuppressedTraceContext) => None
@@ -244,6 +261,24 @@ object ConsoleAppender {
   /**
    * A new `ConsoleAppender` identified by `name`, and that writes to `out`.
    *
+   * @param name      An identifier for the `ConsoleAppender`.
+   * @param terminal  The terminal to which this appender corresponds
+   * @param suppressedMessage How to handle stack traces.
+   * @return A new `ConsoleAppender` that writes to `out`.
+   */
+  def apply(
+      name: String,
+      terminal: Terminal,
+      suppressedMessage: SuppressedTraceContext => Option[String]
+  ): ConsoleAppender = {
+    val appender = new ConsoleAppender(name, Properties.from(terminal), suppressedMessage)
+    appender.start()
+    appender
+  }
+
+  /**
+   * A new `ConsoleAppender` identified by `name`, and that writes to `out`.
+   *
    * @param name               An identifier for the `ConsoleAppender`.
    * @param out                Where to write messages.
    * @param ansiCodesSupported `true` if the output stream supports ansi codes, `false` otherwise.
@@ -312,14 +347,23 @@ object ConsoleAppender {
  */
 class ConsoleAppender private[ConsoleAppender] (
     name: String,
-    out: ConsoleOut,
-    ansiCodesSupported: Boolean,
-    useFormat: Boolean,
+    properties: Properties,
     suppressedMessage: SuppressedTraceContext => Option[String]
 ) extends AbstractAppender(name, null, LogExchange.dummyLayout, true, Array.empty) {
+  def this(
+      name: String,
+      out: ConsoleOut,
+      ansiCodesSupported: Boolean,
+      useFormat: Boolean,
+      suppressedMessage: SuppressedTraceContext => Option[String]
+  ) = this(name, Properties.from(out, ansiCodesSupported, useFormat), suppressedMessage)
   import scala.Console.{ BLUE, GREEN, RED, YELLOW }
 
-  private val reset: String = {
+  private[util] def out: ConsoleOut = properties.out
+  private[util] def ansiCodesSupported: Boolean = properties.isAnsiSupported
+  private[util] def useFormat: Boolean = properties.isColorEnabled
+
+  private def reset: String = {
     if (ansiCodesSupported && useFormat) scala.Console.RESET
     else ""
   }
@@ -380,18 +424,6 @@ class ConsoleAppender private[ConsoleAppender] (
    */
   def appendLog(level: Level.Value, message: => String): Unit = {
     appendLog(labelColor(level), level.toString, NO_COLOR, message)
-  }
-
-  /**
-   * Formats `msg` with `format, wrapped between `RESET`s
-   *
-   * @param format The format to use
-   * @param msg    The message to format
-   * @return The formatted message.
-   */
-  private def formatted(format: String, msg: String): String = {
-    val builder = new java.lang.StringBuilder(reset.length * 2 + format.length + msg.length)
-    builder.append(reset).append(format).append(msg).append(reset).toString
   }
 
   /**

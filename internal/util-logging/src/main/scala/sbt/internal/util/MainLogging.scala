@@ -70,14 +70,19 @@ object MainAppender {
     )
 
   def defaultScreen(console: ConsoleOut): Appender = {
-    ConsoleAppender(ConsoleAppender.generateName, console, Terminal.get.isColorEnabled)
+    ConsoleAppender(ConsoleAppender.generateName, console)
   }
 
   def defaultScreen(
       console: ConsoleOut,
       suppressedMessage: SuppressedTraceContext => Option[String]
-  ): Appender =
-    ConsoleAppender(ConsoleAppender.generateName, console, suppressedMessage = suppressedMessage)
+  ): Appender = {
+    ConsoleAppender(
+      ConsoleAppender.generateName,
+      Terminal.get,
+      suppressedMessage = suppressedMessage
+    )
+  }
 
   def defaultScreen(terminal: Terminal): Appender =
     ConsoleAppender(
@@ -110,8 +115,9 @@ object MainAppender {
   def defaultBacked: PrintWriter => Appender =
     defaultBacked(generateGlobalBackingName, ConsoleAppender.formatEnabledInEnv)
 
-  def defaultBacked(loggerName: String): PrintWriter => Appender =
+  def defaultBacked(loggerName: String): PrintWriter => Appender = {
     defaultBacked(loggerName, ConsoleAppender.formatEnabledInEnv)
+  }
 
   def defaultBacked(useFormat: Boolean): PrintWriter => Appender =
     defaultBacked(generateGlobalBackingName, useFormat)
