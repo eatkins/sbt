@@ -57,12 +57,13 @@ trait NetworkClientImpl { self =>
 
   private def portfile = baseDirectory / "project" / "target" / "active.json"
 
-  lazy val connection: ServerConnection = try init()
-  catch {
-    case _: ConnectionRefusedException =>
-      Files.deleteIfExists(portfile.toPath)
-      init()
-  }
+  lazy val connection: ServerConnection =
+    try init()
+    catch {
+      case _: ConnectionRefusedException =>
+        Files.deleteIfExists(portfile.toPath)
+        init()
+    }
 
   private[this] val mainThread = Thread.currentThread
   private[this] val stdinBytes = new LinkedBlockingQueue[Int]
@@ -79,8 +80,9 @@ trait NetworkClientImpl { self =>
     if (!portfile.exists) {
       forkServer(portfile)
     }
-    val (sk, tkn) = try ClientSocket.socket(portfile, provider)
-    catch { case e: IOException => throw new ConnectionRefusedException(e) }
+    val (sk, tkn) =
+      try ClientSocket.socket(portfile, provider)
+      catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
         msg.method match {
@@ -210,11 +212,12 @@ trait NetworkClientImpl { self =>
     def splitToMessage: Vector[(Level.Value, String)] =
       (msg.method, msg.params) match {
         case ("window/logMessage", Some(json)) =>
-          import sbt.internal.langserver.codec.JsonProtocol._
-          Converter.fromJson[LogMessageParams](json) match {
-            case Success(params) => splitLogMessage(params)
-            case Failure(_)      => Vector()
-          }
+//          import sbt.internal.langserver.codec.JsonProtocol._
+//          Converter.fromJson[LogMessageParams](json) match {
+//            case Success(params) => splitLogMessage(params)
+//            case Failure(_)      => Vector()
+//          }
+          Vector()
         case ("sbt/terminalprops", Some(json)) =>
           Converter.fromJson[String](json) match {
             case Success(id) =>
