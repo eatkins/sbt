@@ -28,7 +28,7 @@ object ConsoleProject {
       extracted.runTask(Keys.scalaCompilerBridgeBinaryJar.in(Keys.consoleProject), state1)
     val scalaInstance = {
       val scalaProvider = state.configuration.provider.scalaProvider
-      ScalaInstance(scalaProvider.version, scalaProvider.launcher)
+      ScalaInstance(scalaProvider.version, scalaProvider)
     }
     val g = BuildPaths.getGlobalBase(state)
     val zincDir = BuildPaths.getZincDirectory(state, g)
