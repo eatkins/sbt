@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicReference
 import sbt.BasicKeys._
 import sbt.internal.util._
 import sbt.protocol.EventMessage
-import sbt.util.Level
 import sjsonnew.JsonFormat
 
 private[sbt] class AskUserThread(
@@ -43,15 +42,19 @@ private[sbt] class AskUserThread(
         terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
         terminal.printStream.flush()
       }
+      if (terminal.getLineHeightAndWidth._2 > 0) terminal.printStream.println()
+      terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
+      terminal.printStream.flush()
       terminal.withRawSystemIn(reader.readLine(prompt)) match {
         case Some(cmd) => onLine(cmd)
         case None =>
           writer.println("") // Prevents server shutdown log lines from appearing on the prompt line
           onLine("exit")
       }
-    } catch { case _: ClosedChannelException | _: IOException => } finally onClose()
+    } catch { case _: ClosedChannelException | _: IOException => }
+    finally onClose()
   def redraw(): Unit = {
-    writer.print(ConsoleAppender.clearLine(0))
+    writer.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
     reader.redraw()
     writer.print(ConsoleAppender.clearScreen(0))
     terminal.outputStream.flush()
