@@ -119,8 +119,8 @@ trait NetworkClientImpl { self =>
    */
   def forkServer(portfile: File): Unit = {
     console.appendLog(Level.Info, "server was not detected. starting an instance")
-    val args = List[String]()
-    val launchOpts = List("-Xms2048M", "-Xmx2048M", "-Xss2M")
+    val args = arguments
+    val launchOpts = Nil
     val launcherJarString = sys.props.get("java.class.path") match {
       case Some(cp) =>
         cp.split(File.pathSeparator)
@@ -494,9 +494,10 @@ object SimpleClient {
       if (args.length == 0) new File("").getCanonicalFile
       else new File(args(0)).getCanonicalFile
     val jni = args.contains("--jni")
+    val cleanedArgs = args.tail.filterNot(_ == "--jni").toList
     new SimpleClient(
       file,
-      args.tail.toList,
+      cleanedArgs,
       if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
     )
   }
