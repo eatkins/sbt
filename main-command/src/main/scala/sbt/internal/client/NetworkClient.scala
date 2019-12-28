@@ -13,15 +13,10 @@ import java.io.{ File, IOException, InputStream }
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.util.concurrent.{
-  ConcurrentHashMap,
-  CountDownLatch,
-  Executors,
-  LinkedBlockingQueue,
-  TimeUnit
-}
+import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue, TimeUnit }
 
 import org.scalasbt.ipcsocket.UnixDomainSocketLibraryProvider
+import sbt.internal.client.NetworkClient.Arguments
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.protocol._
 import sbt.internal.util.{ ConsoleAppender, NetworkReader, Terminal }
@@ -34,6 +29,7 @@ import sjsonnew.shaded.scalajson.ast.unsafe.JObject
 import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
@@ -46,9 +42,12 @@ trait ConsoleInterface {
 
 trait NetworkClientImpl { self =>
   def baseDirectory: File
-  def arguments: List[String]
+  def arguments: List[String] = (sbtArguments ++ commandArguments).toList
   def console: ConsoleInterface
   def provider: UnixDomainSocketLibraryProvider
+  def sbtArguments: Seq[String]
+  def commandArguments: Seq[String]
+  val sbtScript: String
   private val status = new AtomicReference("Ready")
   private val lock: AnyRef = new AnyRef {}
   private val running = new AtomicBoolean(true)
@@ -119,24 +118,7 @@ trait NetworkClientImpl { self =>
    */
   def forkServer(portfile: File): Unit = {
     console.appendLog(Level.Info, "server was not detected. starting an instance")
-    val args = arguments
-    val launchOpts = Nil
-    val launcherJarString = sys.props.get("java.class.path") match {
-      case Some(cp) =>
-        cp.split(File.pathSeparator)
-          .toList
-          .find(_.contains("sbt-launch"))
-          .getOrElse(
-            "/Users/ethanatkins/.ivy2/local/org.scala-sbt/sbt-launch/1.4.0-SNAPSHOT/jars/sbt-launch.jar"
-          )
-      case _ => sys.error("property java.class.path expected")
-    }
-    import scala.collection.JavaConverters._
-    val properties = System.getProperties.asScala.collect {
-      case (key, value) if key.startsWith("sbt.") => s"-D$key=$value"
-    }.toList
-    val cmd = "java" :: launchOpts ::: properties ::: "-jar" :: launcherJarString :: args
-    // val cmd = "sbt"
+    val cmd = sbtScript +: sbtArguments
     val process = new ProcessBuilder(cmd: _*).directory(baseDirectory).start()
     val stdout = process.getInputStream
     val stderr = process.getErrorStream
@@ -450,7 +432,9 @@ trait NetworkClientImpl { self =>
 }
 class NetworkClient(
     configuration: xsbti.AppConfiguration,
-    override val arguments: List[String],
+    override val sbtArguments: Seq[String],
+    override val commandArguments: Seq[String],
+    override val sbtScript: String,
     override val provider: UnixDomainSocketLibraryProvider
 ) extends {
   override val console: ConsoleInterface = {
@@ -462,51 +446,107 @@ class NetworkClient(
     }
   }
 } with NetworkClientImpl {
+  def this(configuration: xsbti.AppConfiguration, arguments: Arguments) =
+    this(
+      configuration,
+      arguments.sbtArguments,
+      arguments.commandArguments,
+      arguments.sbtScript,
+      arguments.provider
+    )
   def this(configuration: xsbti.AppConfiguration, args: List[String]) =
-    this(configuration, args, UnixDomainSocketLibraryProvider.jna)
+    this(configuration, NetworkClient.parseArgs(args.toArray))
   override def baseDirectory: File = configuration.baseDirectory
 }
 
 class SimpleClient(
     override val baseDirectory: File,
-    val arguments: List[String],
+    val sbtArguments: Seq[String],
+    val commandArguments: Seq[String],
+    override val sbtScript: String,
     override val provider: UnixDomainSocketLibraryProvider
 ) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
     import scala.Console.{ GREEN, RED, RESET, YELLOW }
     override def appendLog(level: Level.Value, message: => String): Unit = {
       val prefix = level match {
-        case Level.Warn | Level.Error => s"[$RED$level$RESET]"
-        case Level.Debug              => s"[$YELLOW$level$RESET]"
-        case _                        => s"[$level]"
+        case Level.Error => s"[$RED$level$RESET]"
+        case Level.Warn  => s"[$YELLOW$level$RESET]"
+        case _           => s"[$RESET$level$RESET]"
       }
       println(s"$prefix $message")
     }
 
     override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
   }
-} with NetworkClientImpl {
-  println(provider)
-}
+} with NetworkClientImpl
 object SimpleClient {
+  def main(args: Array[String]): Unit = {
+    apply(args)
+    ()
+  }
   def apply(args: Array[String]): SimpleClient = {
-    val file =
-      if (args.length == 0) new File("").getCanonicalFile
-      else new File(args(0)).getCanonicalFile
-    val jni = args.contains("--jni")
-    val cleanedArgs = args.tail.filterNot(_ == "--jni").toList
+    val arguments = NetworkClient.parseArgs(args)
     new SimpleClient(
-      file,
-      cleanedArgs,
-      if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
+      arguments.baseDirectory,
+      arguments.sbtArguments,
+      arguments.commandArguments,
+      arguments.sbtScript,
+      arguments.provider
     )
   }
 }
 
 object NetworkClient {
+  private[client] class Arguments(
+      val baseDirectory: File,
+      val sbtArguments: Seq[String],
+      val commandArguments: Seq[String],
+      val sbtScript: String,
+      val provider: UnixDomainSocketLibraryProvider
+  )
+  private[client] def parseArgs(args: Array[String]): Arguments = {
+    var i = 0
+    var jni = false
+    var sbtScript = "sbt"
+    val commandArgs = new mutable.ArrayBuffer[String]
+    val sbtArguments = new mutable.ArrayBuffer[String]
+    var pwd: Option[File] = None
+    while (i < args.length) {
+      args(i) match {
+        case "--jni" => jni = true
+        case a if a.startsWith("--pwd=") =>
+          pwd = a.split("--pwd=").lastOption.map(new File(_).getCanonicalFile)
+        case a if a.startsWith("--sbt-script=") =>
+          sbtScript = a.split("--sbt-script=").lastOption.getOrElse(sbtScript)
+        case a if !a.startsWith("-") => commandArgs += a
+        case a =>
+          if (a.startsWith("-Dsbt.")) {
+            a.drop(2).split("=") match {
+              case Array(key, value) => System.setProperty(key, value)
+              case _                 =>
+            }
+          }
+          sbtArguments += a
+      }
+      i += 1
+    }
+    System.getProperties.forEach((k, v) => println(s"$k -> $v"))
+    val file = pwd.getOrElse(new File("").getCanonicalFile)
+    val provider =
+      if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
+    new Arguments(file, sbtArguments, commandArgs, sbtScript, provider)
+  }
   def run(configuration: xsbti.AppConfiguration, arguments: List[String]): Unit =
     try {
-      new NetworkClient(configuration, arguments)
+      val args = parseArgs(arguments.toArray)
+      new NetworkClient(
+        configuration,
+        args.sbtArguments,
+        args.commandArguments,
+        args.sbtScript,
+        args.provider
+      )
       ()
     } catch {
       case NonFatal(e) => e.printStackTrace()
