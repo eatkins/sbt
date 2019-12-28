@@ -4,6 +4,7 @@ import Util._
 import com.typesafe.tools.mima.core.ProblemFilters._
 import com.typesafe.tools.mima.core._
 import local.Scripted
+import java.nio.file.{ Files, Path => JPath }
 
 import scala.util.Try
 
@@ -837,6 +838,7 @@ lazy val zincLmIntegrationProj = (project in file("zinc-lm-integration"))
   )
   .configure(addSbtZincCompileCore, addSbtLmCore, addSbtLmIvyTest)
 
+val makeClientBinary = taskKey[JPath]("Creates a binary for the sbt client")
 // The main integration project for sbt.  It brings all of the projects together, configures them, and provides for overriding conventions.
 lazy val mainProj = (project in file("main"))
   .enablePlugins(ContrabandPlugin)
@@ -871,6 +873,30 @@ lazy val mainProj = (project in file("main"))
     sourceManaged in (Compile, generateContrabands) := baseDirectory.value / "src" / "main" / "contraband-scala",
     testOptions in Test += Tests
       .Argument(TestFrameworks.ScalaCheck, "-minSuccessfulTests", "1000"),
+    makeClientBinary := {
+      val classpath = (Compile / fullClasspath).value.map(_.data)
+      val bin = target.value.toPath / "sbt-client.sh"
+      val script = s"""#!/bin/sh
+        |
+        |cmd=
+        |args=()
+        |for arg in "$$@"; do
+        |  if [[ $$arg == "-console" ]]
+        |    then cmd="sbt"
+        |    else args+="$$arg"
+        |  fi
+        |done
+        |if [[ -z $${cmd} ]]
+        |then
+        |  exec java -cp ${classpath.mkString(java.io.File.pathSeparator)} sbt.internal.client.SimpleClient $$@
+        |else
+        |  exec $$cmd "$${args[@]}"
+        |fi
+      """.stripMargin
+      Files.write(bin, script.getBytes)
+      bin.toFile.setExecutable(true)
+      bin
+    },
     mimaSettings,
     mimaBinaryIssueFilters ++= Vector(
       // New and changed methods on KeyIndex. internal.
