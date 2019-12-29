@@ -124,7 +124,6 @@ object StandardMain {
 
   def runManaged(s: State): xsbti.MainResult = {
     val previous = TrapExit.installManager()
-    System.err.println(s"installed $previous")
     try {
       val hook = ShutdownHooks.add(closeRunnable)
       try {
@@ -135,7 +134,6 @@ object StandardMain {
         ()
       }
     } finally {
-      System.err.println(s"uninstall $previous")
       TrapExit.uninstallManager(previous)
     }
   }
@@ -912,8 +910,11 @@ object BuiltinCommands {
         remainingCommands = exec +: Exec(Shell, None) +: s1.remainingCommands
       )
       .setInteractive(true)
-    if (exec.commandLine.trim.isEmpty) newState
-    else newState.clearGlobalLog
+    val res =
+      if (exec.commandLine.trim.isEmpty) newState
+      else newState.clearGlobalLog
+    StandardMain.exchange.setState(res)
+    res
   }
 
   def startServer: Command =

@@ -142,6 +142,7 @@ private[sbt] final class CommandExchange {
     if (autoStartServerSysProp && autoStartServerAttr) runServer(s)
     else s
   }
+  private[sbt] def setState(s: State): Unit = lastState.set(s)
 
   private def newNetworkName: String = s"network-${nextChannelId.incrementAndGet()}"
 
@@ -436,8 +437,16 @@ private[sbt] final class CommandExchange {
               case "attach" => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
               case k if k.startsWith("kill") =>
                 val execID = k.split("kill[ ]+").lastOption
-                NetworkChannel.cancel(execID, execID.getOrElse("0"))
-              case k =>
+                val st = lastState.get
+                (st.currentCommand.toList ::: st.remainingCommands).collectFirst {
+                  case e if e.execId == execID && e.commandLine.startsWith("console") =>
+                    val kill = s" // console session killed by remote client"
+                    Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
+                    Terminal.get.write(13, 4)
+                  case _ =>
+                    NetworkChannel.cancel(execID, execID.getOrElse("0"))
+                }
+              case _ =>
             }
         }
         if (!isStopped.get) impl()
