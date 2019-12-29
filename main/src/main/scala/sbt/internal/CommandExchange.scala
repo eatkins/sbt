@@ -126,9 +126,7 @@ private[sbt] final class CommandExchange {
                   impl(deadline)
                 case _ => exec
               }
-
             case _ => exec
-
           }
         case None =>
           val newDeadline = if (deadline.fold(false)(_.isOverdue())) {
@@ -139,10 +137,14 @@ private[sbt] final class CommandExchange {
       }
     }
     // Do not manually run GC until the user has been idling for at least the min gc interval.
-    impl(interval match {
+    val exec = impl(interval match {
       case d: FiniteDuration => Some(d.fromNow)
       case _                 => None
     })
+    if (exec.commandLine.nonEmpty) {
+      channels.foreach(c => c.publishEventMessage(ConsoleUnpromptEvent(exec.source)))
+    }
+    exec
   }
 
   def run(s: State): State = {
