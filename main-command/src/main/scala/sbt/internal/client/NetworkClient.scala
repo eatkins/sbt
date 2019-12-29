@@ -512,6 +512,7 @@ object NetworkClient {
     val commandArgs = new mutable.ArrayBuffer[String]
     val sbtArguments = new mutable.ArrayBuffer[String]
     var pwd: Option[File] = None
+    val SysProp = "-D([^=]+)=(.*)".r
     while (i < args.length) {
       args(i) match {
         case "--jni" => jni = true
@@ -520,18 +521,14 @@ object NetworkClient {
         case a if a.startsWith("--sbt-script=") =>
           sbtScript = a.split("--sbt-script=").lastOption.getOrElse(sbtScript)
         case a if !a.startsWith("-") => commandArgs += a
+        case a @ SysProp(key, value) =>
+          System.setProperty(key, value)
+          sbtArguments += a
         case a =>
-          if (a.startsWith("-Dsbt.")) {
-            a.drop(2).split("=") match {
-              case Array(key, value) => System.setProperty(key, value)
-              case _                 =>
-            }
-          }
           sbtArguments += a
       }
       i += 1
     }
-    System.getProperties.forEach((k, v) => println(s"$k -> $v"))
     val file = pwd.getOrElse(new File("").getCanonicalFile)
     val provider =
       if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
