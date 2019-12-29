@@ -239,14 +239,7 @@ final class NetworkChannel(
                 }
               case "attach" =>
                 attached.set(true)
-                new Thread("sbt-network-channel-attach-thread") {
-                  setDaemon(true)
-                  start()
-                  override def run(): Unit = {
-                    StandardMain.exchange.withState(s => publishEventMessage(ConsolePromptEvent(s)))
-                  }
-                }
-                ()
+                initiateMaintenance("attach")
               case _ =>
                 try {
                   onRequestMessage(req)

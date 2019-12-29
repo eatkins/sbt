@@ -56,6 +56,7 @@ private[sbt] final class CommandExchange {
   private val channelBuffer: ListBuffer[CommandChannel] = new ListBuffer()
   private val channelBufferLock = new AnyRef {}
   private val commandChannelQueue = new LinkedBlockingQueue[CommandChannel]
+  private val maintenanceChannelQueue = new LinkedBlockingQueue[MaintenanceTask]
   private val nextChannelId: AtomicInteger = new AtomicInteger(0)
   private[this] val activePrompt = new AtomicBoolean(false)
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
@@ -75,7 +76,7 @@ private[sbt] final class CommandExchange {
 
   def subscribe(c: CommandChannel): Unit = channelBufferLock.synchronized {
     channelBuffer.append(c)
-    c.register(commandChannelQueue)
+    c.register(commandChannelQueue, maintenanceChannelQueue)
   }
 
   private[sbt] def withState[T](f: State => T): T = f(lastState.get)
@@ -231,6 +232,7 @@ private[sbt] final class CommandExchange {
   }
 
   def shutdown(): Unit = {
+    maintenanceThread.close()
     channels foreach (_.shutdown())
     // interrupt and kill the thread
     server.foreach(_.shutdown())
@@ -435,4 +437,30 @@ private[sbt] final class CommandExchange {
     removeChannels(toDel.toList)
   }
   private[this] def needToFinishPromptLine(): Boolean = activePrompt.compareAndSet(true, false)
+  private[this] class MaintenanceThread
+      extends Thread("sbt-command-exchange-maintenance")
+      with AutoCloseable {
+    setDaemon(true)
+    start()
+    private[this] val isStopped = new AtomicBoolean(false)
+    override def run(): Unit = {
+      @tailrec def impl(): Unit = {
+        maintenanceChannelQueue.take match {
+          case null =>
+          case mt: MaintenanceTask =>
+            mt.task match {
+              case "attach" => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
+              case _        =>
+            }
+        }
+        if (!isStopped.get) impl()
+      }
+      try impl()
+      catch { case _: InterruptedException => }
+    }
+    override def close(): Unit = if (isStopped.compareAndSet(false, true)) {
+      interrupt()
+    }
+  }
+  private[this] val maintenanceThread = new MaintenanceThread
 }

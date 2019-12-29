@@ -24,17 +24,29 @@ import sjsonnew.JsonFormat
 abstract class CommandChannel {
   private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
   private val registered: java.util.Set[java.util.Queue[CommandChannel]] = new java.util.HashSet
-  private[sbt] final def register(queue: java.util.Queue[CommandChannel]): Unit =
+  private val maintenance: java.util.Set[java.util.Queue[MaintenanceTask]] = new java.util.HashSet
+  private[sbt] final def register(
+      queue: java.util.Queue[CommandChannel],
+      maintenanceQueue: java.util.Queue[MaintenanceTask]
+  ): Unit =
     registered.synchronized {
       registered.add(queue)
       if (!commandQueue.isEmpty) queue.add(this)
+      maintenance.add(maintenanceQueue)
       ()
     }
-  private[sbt] final def unregister(queue: java.util.Queue[CommandChannel]): Unit =
+  private[sbt] final def unregister(
+      queue: java.util.Queue[CommandChannel],
+      maintenanceQueue: java.util.Queue[MaintenanceTask]
+  ): Unit =
     registered.synchronized {
       registered.remove(queue)
+      maintenance.remove(maintenanceQueue)
       ()
     }
+  private[sbt] final def initiateMaintenance(task: String): Unit = {
+    maintenance.forEach(q => q.synchronized(q.add(new MaintenanceTask(this, task))))
+  }
   private[sbt] def terminal: Terminal
   def append(exec: Exec): Boolean = registered.synchronized {
     val res = commandQueue.add(exec)
@@ -100,3 +112,5 @@ case class ConsolePromptEvent(state: State) extends EventMessage
 case class ConsoleUnpromptEvent(lastSource: Option[CommandSource]) extends EventMessage
 
 case class StartWatchEvent(state: State, index: Int) extends EventMessage
+
+private[internal] class MaintenanceTask(val channel: CommandChannel, val task: String)
