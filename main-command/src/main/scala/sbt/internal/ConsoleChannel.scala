@@ -72,6 +72,7 @@ private[sbt] class AskUserThread(
 private[sbt] trait HasUserThread {
   private[this] val askUserThread = new AtomicReference[UserThread]
   private[sbt] def terminal: Terminal
+  private[sbt] def onLine: String => Unit
 
   private[sbt] def makeAskUserThread(s: State): AskUserThread =
     new AskUserThread(
