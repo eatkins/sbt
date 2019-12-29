@@ -456,22 +456,28 @@ class ConsoleAppender private[ConsoleAppender] (
       messageColor: String,
       message: String
   ): Unit =
-    out.lockObject.synchronized {
-      val builder: StringBuilder =
-        new StringBuilder(labelColor.length + label.length + messageColor.length + reset.length * 3)
-      message.linesIterator.foreach { line =>
-        builder.ensureCapacity(
-          labelColor.length + label.length + messageColor.length + line.length + reset.length * 3 + 3
-        )
-        builder.setLength(0)
-        def fmted(a: String, b: String) = builder.append(reset).append(a).append(b).append(reset)
-        builder.append(reset).append('[')
-        fmted(labelColor, label)
-        builder.append("] ")
-        fmted(messageColor, line)
-        write(builder.toString)
+    try {
+      out.lockObject.synchronized {
+        val builder: StringBuilder =
+          new StringBuilder(
+            labelColor.length + label.length + messageColor.length + reset.length * 3
+          )
+        message.linesIterator.foreach { line =>
+          builder.ensureCapacity(
+            labelColor.length + label.length + messageColor.length + line.length + reset.length * 3 + 3
+          )
+          builder.setLength(0)
+
+          def fmted(a: String, b: String) = builder.append(reset).append(a).append(b).append(reset)
+
+          builder.append(reset).append('[')
+          fmted(labelColor, label)
+          builder.append("] ")
+          fmted(messageColor, line)
+          write(builder.toString)
+        }
       }
-    }
+    } catch { case _: InterruptedException => }
 
   // success is called by ConsoleLogger.
   private[sbt] def success(message: => String): Unit = {
