@@ -124,6 +124,7 @@ object StandardMain {
 
   def runManaged(s: State): xsbti.MainResult = {
     val previous = TrapExit.installManager()
+    System.err.println(s"installed $previous")
     try {
       val hook = ShutdownHooks.add(closeRunnable)
       try {
@@ -133,7 +134,10 @@ object StandardMain {
         finally hook.close()
         ()
       }
-    } finally TrapExit.uninstallManager(previous)
+    } finally {
+      System.err.println(s"uninstall $previous")
+      TrapExit.uninstallManager(previous)
+    }
   }
 
   /** The common interface to standard output, used for all built-in ConsoleLoggers. */

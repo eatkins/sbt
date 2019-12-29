@@ -10,7 +10,7 @@ package sbt.internal.util
 import java.io.{ InputStream, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.Locale
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.locks.ReentrantLock
 
@@ -216,8 +216,9 @@ object Terminal {
   private[sbt] def throwOnClosedSystemIn(in: InputStream): InputStream = new InputStream {
     override def available(): Int = in.available()
     override def read(): Int = in.read() match {
-      case -1 => throw new ClosedChannelException
-      case r  => r
+      case -1          => throw new ClosedChannelException
+      case r if r >= 0 => r
+      case r           => -1
     }
   }
 
@@ -352,6 +353,30 @@ object Terminal {
 
   private[this] val originalOut = System.out
   private[this] val originalIn = System.in
+  private[this] val nonBlockingIn: InputStream with AutoCloseable = new InputStream {
+    private[this] val executor =
+      Executors.newSingleThreadExecutor(r => new Thread(r, "sbt-console-input-reader"))
+    private[this] val buffer = new LinkedBlockingQueue[Int]
+    private[this] val readFuture = new AtomicReference[java.util.concurrent.Future[_]]()
+    private[this] val runnable: Runnable = () =>
+      try {
+        buffer.put(originalIn.read)
+      } finally readFuture.set(null)
+    override def read(): Int = {
+      readFuture.synchronized(readFuture.get match {
+        case null => readFuture.set(executor.submit(runnable))
+        case _    =>
+      })
+      try buffer.take
+      catch { case _: InterruptedException => -1 }
+    }
+
+    override def available(): Int = buffer.size
+    override def close(): Unit = {
+      executor.shutdownNow()
+      ()
+    }
+  }
   private[this] val inputStream = new AtomicReference[InputStream](System.in)
   private[this] def withOut[T](f: => T): T = {
     try {
@@ -366,7 +391,7 @@ object Terminal {
       inputStream.set(Terminal.wrappedSystemIn)
       System.setIn(Terminal.wrappedSystemIn)
       scala.Console.withIn(Terminal.wrappedSystemIn)(f)
-    } finally System.setIn(originalIn)
+    } finally System.setIn(nonBlockingIn)
 
   private[sbt] def withPrintStream[T](f: PrintStream => T): T = console.withPrintStream(f)
   private[this] val terminalLock = new ReentrantLock()
@@ -376,7 +401,7 @@ object Terminal {
   private[this] lazy val isWindows =
     System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH).indexOf("windows") >= 0
   private[this] object WrappedSystemIn extends InputStream {
-    private[this] val in = System.in
+    private[this] val in = nonBlockingIn
     override def available(): Int = if (attached.get) in.available else 0
     override def read(): Int = synchronized {
       if (attached.get) {
@@ -424,7 +449,7 @@ object Terminal {
     }
     term.restore()
     term.setEchoEnabled(true)
-    new JLineTerminal(term, throwOnClosedSystemIn(originalIn), originalOut)
+    new JLineTerminal(term, throwOnClosedSystemIn(nonBlockingIn), originalOut)
   }
 
   private[util] def reset(): Unit = {

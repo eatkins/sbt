@@ -10,7 +10,7 @@ package internal
 
 import java.io.{ File, IOException, PrintStream }
 import java.nio.channels.ClosedChannelException
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sbt.BasicKeys._
 import sbt.Exec
@@ -117,9 +117,14 @@ private[sbt] class BlockedUIThread(
     with UserThread {
   setDaemon(true)
   start()
+  private[this] val isStopped = new AtomicBoolean(false)
+
+  override def interrupt(): Unit = {
+    isStopped.set(true)
+    super.interrupt()
+  }
   import BlockedUIThread._
-  override def read(): Unit = {
-    terminal.printStream.println(s"enter read")
+  override def read(): Unit = if (!isStopped.get) {
     if (terminal.isAnsiSupported) {
       terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
       terminal.printStream.flush()
@@ -128,19 +133,15 @@ private[sbt] class BlockedUIThread(
     terminal.withRawSystemIn {
       @tailrec
       def impl(opts: Map[Char, BlockedUIThread.CommandOption]): Unit = {
-        terminal.printStream.println(s"Blocking for chars $opts")
         val res = terminal.inputStream.read
-        terminal.printStream.println(s"HUH got $res")
         res match {
           case -1 => None
           case k =>
-            terminal.printStream.println(s"got $k")
             options.get(k.toChar) match {
               case None             => impl(opts)
               case Some(More(next)) => impl(next)
               case Some(Action(action)) =>
                 val a = action()
-                terminal.printStream.println(s"cool $a")
                 onMaintenance(a)
             }
         }
@@ -200,7 +201,6 @@ private[sbt] trait HasUserThread {
           askUserThread.set(makeAskUserThread(state, uiState))
         case t =>
           t.interrupt()
-          terminal.printStream.println(s"FUCK ME $uiState")
           askUserThread.set(makeAskUserThread(state, uiState))
       }
     }

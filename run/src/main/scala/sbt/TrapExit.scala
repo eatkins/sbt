@@ -40,23 +40,33 @@ object TrapExit {
    */
   def apply(execute: => Unit, log: Logger): Int =
     System.getSecurityManager match {
-      case m: TrapExit => m.runManaged(InterfaceUtil.toSupplier(execute), log)
-      case _           => runUnmanaged(execute, log)
+      case m: TrapExit =>
+        System.err.println(s"running managed with $m")
+        m.runManaged(InterfaceUtil.toSupplier(execute), log)
+      case _ =>
+        System.err.println(s"running default")
+        runUnmanaged(execute, log)
     }
 
   /**
    * Installs the SecurityManager that implements the isolation and returns the previously installed SecurityManager, which may be null.
    * This method must be called before using `apply`.
    */
-  def installManager(): SecurityManager =
+  def installManager(): SecurityManager = {
+    new Exception("im").printStackTrace()
     System.getSecurityManager match {
       case m: TrapExit => m
-      case m           => System.setSecurityManager(new TrapExit(m)); m
+      case m =>
+        new Exception("cool").printStackTrace()
+        System.setSecurityManager(new TrapExit(m)); m
     }
+  }
 
   /** Uninstalls the isolation SecurityManager and restores the old security manager. */
-  def uninstallManager(previous: SecurityManager): Unit =
+  def uninstallManager(previous: SecurityManager): Unit = {
+    new Exception("").printStackTrace()
     System.setSecurityManager(previous)
+  }
 
   private[this] def runUnmanaged(execute: => Unit, log: Logger): Int = {
     log.warn("Managed execution not possible: security manager not installed.")
