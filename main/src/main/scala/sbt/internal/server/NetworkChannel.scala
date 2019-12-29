@@ -238,12 +238,15 @@ final class NetworkChannel(
                     )
                 }
               case "attach" =>
-                append(Exec("__attach", None, Some(CommandSource(name))))
                 attached.set(true)
-//                try StandardMain.exchange.withState(s => publishEventMessage(ConsolePromptEvent(s)))
-//                catch {
-//                  case NonFatal(_) => append(Exec("__attach", None, Some(CommandSource(name))))
-//                }
+                new Thread("sbt-network-channel-attach-thread") {
+                  setDaemon(true)
+                  start()
+                  override def run(): Unit = {
+                    StandardMain.exchange.withState(s => publishEventMessage(ConsolePromptEvent(s)))
+                  }
+                }
+                ()
               case _ =>
                 try {
                   onRequestMessage(req)

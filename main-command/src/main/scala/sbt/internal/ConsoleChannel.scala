@@ -45,7 +45,6 @@ private[sbt] class AskUserThread(
       if (terminal.getLineHeightAndWidth._2 > 0) terminal.printStream.println()
       terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
       terminal.printStream.flush()
-      println(s"WTF readline $terminal")
       terminal.withRawSystemIn(reader.readLine(prompt)) match {
         case Some(cmd) => onLine(cmd)
         case None =>
