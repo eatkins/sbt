@@ -69,12 +69,15 @@ private[sbt] class AskUserThread(
     if (terminal.getLineHeightAndWidth._2 > 0) terminal.printStream.println()
     terminal.printStream.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
     terminal.printStream.flush()
-    terminal.withRawSystemIn(reader.readLine(prompt) match {
-      case Some(cmd) => onLine(cmd)
-      case None =>
-        writer.println("") // Prevents server shutdown log lines from appearing on the prompt line
-        onLine("exit")
-    })
+    terminal.withRawSystemIn {
+      val line =
+        try reader.readLine(prompt)
+        catch { case _: ClosedChannelException | _: InterruptedException => Some("") }
+      line match {
+        case Some(cmd) => onLine(cmd)
+        case None      =>
+      }
+    }
   }
   override def run(): Unit =
     try read()
@@ -115,9 +118,9 @@ private[sbt] class BlockedUIThread(
     override val onClose: () => Unit
 ) extends Thread(s"blocked-ui-thread-$name")
     with UserThread {
+  private[this] val isStopped = new AtomicBoolean(false)
   setDaemon(true)
   start()
-  private[this] val isStopped = new AtomicBoolean(false)
 
   override def interrupt(): Unit = {
     isStopped.set(true)
@@ -132,14 +135,17 @@ private[sbt] class BlockedUIThread(
     if (terminal.getLineHeightAndWidth._2 > 0) terminal.printStream.println()
     terminal.withRawSystemIn {
       @tailrec
-      def impl(opts: Map[Char, BlockedUIThread.CommandOption]): Unit = {
+      def impl(opts: Map[Char, BlockedUIThread.CommandOption]): Unit = if (!isStopped.get) {
         val res = terminal.inputStream.read
         res match {
-          case -1 => None
+          case -1 =>
           case k =>
+            System.err.println(s"WTF got $k ${options.get(k.toChar)}")
             options.get(k.toChar) match {
-              case None             => impl(opts)
-              case Some(More(next)) => impl(next)
+              case None => impl(opts)
+              case Some(More(next)) =>
+                System.err.println(s"aargh $next")
+                impl(next)
               case Some(Action(action)) =>
                 val a = action()
                 onMaintenance(a)

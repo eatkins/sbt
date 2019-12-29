@@ -95,7 +95,6 @@ abstract class CommandChannel extends HasUserThread {
       append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
   }
   private[sbt] def onMaintenance: String => Unit = { s: String =>
-    System.err.println(s"ok $s")
     maintenance.synchronized(maintenance.forEach { q =>
       q.add(new MaintenanceTask(this, s))
       ()

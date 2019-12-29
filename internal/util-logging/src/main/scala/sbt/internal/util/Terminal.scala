@@ -118,6 +118,7 @@ trait Terminal extends AutoCloseable {
   private[sbt] def withRawSystemIn[T](f: => T): T = f
   private[sbt] def withCanonicalIn[T](f: => T): T = f
   private[sbt] def withEcho[T](f: => T): T = f
+  private[sbt] def write(bytes: Int*): Unit
   private[sbt] def printStream: PrintStream
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
   private[sbt] def restore(): Unit = {}
@@ -126,11 +127,11 @@ trait Terminal extends AutoCloseable {
 object Terminal {
 
   def close(): Unit = {
-//    if (System.console == null) {
-//      originalOut.close()
-//      originalIn.close()
-//      System.err.close()
-//    }
+    if (System.console == null) {
+      originalOut.close()
+      originalIn.close()
+      System.err.close()
+    }
   }
 
   /**
@@ -290,6 +291,7 @@ object Terminal {
     override def withPrintStream[T](f: PrintStream => T): T = t.withPrintStream(f)
     override def restore(): Unit = t.restore()
     override def close(): Unit = {}
+    override private[sbt] def write(bytes: Int*): Unit = t.write(bytes: _*)
   }
   private[sbt] def get: Terminal = ProxyTerminal
 
@@ -353,22 +355,26 @@ object Terminal {
 
   private[this] val originalOut = System.out
   private[this] val originalIn = System.in
-  private[this] val nonBlockingIn: InputStream with AutoCloseable = new InputStream {
+  private[this] class WriteableInputStream(in: InputStream, name: String)
+      extends InputStream
+      with AutoCloseable {
+    final def write(bytes: Int*): Unit = bytes.foreach(buffer.put)
     private[this] val executor =
-      Executors.newSingleThreadExecutor(r => new Thread(r, "sbt-console-input-reader"))
+      Executors.newSingleThreadExecutor(r => new Thread(r, s"sbt-$name-input-reader"))
     private[this] val buffer = new LinkedBlockingQueue[Int]
     private[this] val readFuture = new AtomicReference[java.util.concurrent.Future[_]]()
     private[this] val runnable: Runnable = () =>
-      try {
-        buffer.put(originalIn.read)
-      } finally readFuture.set(null)
+      try buffer.put(in.read)
+      finally readFuture.set(null)
     override def read(): Int = {
       readFuture.synchronized(readFuture.get match {
         case null => readFuture.set(executor.submit(runnable))
         case _    =>
       })
-      try buffer.take
-      catch { case _: InterruptedException => -1 }
+      try buffer.take match {
+        case -1 => throw new ClosedChannelException
+        case b  => b
+      } catch { case _: InterruptedException => -1 }
     }
 
     override def available(): Int = buffer.size
@@ -377,6 +383,8 @@ object Terminal {
       ()
     }
   }
+  private[this] val nonBlockingIn: WriteableInputStream =
+    new WriteableInputStream(originalIn, "console")
   private[this] val inputStream = new AtomicReference[InputStream](System.in)
   private[this] def withOut[T](f: => T): T = {
     try {
@@ -449,7 +457,7 @@ object Terminal {
     }
     term.restore()
     term.setEchoEnabled(true)
-    new JLineTerminal(term, throwOnClosedSystemIn(nonBlockingIn), originalOut)
+    new JLineTerminal(term, nonBlockingIn, originalOut)
   }
 
   private[util] def reset(): Unit = {
@@ -529,7 +537,7 @@ object Terminal {
       val term: jline.Terminal with jline.Terminal2,
       in: InputStream,
       out: OutputStream
-  ) extends TerminalImpl(in, out) {
+  ) extends TerminalImpl(in, out, "console") {
     override def getWidth: Int = term.getWidth
     override def getHeight: Int = term.getHeight
     override def isAnsiSupported: Boolean = term.isAnsiSupported
@@ -559,12 +567,16 @@ object Terminal {
         !(sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")) && isColorEnabled
       }
   }
-  private[sbt] abstract class TerminalImpl(val in: InputStream, val out: OutputStream)
+  private[sbt] abstract class TerminalImpl(val in: InputStream, val out: OutputStream, name: String)
       extends Terminal {
     private[this] val currentLine = new AtomicReference(new ArrayBuffer[Byte])
     private[this] val lineBuffer = new LinkedBlockingQueue[Byte]
     private[this] val flushQueue = new LinkedBlockingQueue[Unit]
     private[this] val writeLock = new AnyRef
+    private[this] val writeableInputStream = in match {
+      case w: WriteableInputStream => w
+      case _                       => new WriteableInputStream(in, name)
+    }
 
     override val outputStream: OutputStream = new OutputStream {
       override def write(b: Int): Unit = {
@@ -579,8 +591,9 @@ object Terminal {
       override def flush(): Unit = writeLock.synchronized(flushQueue.put(()))
     }
     override private[sbt] val printStream: PrintStream = new PrintStream(outputStream, true)
-    override def inputStream: InputStream = in
+    override def inputStream: InputStream = writeableInputStream
 
+    private[sbt] def write(bytes: Int*): Unit = writeableInputStream.write(bytes: _*)
     private[this] val isStopped = new AtomicBoolean(false)
     private[this] object WriteThread extends Thread("sbt-stdout-write-thread") {
       setDaemon(true)

@@ -11,6 +11,7 @@ package server
 
 import java.io.{ IOException, InputStream, OutputStream }
 import java.net.{ Socket, SocketTimeoutException }
+import java.nio.channels.ClosedChannelException
 import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
@@ -554,7 +555,10 @@ final class NetworkChannel(
     override def read(): Int =
       try {
         // if (askUserThread != null) jsonRpcNotify("readInput", true) TODO -- fix condition
-        inputBuffer.take & 0xFF
+        inputBuffer.take & 0xFF match {
+          case -1 => throw new ClosedChannelException()
+          case b  => b
+        }
       } catch { case _: InterruptedException | _: IOException => -1 }
     override def available(): Int = inputBuffer.size
   }
@@ -577,7 +581,7 @@ final class NetworkChannel(
       }
     }
   }
-  private class NetworkTerminal extends TerminalImpl(inputStream, outputStream) {
+  private class NetworkTerminal extends TerminalImpl(inputStream, outputStream, name) {
     def getProperties: TerminalPropertiesResponse = {
       val id = UUID.randomUUID.toString
       val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
@@ -592,7 +596,6 @@ final class NetworkChannel(
     override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
     override def isColorEnabled: Boolean = getProperties.isColorEnabled
     override def isSupershellEnabled: Boolean = getProperties.isSupershellEnabled
-    override val inputStream = Terminal.throwOnClosedSystemIn(super.inputStream)
     private def getCapability[T](
         capability: String,
         query: String => TerminalCapabilitiesQuery,
@@ -638,7 +641,6 @@ object NetworkChannel {
     Option(EvaluateTask.currentlyRunningEngine.get) match {
       case Some((state, runningEngine)) =>
         val runningExecId = state.currentExecId.getOrElse("")
-        System.err.println(s"great $execID $id $runningExecId")
 
         def checkId(): Boolean = {
           if (runningExecId.startsWith("\u2668")) {
@@ -656,10 +658,8 @@ object NetworkChannel {
         // remove hotspring unicode added character for numbers
         if (checkId) {
           runningEngine.cancelAndShutdown()
-          System.err.println(s"cool shutdown $runningExecId")
           Right(runningExecId)
         } else {
-          System.err.println("whoops")
           Left("Task ID not matched")
         }
 
