@@ -21,7 +21,7 @@ import sjsonnew.JsonFormat
  * that can issue command or listen for some outputs.
  * We can think of a command channel to be an abstraction of the terminal window.
  */
-abstract class CommandChannel {
+abstract class CommandChannel extends HasUserThread {
   private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
   private val registered: java.util.Set[java.util.Queue[CommandChannel]] = new java.util.HashSet
   private val maintenance: java.util.Set[java.util.Queue[MaintenanceTask]] = new java.util.HashSet
@@ -59,7 +59,7 @@ abstract class CommandChannel {
   final def publishEvent[A: JsonFormat](event: A): Unit = publishEvent(event, None)
   def publishEventMessage(event: EventMessage): Unit
   def publishBytes(bytes: Array[Byte]): Unit
-  def shutdown(): Unit
+  def shutdown(): Unit = stopThread()
   def name: String
   private[this] val level = new AtomicReference[Level.Value](Level.Info)
   private[this] val loggerHolder = new AtomicReference[Option[(ManagedLogger, Level.Value)]](None)
@@ -108,7 +108,8 @@ case class ConsolePromptEvent(state: State) extends EventMessage
 /*
  * This is a data passed specifically for unprompting local console.
  */
-case class ConsoleUnpromptEvent(lastSource: Option[CommandSource]) extends EventMessage
+case class ConsoleUnpromptEvent(lastSource: Option[CommandSource], state: State)
+    extends EventMessage
 
 case class StartWatchEvent(state: State, index: Int) extends EventMessage
 

@@ -57,7 +57,6 @@ final class NetworkChannel(
   ) = this(name, connection, structure, auth, instance, handlers)
   import NetworkChannel._
 
-  private[this] val askUserThread = new AtomicReference[AskUserThread]
   private[this] val inputBuffer = new LinkedBlockingQueue[Byte]()
   private[this] val attached = new AtomicBoolean(false)
   private val running = new AtomicBoolean(true)
@@ -354,32 +353,9 @@ final class NetworkChannel(
 
   def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
     event match {
-      case ConsolePromptEvent(state) if isAttached =>
-        askUserThread.synchronized {
-          askUserThread.get match {
-            case null =>
-              askUserThread.set(
-                new AskUserThread(
-                  name,
-                  state,
-                  terminal,
-                  onLine,
-                  () => askUserThread.synchronized(askUserThread.set(null))
-                )
-              )
-            case t => t.redraw()
-          }
-        }
-      case ConsoleUnpromptEvent(lastSource) =>
-        if (!lastSource.map(_.channelName).contains(name)) {
-          askUserThread.getAndSet(null) match {
-            case null =>
-            case t =>
-              t.interrupt()
-              terminal.printStream.println("blocked by other task")
-              askUserThread.set(null)
-          }
-        }
+      case ConsolePromptEvent(state) if isAttached => reset(state)
+      case ConsoleUnpromptEvent(lastSource, state) =>
+        update(lastSource, (_: NetworkChannel).name, state, this)
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)
@@ -578,16 +554,15 @@ final class NetworkChannel(
     }
   }
 
-  def shutdown(): Unit = shutdown(true)
+  override def shutdown(): Unit = {
+    super.shutdown()
+    shutdown(true)
+  }
   import sjsonnew.BasicJsonProtocol.BooleanJsonFormat
   private[sbt] def shutdown(logShutdown: Boolean): Unit = {
     log.info("Shutting down client connection")
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
-    askUserThread.getAndSet(null) match {
-      case null =>
-      case t    => t.interrupt()
-    }
     running.set(false)
     out.close()
   }
@@ -598,7 +573,7 @@ final class NetworkChannel(
   private[this] lazy val inputStream: InputStream = new InputStream {
     override def read(): Int =
       try {
-        if (askUserThread.get == null) jsonRpcNotify("readInput", true)
+        // if (askUserThread != null) jsonRpcNotify("readInput", true) TODO -- fix condition
         inputBuffer.take & 0xFF
       } catch { case _: InterruptedException | _: IOException => -1 }
     override def available(): Int = inputBuffer.size

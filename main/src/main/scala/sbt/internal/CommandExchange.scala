@@ -142,7 +142,7 @@ private[sbt] final class CommandExchange {
       case _                 => None
     })
     if (exec.commandLine.nonEmpty) {
-      channels.foreach(c => c.publishEventMessage(ConsoleUnpromptEvent(exec.source)))
+      channels.foreach(c => c.publishEventMessage(ConsoleUnpromptEvent(exec.source, lastState.get)))
     }
     exec
   }
