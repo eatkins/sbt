@@ -353,9 +353,13 @@ final class NetworkChannel(
 
   def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
     event match {
-      case ConsolePromptEvent(state) if isAttached => reset(state)
+      case ConsolePromptEvent(state) if isAttached => reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
-        update(lastSource, (_: NetworkChannel).name, state, this)
+        if (lastSource.fold(true)(_.channelName != name))
+          reset(
+            state,
+            new UserThread.Blocked(state.currentCommand.toList ::: state.remainingCommands)
+          )
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)
@@ -506,47 +510,23 @@ final class NetworkChannel(
       )
 
       try {
-        Option(EvaluateTask.currentlyRunningEngine.get) match {
-          case Some((state, runningEngine)) =>
-            val runningExecId = state.currentExecId.getOrElse("")
-
-            def checkId(): Boolean = {
-              if (runningExecId.startsWith("\u2668")) {
-                (
-                  Try { crp.id.toLong }.toOption,
-                  Try { runningExecId.substring(1).toLong }.toOption
-                ) match {
-                  case (Some(id), Some(eid)) => id == eid
-                  case _                     => false
-                }
-              } else runningExecId == crp.id
-            }
-
-            // direct comparison on strings and
-            // remove hotspring unicode added character for numbers
-            if (checkId) {
-              runningEngine.cancelAndShutdown()
-
-              import sbt.protocol.codec.JsonProtocol._
-              jsonRpcRespond(
-                ExecStatusEvent(
-                  "Task cancelled",
-                  Some(name),
-                  Some(runningExecId.toString),
-                  Vector(),
-                  None,
-                ),
-                execId
-              )
-            } else {
-              errorRespond("Task ID not matched")
-            }
-
-          case None =>
-            errorRespond("No tasks under execution")
+        NetworkChannel.cancel(execId, crp.id) match {
+          case Left(msg) => errorRespond(msg)
+          case Right(runningExecId) =>
+            import sbt.protocol.codec.JsonProtocol._
+            jsonRpcRespond(
+              ExecStatusEvent(
+                "Task cancelled",
+                Some(name),
+                Some(runningExecId),
+                Vector(),
+                None,
+              ),
+              execId
+            )
         }
       } catch {
-        case NonFatal(e) =>
+        case NonFatal(_) =>
           errorRespond("Cancel request failed")
       }
     } else {
@@ -650,4 +630,41 @@ object NetworkChannel {
   case object SingleLine extends ChannelState
   case object InHeader extends ChannelState
   case object InBody extends ChannelState
+  private[sbt] def cancel(
+      execID: Option[String],
+      id: String
+  ): Either[String, String] = {
+
+    Option(EvaluateTask.currentlyRunningEngine.get) match {
+      case Some((state, runningEngine)) =>
+        val runningExecId = state.currentExecId.getOrElse("")
+        System.err.println(s"great $execID $id $runningExecId")
+
+        def checkId(): Boolean = {
+          if (runningExecId.startsWith("\u2668")) {
+            (
+              Try { id.toLong }.toOption,
+              Try { runningExecId.substring(1).toLong }.toOption
+            ) match {
+              case (Some(id), Some(eid)) => id == eid
+              case _                     => false
+            }
+          } else runningExecId == id
+        }
+
+        // direct comparison on strings and
+        // remove hotspring unicode added character for numbers
+        if (checkId) {
+          runningEngine.cancelAndShutdown()
+          System.err.println(s"cool shutdown $runningExecId")
+          Right(runningExecId)
+        } else {
+          System.err.println("whoops")
+          Left("Task ID not matched")
+        }
+
+      case None =>
+        Left("No tasks under execution")
+    }
+  }
 }
