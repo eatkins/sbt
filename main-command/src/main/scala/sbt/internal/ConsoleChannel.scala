@@ -51,7 +51,7 @@ private[sbt] class AskUserThread(
           writer.println("") // Prevents server shutdown log lines from appearing on the prompt line
           onLine("exit")
       }
-    } catch { case _: ClosedChannelException | _: IOException => } finally onClose()
+    } catch { case _: ClosedChannelException | _: InterruptedException | _: IOException => } finally onClose()
   def redraw(): Unit = {
     writer.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
     reader.redraw()
