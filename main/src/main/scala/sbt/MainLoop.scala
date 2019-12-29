@@ -10,7 +10,7 @@ package sbt
 import java.io.PrintWriter
 import java.util.Properties
 
-import sbt.internal.{ Aggregation, ShutdownHooks }
+import sbt.internal.{ Aggregation, ConsoleUnpromptEvent, ShutdownHooks }
 import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.server.NetworkChannel
@@ -192,6 +192,7 @@ object MainLoop {
               state.put(sbt.Keys.currentTaskProgress, new Keys.TaskProgress(progress))
             } else state
         }
+        StandardMain.exchange.publishEventMessage(ConsoleUnpromptEvent(exec.source, progressState))
         val execSource = exec.source.map(_.channelName)
         val newState = (StandardMain.exchange.channels.collectFirst {
           case c: NetworkChannel if execSource.contains(c.name) => c

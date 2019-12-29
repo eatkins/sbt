@@ -10,8 +10,8 @@ package internal
 
 import java.io.IOException
 import java.net.Socket
-import java.util.concurrent.{ ConcurrentLinkedQueue, LinkedBlockingQueue, TimeUnit }
 import java.util.concurrent.atomic._
+import java.util.concurrent.{ ConcurrentLinkedQueue, LinkedBlockingQueue, TimeUnit }
 
 import sbt.BasicKeys._
 import sbt.nio.Watch.NullLogger
@@ -19,18 +19,12 @@ import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
 import sbt.internal.util.codec.JValueFormats
-import sbt.internal.util.{
-  ConsoleOut,
-  MainAppender,
-  ManagedLogger,
-  ObjectEvent,
-  StringEvent,
-  Terminal
-}
+import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
+import sbt.nio.Watch.NullLogger
 import sbt.protocol.{ EventMessage, ExecStatusEvent }
-import sbt.util.{ Level, LogExchange, Logger }
+import sbt.util.{ Level, Logger }
 import sjsonnew.JsonFormat
 import sjsonnew.shaded.scalajson.ast.unsafe._
 
@@ -101,14 +95,6 @@ private[sbt] final class CommandExchange {
       commandChannelQueue.poll(1, TimeUnit.SECONDS)
       slurpMessages()
       Option(commandQueue.poll) match {
-        case Some(exec) if exec.commandLine == "__attach" =>
-          val cname = exec.source.map(_.channelName)
-          channels.find(c => cname.contains(c.name)).foreach {
-            case nc: NetworkChannel =>
-              state.foreach(s => nc.publishEventMessage(ConsolePromptEvent(s)))
-            case _ =>
-          }
-          impl(deadline)
         case Some(exec) =>
           val needFinish = needToFinishPromptLine()
           if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0")) {
@@ -137,14 +123,10 @@ private[sbt] final class CommandExchange {
       }
     }
     // Do not manually run GC until the user has been idling for at least the min gc interval.
-    val exec = impl(interval match {
+    impl(interval match {
       case d: FiniteDuration => Some(d.fromNow)
       case _                 => None
     })
-    if (exec.commandLine.nonEmpty) {
-      channels.foreach(c => c.publishEventMessage(ConsoleUnpromptEvent(exec.source, lastState.get)))
-    }
-    exec
   }
 
   def run(s: State): State = {
@@ -452,7 +434,10 @@ private[sbt] final class CommandExchange {
           case mt: MaintenanceTask =>
             mt.task match {
               case "attach" => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
-              case _        =>
+              case k if k.startsWith("kill") =>
+                val execID = k.split("kill[ ]+").lastOption
+                NetworkChannel.cancel(execID, execID.getOrElse("0"))
+              case k =>
             }
         }
         if (!isStopped.get) impl()
