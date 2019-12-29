@@ -370,6 +370,16 @@ final class NetworkChannel(
             case t => t.redraw()
           }
         }
+      case ConsoleUnpromptEvent(lastSource) =>
+        if (!lastSource.map(_.channelName).contains(name)) {
+          askUserThread.getAndSet(null) match {
+            case null =>
+            case t =>
+              t.interrupt()
+              terminal.printStream.println("blocked by other task")
+              askUserThread.set(null)
+          }
+        }
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)

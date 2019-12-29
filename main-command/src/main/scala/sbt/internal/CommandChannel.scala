@@ -108,7 +108,6 @@ case class ConsolePromptEvent(state: State) extends EventMessage
 /*
  * This is a data passed specifically for unprompting local console.
  */
-@deprecated("No longer used", "1.4.0")
 case class ConsoleUnpromptEvent(lastSource: Option[CommandSource]) extends EventMessage
 
 case class StartWatchEvent(state: State, index: Int) extends EventMessage
