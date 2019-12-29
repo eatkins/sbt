@@ -74,7 +74,6 @@ final class NetworkChannel(
   private val VsCodeOld = "application/vscode-jsonrpc; charset=utf8"
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val alive = new AtomicBoolean(true)
-  private[this] val logLevelHolder = new AtomicReference[Level.Value](Level.Info)
 
   override def log: Logger = new Logger {
     override def trace(t: => Throwable): Unit = {}
@@ -241,6 +240,10 @@ final class NetworkChannel(
               case "attach" =>
                 append(Exec("__attach", None, Some(CommandSource(name))))
                 attached.set(true)
+//                try StandardMain.exchange.withState(s => publishEventMessage(ConsolePromptEvent(s)))
+//                catch {
+//                  case NonFatal(_) => append(Exec("__attach", None, Some(CommandSource(name))))
+//                }
               case _ =>
                 try {
                   onRequestMessage(req)

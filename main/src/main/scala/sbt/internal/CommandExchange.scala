@@ -59,6 +59,7 @@ private[sbt] final class CommandExchange {
   private val nextChannelId: AtomicInteger = new AtomicInteger(0)
   private[this] val activePrompt = new AtomicBoolean(false)
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
+  private[this] val lastState = new AtomicReference[State]
 
   def channels: List[CommandChannel] = channelBuffer.toList
   private[this] def removeChannels(toDel: List[CommandChannel]): Unit = {
@@ -77,6 +78,7 @@ private[sbt] final class CommandExchange {
     c.register(commandChannelQueue)
   }
 
+  private[sbt] def withState[T](f: State => T): T = f(lastState.get)
   def blockUntilNextExec: Exec = blockUntilNextExec(Duration.Inf, NullLogger)
   // periodically move all messages from all the channels
   private[sbt] def blockUntilNextExec(interval: Duration, logger: Logger): Exec =
@@ -86,6 +88,7 @@ private[sbt] final class CommandExchange {
       state: Option[State],
       logger: Logger
   ): Exec = {
+    state.foreach(lastState.set)
     @tailrec def impl(deadline: Option[Deadline]): Exec = {
       @tailrec def slurpMessages(): Unit =
         channels.foldLeft(Option.empty[Exec]) { _ orElse _.poll } match {
