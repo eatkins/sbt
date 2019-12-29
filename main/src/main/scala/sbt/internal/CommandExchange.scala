@@ -110,8 +110,10 @@ private[sbt] final class CommandExchange {
           impl(deadline)
         case Some(exec) =>
           val needFinish = needToFinishPromptLine()
-          if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0"))
-            ConsoleOut.systemOut.println("")
+          if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0")) {
+            Terminal.console.outputStream.write(10)
+            Terminal.console.outputStream.flush()
+          }
           exec.commandLine match {
             case "shutdown" => exec.withCommandLine("exit")
             case "exit" if exec.source.fold(false)(_.channelName.startsWith("network")) =>
@@ -161,19 +163,23 @@ private[sbt] final class CommandExchange {
   /**
    * Check if a server instance is running already, and start one if it isn't.
    */
-  private[sbt] def runServer(s: State): State = {
+  private[sbt] def runServer(state: State): State = {
+    val s = Option(lastState.get).getOrElse(state)
     lazy val port = s.get(serverPort).getOrElse(5001)
     lazy val host = s.get(serverHost).getOrElse("127.0.0.1")
     lazy val auth: Set[ServerAuthentication] =
       s.get(serverAuthentication).getOrElse(Set(ServerAuthentication.Token))
     lazy val connectionType = s.get(serverConnectionType).getOrElse(ConnectionType.Tcp)
-    lazy val level = s.get(serverLogLevel).orElse(s.get(logLevel)).getOrElse(Level.Info)
+    def level: Level.Value = s.get(serverLogLevel).orElse(s.get(logLevel)).getOrElse(Level.Info)
     lazy val handlers = s.get(fullServerHandlers).getOrElse(Nil)
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
-      if (needToFinishPromptLine()) ConsoleOut.systemOut.println("")
-      s.log.info(s"new client connected: $name")
+      if (needToFinishPromptLine() && (level == Level.Debug)) {
+        Terminal.console.outputStream.write(10)
+        Terminal.console.outputStream.flush()
+      }
+      s.log.debug(s"new client connected: $name")
       val channel =
         new NetworkChannel(name, socket, Project structure s, auth, instance, handlers)
       subscribe(channel)
