@@ -13,6 +13,7 @@ import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicReference
 
 import sbt.BasicKeys._
+import sbt.Exec
 import sbt.internal.util._
 import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
@@ -88,16 +89,17 @@ private[sbt] class AskUserThread(
 
 private[sbt] object BlockedUIThread {
   private[sbt] sealed class CommandOption
-  private[sbt] class More(key: Char, val next: Map[Char, CommandOption]) extends CommandOption
+  private[sbt] class More(val next: Map[Char, CommandOption]) extends CommandOption
   private[sbt] object More {
+    def apply(o: Map[Char, CommandOption]): More = new More(o)
     def unapply(o: CommandOption): Option[Map[Char, CommandOption]] = o match {
       case m: More => Some(m.next)
       case _       => None
     }
   }
-  private[sbt] class Action(val action: () => String) extends CommandOption
+  private[sbt] class Action(val action: () => String, val show: String) extends CommandOption
   private[sbt] object Action {
-    def apply(action: () => String): Action = new Action(action)
+    def apply(action: () => String, show: String): Action = new Action(action, show)
     def unapply(o: CommandOption): Option[() => String] = o match {
       case a: Action => Some(a.action)
       case _         => None
@@ -169,14 +171,23 @@ private[sbt] trait HasUserThread {
           () => askUserThread.synchronized(askUserThread.set(null))
         )
       case UserThread.Blocked(remaining) =>
-        terminal.printStream.println(s"WTF $remaining")
+        val opts = remaining.flatMap { e: Exec =>
+          e.execId.map(i => (e.commandLine, i))
+        } match {
+          case Seq()          => Map.empty[Char, BlockedUIThread.CommandOption]
+          case Seq((cmd, id)) => Map('k' -> BlockedUIThread.Action(() => s"kill $id", s"kill $cmd"))
+          case cmds =>
+            val rest = cmds.zipWithIndex.map {
+              case ((cmd, id), index) =>
+                index.toString.head -> BlockedUIThread.Action(() => s"kill $id", s"kill $cmd")
+            }.toMap
+            Map('k' -> BlockedUIThread.More(rest))
+        }
         new BlockedUIThread(
           name,
           s,
           terminal,
-          remaining.headOption
-            .map(h => Map('k' -> BlockedUIThread.Action(() => s"kill ${h.execId.getOrElse("")}")))
-            .getOrElse(Map.empty),
+          opts,
           onMaintenance,
           () => askUserThread.synchronized(askUserThread.set(null))
         )

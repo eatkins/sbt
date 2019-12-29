@@ -61,7 +61,7 @@ final class Console(compiler: AnalyzingCompiler) {
         loader,
         bindings
       )
-      catch { case _: InterruptedException => }
+      catch { case e: InterruptedException => println(s"MOFO $e") }
     val previous = sys.props.get("scala.color").getOrElse("auto")
     try {
       sys.props("scala.color") = if (terminal.isColorEnabled) "true" else "false"
