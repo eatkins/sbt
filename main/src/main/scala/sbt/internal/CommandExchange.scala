@@ -221,7 +221,7 @@ private[sbt] final class CommandExchange {
 
   def shutdown(): Unit = {
     maintenanceThread.close()
-    channels foreach (_.shutdown())
+    channels foreach (_.shutdown(true))
     // interrupt and kill the thread
     server.foreach(_.shutdown())
     server = None
@@ -437,7 +437,8 @@ private[sbt] final class CommandExchange {
           case null =>
           case mt: MaintenanceTask =>
             mt.task match {
-              case "attach" => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
+              case "attach"                 => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
+              case k if k == "kill channel" => mt.channel.shutdown(false)
               case k if k.startsWith("kill") =>
                 val execID = k.split("kill[ ]+").lastOption
                 if (currentExec.get.execId.fold(false)(execID.contains)) {

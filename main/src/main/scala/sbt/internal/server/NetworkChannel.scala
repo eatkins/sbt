@@ -191,7 +191,7 @@ final class NetworkChannel(
           }
         } // while
       } finally {
-        shutdown()
+        shutdown(false)
       }
     }
 
@@ -414,7 +414,7 @@ final class NetworkChannel(
       } catch {
         case _: IOException =>
           alive.set(false)
-          shutdown()
+          shutdown(true)
       }
 
   def onCommand(command: CommandMessage): Unit = {
@@ -536,13 +536,14 @@ final class NetworkChannel(
     }
   }
 
+  @deprecated("Use variant that takes logShutdown parameter", "1.4.0")
   override def shutdown(): Unit = {
     super.shutdown()
-    shutdown(true)
+    shutdown()
   }
   import sjsonnew.BasicJsonProtocol.BooleanJsonFormat
-  private[sbt] def shutdown(logShutdown: Boolean): Unit = {
-    log.info("Shutting down client connection")
+  override def shutdown(logShutdown: Boolean): Unit = {
+    log.info(s"Shutting down client connection $name")
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
     running.set(false)
