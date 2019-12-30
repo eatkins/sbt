@@ -13,7 +13,7 @@ import java.io.{ IOException, InputStream, OutputStream }
 import java.net.{ Socket, SocketTimeoutException }
 import java.nio.channels.ClosedChannelException
 import java.util.UUID
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
 
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
@@ -25,6 +25,7 @@ import sbt.internal.protocol.{
   JsonRpcRequestMessage,
   JsonRpcNotificationMessage
 }
+import sbt.internal.ui.UserThread
 import sbt.internal.util.Terminal.TerminalImpl
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util.complete.Parser

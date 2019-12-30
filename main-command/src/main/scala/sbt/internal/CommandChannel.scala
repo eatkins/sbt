@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
 import sbt.internal.util.{ MainAppender, ManagedLogger, Terminal }
+import sbt.internal.ui.HasUserThread
 import sbt.protocol.EventMessage
 import sbt.util.{ Level, LogExchange }
 import sjsonnew.JsonFormat
@@ -45,7 +46,7 @@ abstract class CommandChannel extends HasUserThread {
       ()
     }
   private[sbt] final def initiateMaintenance(task: String): Unit = {
-    maintenance.forEach(q => q.synchronized(q.add(new MaintenanceTask(this, task))))
+    maintenance.forEach(q => q.synchronized { q.add(new MaintenanceTask(this, task)); () })
   }
   private[sbt] def terminal: Terminal
   def append(exec: Exec): Boolean = registered.synchronized {
@@ -68,6 +69,7 @@ abstract class CommandChannel extends HasUserThread {
     case _ =>
       level.set(l)
       mkLogger
+      ()
   }
   private[sbt] final def logLevel: Level.Value = level.get
   private[this] lazy val appender = MainAppender.defaultScreen(terminal)
@@ -86,19 +88,25 @@ abstract class CommandChannel extends HasUserThread {
       case None         => mkLogger
     }
   }
-  private[sbt] def onLine: String => Unit = {
-    case "error" => level.set(Level.Error); append(Exec("error", None, None))
-    case "debug" => level.set(Level.Debug); append(Exec("debug", None, None))
-    case "info"  => level.set(Level.Info); append(Exec("info", None, None))
-    case "warn"  => level.set(Level.Warn); append(Exec("warn", None, None))
-    case cmd =>
-      append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name)))); ()
+  private[this] def setLevel(value: Level.Value, name: String): Boolean = {
+    level.set(value)
+    append(Exec(name, Some(Exec.newExecId), Some(CommandSource(name))))
   }
-  private[sbt] def onMaintenance: String => Unit = { s: String =>
+  private[sbt] def onLine: String => Boolean = {
+    case "error" => setLevel(Level.Error, "error")
+    case "debug" => setLevel(Level.Debug, "debug")
+    case "info"  => setLevel(Level.Info, "info")
+    case "warn"  => setLevel(Level.Warn, "warn")
+    case cmd =>
+      append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
+      true
+  }
+  private[sbt] def onMaintenance: String => Boolean = { s: String =>
     maintenance.synchronized(maintenance.forEach { q =>
       q.add(new MaintenanceTask(this, s))
       ()
     })
+    true
   }
 }
 

@@ -26,7 +26,7 @@ import sbt.internal.util._
 import sbt.internal.util.complete.{ Parser, SizeParser }
 import sbt.io._
 import sbt.io.syntax._
-import sbt.util.{ Level, LogExchange, Logger, Show }
+import sbt.util.{ Level, Logger, Show }
 import xsbti.compile.CompilerCache
 
 import scala.annotation.tailrec
