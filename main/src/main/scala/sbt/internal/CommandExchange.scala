@@ -55,6 +55,7 @@ private[sbt] final class CommandExchange {
   private[this] val activePrompt = new AtomicBoolean(false)
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val lastState = new AtomicReference[State]
+  private[this] val currentExec = new AtomicReference[Exec]
 
   def channels: List[CommandChannel] = channelBuffer.toList
   private[this] def removeChannels(toDel: List[CommandChannel]): Unit = {
@@ -123,10 +124,12 @@ private[sbt] final class CommandExchange {
       }
     }
     // Do not manually run GC until the user has been idling for at least the min gc interval.
-    impl(interval match {
+    val res = impl(interval match {
       case d: FiniteDuration => Some(d.fromNow)
       case _                 => None
     })
+    currentExec.set(res)
+    res
   }
 
   def run(s: State): State = {
@@ -437,14 +440,14 @@ private[sbt] final class CommandExchange {
               case "attach" => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
               case k if k.startsWith("kill") =>
                 val execID = k.split("kill[ ]+").lastOption
-                val st = lastState.get
-                (st.currentCommand.toList ::: st.remainingCommands).collectFirst {
-                  case e if e.execId == execID && e.commandLine.startsWith("console") =>
+                if (currentExec.get.execId.fold(false)(execID.contains)) {
+                  if (currentExec.get.commandLine.startsWith("console")) {
                     val kill = s" // console session killed by remote client"
                     Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
                     Terminal.get.write(13, 4)
-                  case _ =>
+                  } else {
                     NetworkChannel.cancel(execID, execID.getOrElse("0"))
+                  }
                 }
               case _ =>
             }

@@ -913,7 +913,6 @@ object BuiltinCommands {
     val res =
       if (exec.commandLine.trim.isEmpty) newState
       else newState.clearGlobalLog
-    StandardMain.exchange.setState(res)
     res
   }
 

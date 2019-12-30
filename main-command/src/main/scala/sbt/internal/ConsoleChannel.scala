@@ -13,20 +13,15 @@ import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sbt.BasicKeys._
-import sbt.Exec
 import sbt.internal.util._
 import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
 
 import scala.annotation.tailrec
 
-private[sbt] trait UserThread extends Thread {
+private[sbt] trait UserThread extends Thread with AutoCloseable {
   def read(): Unit
   def redraw(): Unit
-  def onClose(): () => Unit
-  override def run(): Unit =
-    try read()
-    catch { case _: ClosedChannelException | _: InterruptedException | _: IOException => } finally onClose()
 }
 
 private[sbt] object UserThread {
@@ -44,8 +39,7 @@ private[sbt] class AskUserThread(
     name: String,
     s: State,
     terminal: Terminal,
-    onLine: String => Unit,
-    override val onClose: () => Unit
+    onLine: String => Unit
 ) extends Thread(s"ask-user-thread-$name")
     with UserThread {
   private[this] val writer = new PrintStream(terminal.outputStream, true)
@@ -81,13 +75,15 @@ private[sbt] class AskUserThread(
   }
   override def run(): Unit =
     try read()
-    catch { case _: ClosedChannelException | _: InterruptedException | _: IOException => } finally onClose()
+    catch { case _: ClosedChannelException | _: InterruptedException | _: IOException => }
   def redraw(): Unit = {
     writer.print(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
     reader.redraw()
     writer.print(ConsoleAppender.clearScreen(0))
     terminal.outputStream.flush()
   }
+
+  override def close(): Unit = interrupt()
 }
 
 private[sbt] object BlockedUIThread {
@@ -115,17 +111,23 @@ private[sbt] class BlockedUIThread(
     terminal: Terminal,
     options: Map[Char, BlockedUIThread.CommandOption],
     onMaintenance: String => Unit,
-    override val onClose: () => Unit
 ) extends Thread(s"blocked-ui-thread-$name")
     with UserThread {
   private[this] val isStopped = new AtomicBoolean(false)
   setDaemon(true)
   start()
 
-  override def interrupt(): Unit = {
+  override def close(): Unit = {
     isStopped.set(true)
-    super.interrupt()
+    interrupt()
   }
+
+  override def run(): Unit =
+    try read()
+    catch {
+      case _: ClosedChannelException | _: InterruptedException | _: IOException =>
+        isStopped.set(true)
+    }
   import BlockedUIThread._
   override def read(): Unit = if (!isStopped.get) {
     if (terminal.isAnsiSupported) {
@@ -140,19 +142,18 @@ private[sbt] class BlockedUIThread(
         res match {
           case -1 =>
           case k =>
-            System.err.println(s"WTF got $k ${options.get(k.toChar)}")
-            options.get(k.toChar) match {
-              case None => impl(opts)
-              case Some(More(next)) =>
-                System.err.println(s"aargh $next")
-                impl(next)
+            val c = k.toByte.toChar
+            opts.get(c) match {
+              case None             => impl(opts)
+              case Some(More(next)) => impl(next)
               case Some(Action(action)) =>
                 val a = action()
                 onMaintenance(a)
             }
         }
       }
-      impl(options)
+      try impl(options)
+      catch { case _: InterruptedException => isStopped.set(true) }
     }
   }
   def redraw(): Unit = {
@@ -174,19 +175,19 @@ private[sbt] trait HasUserThread {
           name,
           s,
           terminal,
-          onLine,
-          () => askUserThread.synchronized(askUserThread.set(null))
+          onLine
         )
       case UserThread.Blocked(remaining) =>
         val opts = remaining.flatMap { e: Exec =>
           e.execId.map(i => (e.commandLine, i))
         } match {
-          case Seq()          => Map.empty[Char, BlockedUIThread.CommandOption]
-          case Seq((cmd, id)) => Map('k' -> BlockedUIThread.Action(() => s"kill $id", s"kill $cmd"))
+          case Seq() => Map.empty[Char, BlockedUIThread.CommandOption]
+          case Seq((cmd, id)) if cmd.trim.nonEmpty =>
+            Map('k' -> BlockedUIThread.Action(() => s"kill $id", s"kill $cmd $id"))
           case cmds =>
-            val rest = cmds.zipWithIndex.map {
-              case ((cmd, id), index) =>
-                index.toString.head -> BlockedUIThread.Action(() => s"kill $id", s"kill $cmd")
+            val rest = cmds.zipWithIndex.collect {
+              case ((cmd, id), index) if cmd.nonEmpty =>
+                index.toString.head -> BlockedUIThread.Action(() => s"kill $id", s"kill $cmd $id")
             }.toMap
             Map('k' -> BlockedUIThread.More(rest))
         }
@@ -195,8 +196,7 @@ private[sbt] trait HasUserThread {
           s,
           terminal,
           opts,
-          onMaintenance,
-          () => askUserThread.synchronized(askUserThread.set(null))
+          onMaintenance
         )
     }
 
@@ -204,11 +204,11 @@ private[sbt] trait HasUserThread {
     askUserThread.synchronized {
       askUserThread.getAndSet(null) match {
         case null =>
-          askUserThread.set(makeAskUserThread(state, uiState))
         case t =>
-          t.interrupt()
-          askUserThread.set(makeAskUserThread(state, uiState))
+          t.close()
+          t.join()
       }
+      askUserThread.set(makeAskUserThread(state, uiState))
     }
   }
 
