@@ -30,7 +30,8 @@ private[sbt] trait HasUserThread {
           name,
           s,
           terminal,
-          onLine
+          onLine,
+          onMaintenance
         )
       case UserThread.Blocked(remaining) =>
         val opts = remaining.flatMap { e: Exec =>

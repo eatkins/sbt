@@ -60,7 +60,9 @@ abstract class CommandChannel extends HasUserThread {
   final def publishEvent[A: JsonFormat](event: A): Unit = publishEvent(event, None)
   def publishEventMessage(event: EventMessage): Unit
   def publishBytes(bytes: Array[Byte]): Unit
-  def shutdown(): Unit = stopThread()
+  def shutdown(logShutdown: Boolean): Unit = stopThread()
+  @deprecated("Use the variant that takes the logShutdown parameter", "1.4.0")
+  def shutdown(): Unit = shutdown(true)
   def name: String
   private[this] val level = new AtomicReference[Level.Value](Level.Info)
   private[this] val loggerHolder = new AtomicReference[Option[(ManagedLogger, Level.Value)]](None)
