@@ -562,10 +562,11 @@ object Terminal {
     }
     override def isColorEnabled: Boolean = ConsoleAppender.formatEnabledInEnv
 
-    override def isSupershellEnabled: Boolean =
-      System.getProperty("sbt.supershell", "") == "true" || {
-        !(sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")) && isColorEnabled
-      }
+    override def isSupershellEnabled: Boolean = System.getProperty("sbt.supershell") match {
+      case null   => !sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI") && isColorEnabled
+      case "true" => true
+      case _      => false
+    }
   }
   private[sbt] abstract class TerminalImpl(val in: InputStream, val out: OutputStream, name: String)
       extends Terminal {
