@@ -11,7 +11,6 @@ package internal
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger, AtomicReference }
 
 import sbt.internal.util._
-import sbt.util.Level
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -19,9 +18,11 @@ import scala.concurrent.duration._
 /**
  * implements task progress display on the shell.
  */
-private[sbt] final class TaskProgress(log: ManagedLogger)
+private[sbt] final class TaskProgress
     extends AbstractTaskExecuteProgress
     with ExecuteProgress[Task] {
+  @deprecated("Use the no argument constructor.", "1.4.0")
+  def this(log: ManagedLogger) = this()
   private[this] val lastTaskCount = new AtomicInteger(0)
   private[this] val currentProgressThread = new AtomicReference[Option[ProgressThread]](None)
   private[this] val sleepDuration = SysProp.supershellSleep.millis
@@ -96,10 +97,8 @@ private[sbt] final class TaskProgress(log: ManagedLogger)
       case _ =>
     }
   }
-  private[this] def appendProgress(event: ProgressEvent): Unit = {
-    import sbt.internal.util.codec.JsonProtocol._
-    log.logEvent(Level.Info, event)
-  }
+  private[this] def appendProgress(event: ProgressEvent): Unit =
+    StandardMain.exchange.updateProgress(event)
   private[this] def active: Vector[Task[_]] = activeTasks.toVector.filterNot(Def.isDummy)
   private[this] def activeExceedingThreshold: Vector[(Task[_], Long)] = active.flatMap { task =>
     val elapsed = timings.get(task).currentElapsedMicros

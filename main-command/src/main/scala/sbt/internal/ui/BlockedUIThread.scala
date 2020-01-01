@@ -1,7 +1,9 @@
 package sbt.internal.ui
 
-import sbt.State
-import sbt.internal.util.Terminal
+import sbt.{ Exec, State }
+import sbt.internal.util.{ ConsoleAppender, EscHelpers, ProgressEvent, ProgressState, Terminal }
+import sbt.internal.util.complete.Parser
+import sbt.internal.util.complete.Parser._
 
 private[sbt] object BlockedUIThread {
   private[sbt] sealed class CommandOption
@@ -27,10 +29,61 @@ private[sbt] class BlockedUIThread(
     name: String,
     s: State,
     terminal: Terminal,
-    options: Map[Char, BlockedUIThread.CommandOption],
+    onLine: String => Boolean,
     onMaintenance: String => Boolean,
 ) extends Thread(s"blocked-ui-thread-$name")
     with UIThread {
-  override private[sbt] def reader: UIThread.Reader = () => None
-  override private[sbt] def handleInput(s: Option[String]): Boolean = true
+  private def differentSource(e: Exec): Boolean = e.source match {
+    case None    => true
+    case Some(s) => s.channelName != name
+  }
+  override private[sbt] lazy val reader: UIThread.Reader = {
+    val remaining = (s.currentCommand.toList ::: s.remainingCommands).collect {
+      case e if e.commandLine.nonEmpty && e.execId.isDefined && differentSource(e) =>
+        (e.commandLine, e.execId.get)
+    }
+    val killParser = remaining match {
+      case Seq() => Parser.failure("no commands")
+      case Seq((cl, id), t @ _*) =>
+        val kill = token("kill") ~> token(' ').+ ~> t.foldLeft(token(cl) ^^^ s"kill $id") {
+          case (p, (c, i)) if c.nonEmpty => p | (token(c) ^^^ s"kill $i")
+          case (p, _)                    => p
+        }
+        kill.map(Left(_))
+    }
+    val prefix =
+      if (remaining.isEmpty) ""
+      else {
+        "sbt server is running other commands: " +
+          remaining.map(_._1).mkString("\n", "\n", "\n") +
+          s"stop running commands with the kill command, for example: `kill ${remaining.head._1}`."
+      }
+    val parser = killParser | matched(s.combinedParser).map(Right(_))
+    val sp = UIThread.shellPrompt(terminal, s)
+    val spLen = EscHelpers.removeEscapeSequences(sp).length
+    val prompt = if (terminal.isAnsiSupported) {
+      sp + "\n" + prefix + ConsoleAppender.cursorUp(terminal.lineCount(prefix)) +
+        ConsoleAppender.CursorLeft1000 + ConsoleAppender.cursorRight(spLen)
+    } else {
+      prefix + "\n" + sp
+    }
+    val reader = UIThread.Reader.terminalReader(prompt, parser)(terminal, s)
+    () =>
+      reader.readLine match {
+        case Right(cmd) =>
+          Parser.parse(cmd, parser) match {
+            case Right(e) => e
+            case Left(_)  => Left("")
+          }
+        case l => l
+      }
+  }
+  override private[sbt] def handleInput(s: Either[String, String]): Boolean = s match {
+    case Left(c)  => onMaintenance(c)
+    case Right(c) => onLine(c)
+  }
+
+  override private[sbt] def onProgressEvent(pe: ProgressEvent, terminal: Terminal): Unit = {
+    ProgressState.updateProgressState(pe, terminal)
+  }
 }

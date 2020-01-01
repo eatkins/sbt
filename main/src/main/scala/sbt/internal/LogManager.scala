@@ -142,9 +142,7 @@ object LogManager {
     val screenTrace = getOr(traceLevel.key, data, scope, state, defaultTraceLevel(state))
     val backingTrace = getOr(persistTraceLevel.key, data, scope, state, Int.MaxValue)
     val extraBacked = state.globalLogging.backed :: relay :: Nil
-    val ps = Project.extract(state).get(sbt.Keys.progressState in ThisBuild)
     val consoleOpt = consoleLocally(state, console)
-    ps.foreach(ProgressState.set)
     val config = MainAppender.MainAppenderConfig(
       consoleOpt,
       backed,

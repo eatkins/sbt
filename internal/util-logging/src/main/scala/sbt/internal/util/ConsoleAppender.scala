@@ -521,12 +521,8 @@ class ConsoleAppender private[ConsoleAppender] (
     def appendEvent(oe: ObjectEvent[_]): Unit = {
       val contentType = oe.contentType
       contentType match {
-        case "sbt.internal.util.TraceEvent" => appendTraceEvent(oe.message.asInstanceOf[TraceEvent])
+        case "sbt.internal.util.TraceEvent"    => appendTraceEvent(oe.message.asInstanceOf[TraceEvent])
         case "sbt.internal.util.ProgressEvent" =>
-          oe.message match {
-            case pe: ProgressEvent => ProgressState.updateProgressState(pe)
-            case _                 =>
-          }
         case _ =>
           LogExchange.stringCodec[AnyRef](contentType) match {
             case Some(codec) if contentType == "sbt.internal.util.SuccessEvent" =>
@@ -567,39 +563,53 @@ private[sbt] final class ProgressState(
     progressLines.set(Nil)
     padding.set(0)
   }
+  private[util] def clearBytes(): Unit = {
+    val pad = padding.get
+    if (currentLineBytes.get.isEmpty && pad > 0) padding.decrementAndGet()
+    currentLineBytes.set(new ArrayBuffer[Byte])
+  }
+
+  private[util] def addBytes(bytes: ArrayBuffer[Byte]): Unit = {
+    val previous = currentLineBytes.get
+    val padding = this.padding.get
+    val prevLineCount = if (padding > 0) Terminal.lineCount(new String(previous.toArray)) else 0
+    previous ++= bytes
+    if (padding > 0) {
+      val newLineCount = Terminal.lineCount(new String(previous.toArray))
+      val diff = newLineCount - prevLineCount
+      this.padding.set(math.max(padding - diff, 0))
+    }
+  }
+
+  private[util] def reprint(printStream: PrintStream): Unit = {
+    if (progressLines.get.nonEmpty) {
+      val lines = printProgress(0, 0)
+      printStream.print(ClearScreenAfterCursor + "\n" + lines)
+    } else printStream.write('\n')
+  }
+
+  private[util] def printProgress(height: Int, width: Int): String = {
+    val previousLines = progressLines.get
+    if (previousLines.nonEmpty) {
+      val currentLength = previousLines.foldLeft(0)(_ + Terminal.lineCount(_))
+      val left = cursorLeft(1000) // resets the position to the left
+      val offset = width > 0
+      val pad = math.max(padding.get - height, 0)
+      val start = clearScreen(0) + (if (offset) "\n" else "")
+      val totalSize = currentLength + blankZone + pad
+      val blank = left + s"\n$DeleteLine" * (totalSize - currentLength)
+      val lines = previousLines.mkString(DeleteLine, s"\n$DeleteLine", s"\n$DeleteLine")
+      val resetCursorUp = cursorUp(totalSize + (if (offset) 1 else 0))
+      val resetCursorRight = left + (if (offset) cursorRight(width) else "")
+      val resetCursor = resetCursorUp + resetCursorRight
+      start + blank + lines + resetCursor
+    } else {
+      clearScreen(0)
+    }
+  }
 }
+
 private[sbt] object ProgressState {
-  private val progressState: AtomicReference[ProgressState] = new AtomicReference(null)
-  private[util] def clearBytes(): Unit = progressState.get match {
-    case null =>
-    case state =>
-      val pad = state.padding.get
-      if (state.currentLineBytes.get.isEmpty && pad > 0) state.padding.decrementAndGet()
-      state.currentLineBytes.set(new ArrayBuffer[Byte])
-  }
-
-  private[util] def addBytes(bytes: ArrayBuffer[Byte]): Unit = progressState.get match {
-    case null =>
-    case state =>
-      val previous = state.currentLineBytes.get
-      val padding = state.padding.get
-      val prevLineCount = if (padding > 0) Terminal.lineCount(new String(previous.toArray)) else 0
-      previous ++= bytes
-      if (padding > 0) {
-        val newLineCount = Terminal.lineCount(new String(previous.toArray))
-        val diff = newLineCount - prevLineCount
-        state.padding.set(math.max(padding - diff, 0))
-      }
-  }
-
-  private[util] def reprint(printStream: PrintStream): Unit = progressState.get match {
-    case null => printStream.write('\n')
-    case state =>
-      if (state.progressLines.get.nonEmpty) {
-        val lines = printProgress(0, 0)
-        printStream.print(ClearScreenAfterCursor + "\n" + lines)
-      } else printStream.write('\n')
-  }
 
   /**
    * Receives a new task report and replaces the old one. In the event that the new
@@ -608,34 +618,31 @@ private[sbt] object ProgressState {
    * at the info or greater level, we can decrement the padding because the console
    * line will have filled in the blank line.
    */
-  private[util] def updateProgressState(pe: ProgressEvent): Unit = {
-    val terminal = Terminal.get
+  private[sbt] def updateProgressState(pe: ProgressEvent, terminal: Terminal): Unit = {
+    val state = terminal.progressState
     if (terminal.isSupershellEnabled) {
       terminal.withPrintStream { ps =>
-        progressState.get match {
-          case null =>
-          case state =>
-            val info = pe.items.map { item =>
-              val elapsed = item.elapsedMicros / 1000000L
-              s"  | => ${item.name} ${elapsed}s"
-            }
-
-            val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))
-            val previousLines = state.progressLines.getAndSet(info)
-            val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
-
-            val (height, width) = terminal.getLineHeightAndWidth
-            val prevSize = prevLength + state.padding.get
-
-            val newPadding = math.max(0, prevSize - currentLength)
-            state.padding.set(newPadding)
-            ps.print(printProgress(height, width))
-            ps.flush()
+        val info = pe.items.map { item =>
+          val elapsed = item.elapsedMicros / 1000000L
+          s"  | => ${item.name} ${elapsed}s"
         }
+
+        val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))
+        val previousLines = state.progressLines.getAndSet(info)
+        val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
+
+        val (height, width) = terminal.getLineHeightAndWidth
+        val prevSize = prevLength + state.padding.get
+
+        val newPadding = math.max(0, prevSize - currentLength)
+        state.padding.set(newPadding)
+        ps.print(state.printProgress(height, width))
+        ps.flush()
       }
     }
   }
 
+<<<<<<< HEAD
   private[sbt] def set(state: ProgressState): Unit = progressState.set(state)
 
   private[util] def printProgress(height: Int, width: Int): String = progressState.get match {
@@ -660,4 +667,6 @@ private[sbt] object ProgressState {
       }
   }
 
+=======
+>>>>>>> progress refactor
 }

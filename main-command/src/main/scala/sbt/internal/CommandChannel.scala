@@ -11,8 +11,8 @@ package internal
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
-import sbt.internal.util.{ MainAppender, ManagedLogger, Terminal }
 import sbt.internal.ui.HasUserThread
+import sbt.internal.util.{ MainAppender, ManagedLogger, ProgressEvent, Terminal }
 import sbt.protocol.EventMessage
 import sbt.util.{ Level, LogExchange }
 import sjsonnew.JsonFormat
@@ -50,9 +50,11 @@ abstract class CommandChannel extends HasUserThread {
   }
   private[sbt] def terminal: Terminal
   def append(exec: Exec): Boolean = registered.synchronized {
-    val res = commandQueue.add(exec)
-    if (res) registered.forEach(q => q.synchronized { q.add(this); () })
-    res
+    exec.commandLine.nonEmpty && {
+      val res = commandQueue.add(exec)
+      if (res) registered.forEach(q => q.synchronized { q.add(this); () })
+      res
+    }
   }
   def poll: Option[Exec] = Option(commandQueue.poll)
 
