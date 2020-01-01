@@ -10,7 +10,7 @@ package sbt
 import java.io.PrintWriter
 import java.util.Properties
 
-import sbt.internal.{ Aggregation, ConsoleUnpromptEvent, ShutdownHooks }
+import sbt.internal.{ Aggregation, CommandChannel, ConsoleUnpromptEvent, ShutdownHooks }
 import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.server.NetworkChannel
@@ -195,7 +195,7 @@ object MainLoop {
         StandardMain.exchange.publishEventMessage(ConsoleUnpromptEvent(exec.source, progressState))
         val execSource = exec.source.map(_.channelName)
         val newState = (StandardMain.exchange.channels.collectFirst {
-          case c: NetworkChannel if execSource.contains(c.name) => c
+          case c: CommandChannel if execSource.contains(c.name) => c
         } match {
           case Some(channel) =>
             Terminal.withTerminal(channel.terminal) {

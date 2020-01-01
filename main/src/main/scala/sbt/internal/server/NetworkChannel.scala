@@ -357,11 +357,9 @@ final class NetworkChannel(
     event match {
       case ConsolePromptEvent(state) if isAttached => reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
+        terminal.progressState.reset()
         if (lastSource.fold(true)(_.channelName != name))
-          reset(
-            state,
-            new UserThread.Blocked(state.currentCommand.toList ::: state.remainingCommands)
-          )
+          reset(state, UserThread.Blocked)
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)
@@ -554,14 +552,15 @@ final class NetworkChannel(
   private[this] lazy val pendingTerminalCapability =
     new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
   private[this] lazy val inputStream: InputStream = new InputStream {
-    override def read(): Int =
+    override def read(): Int = {
       try {
         // if (askUserThread != null) jsonRpcNotify("readInput", true) TODO -- fix condition
         inputBuffer.take & 0xFF match {
           case -1 => throw new ClosedChannelException()
           case b  => b
         }
-      } catch { case _: InterruptedException | _: IOException => -1 }
+      } catch { case _: IOException => -1 }
+    }
     override def available(): Int = inputBuffer.size
   }
   import sjsonnew.BasicJsonProtocol._

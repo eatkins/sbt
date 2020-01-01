@@ -111,6 +111,12 @@ trait Terminal extends AutoCloseable {
    */
   def isSupershellEnabled: Boolean
 
+  /**
+   * Returns the last line written to the terminal's output stream.
+   * @return the last line
+   */
+  def getLastLine: Option[String]
+
   def getBooleanCapability(capability: String): Boolean
   def getNumericCapability(capability: String): Int
   def getStringCapability(capability: String): String
@@ -122,6 +128,7 @@ trait Terminal extends AutoCloseable {
   private[sbt] def printStream: PrintStream
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
   private[sbt] def restore(): Unit = {}
+  private[sbt] val progressState = new ProgressState(1)
 }
 
 object Terminal {
@@ -292,6 +299,7 @@ object Terminal {
     override def restore(): Unit = t.restore()
     override def close(): Unit = {}
     override private[sbt] def write(bytes: Int*): Unit = t.write(bytes: _*)
+    override def getLastLine: Option[String] = t.getLastLine
   }
   private[sbt] def get: Terminal = ProxyTerminal
 
@@ -371,10 +379,10 @@ object Terminal {
         case null => readFuture.set(executor.submit(runnable))
         case _    =>
       })
-      try buffer.take match {
+      buffer.take match {
         case -1 => throw new ClosedChannelException
         case b  => b
-      } catch { case _: InterruptedException => -1 }
+      }
     }
 
     override def available(): Int = buffer.size
@@ -612,10 +620,10 @@ object Terminal {
             import scala.collection.JavaConverters._
             val remaining = bytes.asScala.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
               if (i == 10) {
-                ProgressState.addBytes(buf)
-                ProgressState.clearBytes()
+                progressState.addBytes(buf)
+                progressState.clearBytes()
                 buf.foreach(b => out.write(b & 0xFF))
-                ProgressState.reprint(rawPrintStream)
+                progressState.reprint(rawPrintStream)
                 currentLine.set(new ArrayBuffer[Byte])
                 new ArrayBuffer[Byte]
               } else buf += i
@@ -642,6 +650,11 @@ object Terminal {
         val line = EscHelpers.removeEscapeSequences(new String(bytes))
         val count = lineCount(line)
         (count, line.length - ((count - 1) * width))
+    }
+
+    override def getLastLine: Option[String] = currentLine.get.toArray match {
+      case bytes if bytes.isEmpty => None
+      case bytes                  => Some(new String(bytes))
     }
 
     private[this] val rawPrintStream: PrintStream = new PrintStream(out, true) {

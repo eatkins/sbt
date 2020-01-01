@@ -25,6 +25,11 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
   def publishEventMessage(event: EventMessage): Unit =
     event match {
       case e: ConsolePromptEvent => reset(e.state, UserThread.Ready)
-      case _                     => //
+      case ConsoleUnpromptEvent(lastSource, state) =>
+        terminal.progressState.reset()
+        if (lastSource.fold(true)(_.channelName != name))
+          reset(state, UserThread.Blocked)
+        else stopThread()
+      case _ => //
     }
 }

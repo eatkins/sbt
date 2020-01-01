@@ -3799,15 +3799,10 @@ object Classpaths {
   def shellPromptFromState: State => String = shellPromptFromState(Terminal.console)
   def shellPromptFromState(terminal: Terminal): State => String = { s: State =>
     val extracted = Project.extract(s)
-    def ansi(s: String): String = if (terminal.isAnsiSupported) s"$s" else ""
-    def wrap(s: String) =
-      s"${ansi(ConsoleAppender.DeleteLine)}$s${ansi(ConsoleAppender.clearScreen(0))}"
     (name in extracted.currentRef).get(extracted.structure.data) match {
       case Some(name) =>
-        val prompt =
-          s"sbt:$name" + Def.withColor(s"> ", Option(scala.Console.CYAN), terminal.isColorEnabled)
-        wrap(prompt)
-      case _ => wrap("> ")
+        s"sbt:$name" + Def.withColor(s"> ", Option(scala.Console.CYAN), terminal.isColorEnabled)
+      case _ => "> "
     }
   }
 }

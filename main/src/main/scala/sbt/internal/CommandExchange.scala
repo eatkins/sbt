@@ -19,7 +19,7 @@ import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
 import sbt.internal.util.codec.JValueFormats
-import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
+import sbt.internal.util.{ ObjectEvent, ProgressEvent, ProgressState, StringEvent, Terminal }
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
 import sbt.nio.Watch.NullLogger
@@ -423,6 +423,9 @@ private[sbt] final class CommandExchange {
     }
 
     removeChannels(toDel.toList)
+  }
+  private[sbt] def updateProgress(pe: ProgressEvent): Unit = {
+    channels.foreach(c => ProgressState.updateProgressState(pe, c.terminal))
   }
   private[this] def needToFinishPromptLine(): Boolean = activePrompt.compareAndSet(true, false)
   private[this] class MaintenanceThread
