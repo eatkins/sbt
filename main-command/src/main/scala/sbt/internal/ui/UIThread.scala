@@ -44,13 +44,10 @@ object UIThread {
       () => {
         def clear(): Unit = if (terminal.isAnsiSupported) {
           val dl = ConsoleAppender.DeleteLine
-          terminal.printStream.print(dl + ConsoleAppender.clearScreen(0) + dl)
+          terminal.printStream.print(
+            dl + ConsoleAppender.clearScreen(0) + dl + ConsoleAppender.CursorLeft1000
+          )
           terminal.printStream.flush()
-        }
-        if (terminal.getLineHeightAndWidth._2 > 0 && !terminal.getLastLine.contains(prompt)) {
-          terminal.printStream.println()
-        } else {
-          terminal.printStream.print(ConsoleAppender.CursorLeft1000)
         }
         clear()
         try {
