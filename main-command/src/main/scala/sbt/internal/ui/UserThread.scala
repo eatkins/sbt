@@ -44,11 +44,15 @@ private[sbt] trait HasUserThread {
 
   private[sbt] def reset(state: State, uiState: UserThread.UIState): Unit = {
     askUserThread.synchronized {
-      askUserThread.getAndSet(null) match {
-        case null =>
-        case t    => t.close()
+      askUserThread.get match {
+        case a: AskUserThread if a.isAlive && uiState == UserThread.Ready =>
+        case _ =>
+          askUserThread.getAndSet(null) match {
+            case null =>
+            case t    => t.close()
+          }
+          askUserThread.set(makeAskUserThread(state, uiState))
       }
-      askUserThread.set(makeAskUserThread(state, uiState))
     }
   }
 

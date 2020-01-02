@@ -16,6 +16,7 @@ import java.util.concurrent.locks.ReentrantLock
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
+import sbt.internal.util.Prompt.AskUser
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -129,6 +130,9 @@ trait Terminal extends AutoCloseable {
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
   private[sbt] def restore(): Unit = {}
   private[sbt] val progressState = new ProgressState(1)
+  private[this] val promptHolder: AtomicReference[Prompt] = new AtomicReference(AskUser)
+  private[sbt] final def prompt: Prompt = promptHolder.get
+  private[sbt] final def setPrompt(prompt: Prompt): Unit = promptHolder.set(prompt)
 }
 
 object Terminal {
@@ -495,9 +499,8 @@ object Terminal {
 
   private[sbt] def createReader(term: Terminal): ConsoleReader = {
     new ConsoleReader(term.inputStream, term.outputStream, term.toJLine) {
-      override def readLine(prompt: String, mask: Character): String = term.withRawSystemIn {
-        super.readLine(prompt, mask)
-      }
+      override def readLine(prompt: String, mask: Character): String =
+        term.withRawSystemIn(super.readLine(prompt, mask))
       override def readLine(prompt: String): String = term.withRawSystemIn(super.readLine(prompt))
     }
   }
@@ -623,7 +626,7 @@ object Terminal {
                 progressState.addBytes(buf)
                 progressState.clearBytes()
                 buf.foreach(b => out.write(b & 0xFF))
-                progressState.reprint(rawPrintStream)
+                Prompt.render(prompt, progressState, TerminalImpl.this)
                 currentLine.set(new ArrayBuffer[Byte])
                 new ArrayBuffer[Byte]
               } else buf += i

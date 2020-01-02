@@ -19,11 +19,11 @@ import scala.concurrent.duration._
 /**
  * implements task progress display on the shell.
  */
-private[sbt] final class TaskProgress
+private[sbt] final class TaskProgress(execID: Option[String])
     extends AbstractTaskExecuteProgress
     with ExecuteProgress[Task] {
-  @deprecated("Use the no argument constructor.", "1.4.0")
-  def this(log: ManagedLogger) = this()
+  @deprecated("Use the constructor taking an ExecID.", "1.4.0")
+  def this(log: ManagedLogger) = this(None)
   private[this] val lastTaskCount = new AtomicInteger(0)
   private[this] val currentProgressThread = new AtomicReference[Option[ProgressThread]](None)
   private[this] val sleepDuration = SysProp.supershellSleep.millis
