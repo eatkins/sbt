@@ -139,8 +139,8 @@ object StandardMain {
   }
 
   /** The common interface to standard output, used for all built-in ConsoleLoggers. */
-  val console: ConsoleOut =
-    ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
+  val console: ConsoleOut = ConsoleOut.systemOut
+  //ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
   ConsoleOut.setGlobalProxy(console)
 
   private[this] def initialGlobalLogging(file: Option[File]): GlobalLogging = {
