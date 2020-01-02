@@ -626,9 +626,10 @@ object Terminal {
                     } else write(10)
                   }
                 }
+                val newBytes = buf.nonEmpty
                 buf += i
                 buf.foreach(write)
-                val p = if (currentLine.get.nonEmpty) {
+                val p = if (currentLine.get.nonEmpty && newBytes) {
                   Prompt.render(
                     prompt,
                     new String(currentLine.get.toArray),

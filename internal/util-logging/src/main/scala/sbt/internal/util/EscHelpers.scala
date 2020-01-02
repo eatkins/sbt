@@ -7,6 +7,9 @@
 
 package sbt.internal.util
 
+import scala.collection.mutable.ArrayBuffer
+import scala.util.Try
+
 object EscHelpers {
 
   /** Escape character, used to introduce an escape sequence. */
@@ -83,6 +86,44 @@ object EscHelpers {
         }
       nextESC(s, next, sb)
     }
+  }
+  private[this] val esc = 1
+  private[this] val csi = 2
+  def stripColorsAndMoves(s: String): String = {
+    val bytes = s.getBytes
+    val res = Array.fill(bytes.length)(32.toByte)
+    var i = 0
+    var index = 0
+    var state = 0
+    var limit = 0
+    val digit = new ArrayBuffer[Byte]
+    var leftDigit = -1
+    do {
+      bytes(i) match {
+        case 27 => state = esc
+        case b if (state == esc || state == csi) && b >= 48 && b < 58 =>
+          state = csi
+          digit += b
+        case b if state == csi =>
+          leftDigit = Try(new String(digit.toArray).toInt).getOrElse(0)
+          state = 0
+          b.toChar match {
+            case 'D' => index = math.min(index - leftDigit, 0)
+            case 'C' => index = math.min(limit, math.min(index + leftDigit, res.length - 1))
+            case 'K' =>
+              if (leftDigit > 0) (0 until index).foreach(res(_) = 32)
+            case ';' => state = csi
+          }
+          digit.clear()
+        case b if state == esc =>
+        case b =>
+          res(index) = b
+          limit = math.max(limit, index)
+          index += 1
+      }
+      i += 1
+    } while (i < bytes.length)
+    new String(res, 0, index)
   }
 
   /** Skips the escape sequence starting at `i-1`.  `i` should be positioned at the character after the ESC that starts the sequence. */
