@@ -108,11 +108,12 @@ object EscHelpers {
           leftDigit = Try(new String(digit.toArray).toInt).getOrElse(0)
           state = 0
           b.toChar match {
-            case 'D' => index = math.min(index - leftDigit, 0)
+            case 'D' => index = math.max(index - leftDigit, 0)
             case 'C' => index = math.min(limit, math.min(index + leftDigit, res.length - 1))
-            case 'K' =>
-              if (leftDigit > 0) (0 until index).foreach(res(_) = 32)
+            case 'K' => if (leftDigit > 0) (0 until index).foreach(res(_) = 32)
+            case 'm' =>
             case ';' => state = csi
+            case _   => System.err.println("Whoops")
           }
           digit.clear()
         case b if state == esc =>
