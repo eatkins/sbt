@@ -91,7 +91,7 @@ object EscHelpers {
   private[this] val csi = 2
   def stripColorsAndMoves(s: String): String = {
     val bytes = s.getBytes
-    val res = Array.fill(bytes.length)(32.toByte)
+    val res = Array.fill[Byte](bytes.length)(32)
     var i = 0
     var index = 0
     var state = 0
@@ -104,19 +104,24 @@ object EscHelpers {
         case b if (state == esc || state == csi) && b >= 48 && b < 58 =>
           state = csi
           digit += b
+        case '[' if state == esc => state = csi
+        case 8 =>
+          state = 0
+          index = math.max(index - 1, 0)
         case b if state == csi =>
           leftDigit = Try(new String(digit.toArray).toInt).getOrElse(0)
           state = 0
           b.toChar match {
             case 'D' => index = math.max(index - leftDigit, 0)
             case 'C' => index = math.min(limit, math.min(index + leftDigit, res.length - 1))
-            case 'K' => if (leftDigit > 0) (0 until index).foreach(res(_) = 32)
+            case 'K' | 'J' =>
+              if (leftDigit > 0) (0 until index).foreach(res(_) = 32)
+              else res(index) = 32
             case 'm' =>
             case ';' => state = csi
-            case _   => System.err.println("Whoops")
+            case _   =>
           }
           digit.clear()
-        case b if state == esc =>
         case b =>
           res(index) = b
           limit = math.max(limit, index)
