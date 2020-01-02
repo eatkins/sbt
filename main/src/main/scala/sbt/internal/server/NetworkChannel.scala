@@ -357,9 +357,9 @@ final class NetworkChannel(
     event match {
       case ConsolePromptEvent(state) if isAttached => reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
-        terminal.progressState.reset()
-        if (lastSource.fold(true)(_.channelName != name))
-          reset(state, UserThread.Blocked)
+        if (lastSource.fold(true)(_.channelName != name)) {
+          terminal.progressState.reset()
+        } else stopThread()
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)
