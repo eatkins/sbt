@@ -13,23 +13,16 @@ private[sbt] object Prompt {
   }
   private[sbt] def render(
       prompt: Prompt,
+      getPrompt: String,
       progressState: ProgressState,
       terminal: Terminal,
       printStream: PrintStream
-  ): String = {
-    prompt match {
-      case null =>
-        printStream.println()
-        ""
-      case AskUser(mkPrompt) =>
-        val p = mkPrompt()
-        //System.err.println(s"WTF $mkPrompt")
-        terminal.write(p.getBytes.map(_ & 0xFF): _*)
-        terminal.withPrintStream(progressState.reprint)
-        p
-      case Running =>
-        terminal.withPrintStream(progressState.reprint)
-        ""
-    }
+  ): String = prompt match {
+    case AskUser(_) =>
+      printStream.print(getPrompt)
+      printStream.flush()
+      if (progressState.progressLines.get.nonEmpty) progressState.reprint(printStream)
+      getPrompt
+    case _ => ""
   }
 }

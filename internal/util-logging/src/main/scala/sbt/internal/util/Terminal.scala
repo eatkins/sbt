@@ -626,11 +626,20 @@ object Terminal {
                     } else write(10)
                   }
                 }
+                buf += i
                 buf.foreach(write)
-                val p = Prompt.render(prompt, progressState, TerminalImpl.this, rawPrintStream)
+                val p = if (currentLine.get.nonEmpty) {
+                  Prompt.render(
+                    prompt,
+                    new String(currentLine.get.toArray),
+                    progressState,
+                    TerminalImpl.this,
+                    rawPrintStream
+                  )
+                } else ""
                 val cl = new ArrayBuffer[Byte]
-                currentLine.set(cl)
                 cl ++= p.getBytes
+                currentLine.set(cl)
                 new ArrayBuffer[Byte]
               } else buf += i
             }
