@@ -102,8 +102,8 @@ abstract class CommandChannel extends HasUserThread {
     case "info"  => setLevel(Level.Info, "info")
     case "warn"  => setLevel(Level.Warn, "warn")
     case cmd =>
-      append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
-      true
+      if (cmd.nonEmpty) append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
+      else false
   }
   private[sbt] def onMaintenance: String => Boolean = { s: String =>
     maintenance.synchronized(maintenance.forEach { q =>
