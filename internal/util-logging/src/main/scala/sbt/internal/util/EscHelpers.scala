@@ -129,7 +129,7 @@ object EscHelpers {
       }
       i += 1
     } while (i < bytes.length)
-    new String(res, 0, index)
+    new String(res, 0, limit + 1)
   }
 
   /** Skips the escape sequence starting at `i-1`.  `i` should be positioned at the character after the ESC that starts the sequence. */

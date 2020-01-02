@@ -74,7 +74,7 @@ private[sbt] class BlockedUIThread(
     } else {
       prefix + "\n" + sp
     }
-    val reader = UIThread.Reader.terminalReader(prompt, parser)(terminal, s)
+    val reader = UIThread.Reader.terminalReader(terminal.prompt, parser)(terminal, s)
     () =>
       reader.readLine match {
         case Right(cmd) =>

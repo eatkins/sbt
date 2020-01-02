@@ -38,4 +38,9 @@ class CleanStringSpec extends FlatSpec {
     val str = new String(bytes)
     assert(EscHelpers.stripColorsAndMoves(str) == "sbt:scala-compile> clean")
   }
+  it should "handle cursor left overwrite" in {
+    val clean = "1234"
+    val backspaced = s"1235${8.toChar}4${8.toChar}"
+    assert(EscHelpers.stripColorsAndMoves(backspaced) == clean)
+  }
 }

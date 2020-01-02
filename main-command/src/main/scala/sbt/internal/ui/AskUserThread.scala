@@ -19,7 +19,7 @@ private[sbt] class AskUserThread(
 ) extends Thread(s"ask-user-thread-$name")
     with UIThread {
   override private[sbt] def reader: UIThread.Reader =
-    UIThread.Reader.terminalReader(terminal, state)
+    UIThread.Reader.terminalReader(terminal.prompt, state.combinedParser)(terminal, state)
   override private[sbt] def handleInput(s: Either[String, String]): Boolean = s match {
     case Left(c)  => onMaintenance(c)
     case Right(c) => onLine(c)
