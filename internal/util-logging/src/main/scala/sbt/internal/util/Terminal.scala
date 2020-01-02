@@ -16,6 +16,7 @@ import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
+import sbt.internal.util.Prompt.AskUser
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -486,8 +487,12 @@ object Terminal {
   }
   fixTerminalProperty()
 
-  private[sbt] def createReader(term: Terminal): ConsoleReader = {
-    new ConsoleReader(term.inputStream, term.outputStream, term.toJLine) {
+  private[sbt] def createReader(term: Terminal, prompt: Prompt): ConsoleReader = {
+    val os = prompt match {
+      case a @ AskUser(_) => a.wrappedOutputStream(term.outputStream)
+      case _              => term.outputStream
+    }
+    new ConsoleReader(term.inputStream, os, term.toJLine) {
       override def readLine(prompt: String, mask: Character): String =
         term.withRawSystemIn(super.readLine(prompt, mask))
       override def readLine(prompt: String): String = term.withRawSystemIn(super.readLine(prompt))
@@ -632,7 +637,6 @@ object Terminal {
                 val p = if (currentLine.get.nonEmpty && newBytes) {
                   Prompt.render(
                     prompt,
-                    new String(currentLine.get.toArray),
                     progressState,
                     TerminalImpl.this,
                     rawPrintStream

@@ -595,7 +595,7 @@ private[sbt] final class ProgressState(
       val left = cursorLeft(1000) // resets the position to the left
       val offset = width > 0
       val pad = math.max(padding.get - height, 0)
-      val start = clearScreen(0) + (if (offset) "\n" else "")
+      val start = clearScreen(0) + (if (offset) ConsoleAppender.cursorRight(1000) + "\n" else "")
       val totalSize = currentLength + blankZone + pad
       val blank = left + s"\n$DeleteLine" * (totalSize - currentLength)
       val lines = previousLines.mkString(DeleteLine, s"\n$DeleteLine", s"\n$DeleteLine")

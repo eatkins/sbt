@@ -27,9 +27,10 @@ object LineReader {
 
   def createReader(
       historyPath: Option[File],
-      terminal: Terminal
+      terminal: Terminal,
+      prompt: Prompt = Prompt.Running,
   ): ConsoleReader = {
-    val cr = Terminal.createReader(terminal)
+    val cr = Terminal.createReader(terminal, prompt)
     cr.setExpandEvents(false) // https://issues.scala-lang.org/browse/SI-7650
     cr.setBellEnabled(false)
     val h = historyPath match {
@@ -152,7 +153,7 @@ private[sbt] object JLine {
 
   @deprecated("Use LineReader.createReader", "1.4.0")
   def createReader(historyPath: Option[File], in: InputStream): ConsoleReader = {
-    val cr = Terminal.createReader(Terminal.console)
+    val cr = Terminal.createReader(Terminal.console, Prompt.Running)
     cr.setExpandEvents(false) // https://issues.scala-lang.org/browse/SI-7650
     cr.setBellEnabled(false)
     val h = historyPath match {
