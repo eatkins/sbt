@@ -8,7 +8,8 @@
 package sbt
 package internal
 
-import sbt.internal.ui.UserThread
+import sbt.internal.ui.{ UIThread, UserThread }
+import sbt.internal.util.Prompt.AskUser
 import sbt.internal.util._
 import sbt.protocol.EventMessage
 import sjsonnew.JsonFormat
@@ -24,11 +25,12 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
 
   def publishEventMessage(event: EventMessage): Unit =
     event match {
-      case e: ConsolePromptEvent =>
+      case ConsolePromptEvent(state) =>
         // Need to stop thread because the ConsoleChannel logs remote commands which screw up
         // the prompt.
+        terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
         stopThread()
-        reset(e.state, UserThread.Ready)
+        reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
         if (lastSource.fold(true)(_.channelName != name)) {
           terminal.progressState.reset()

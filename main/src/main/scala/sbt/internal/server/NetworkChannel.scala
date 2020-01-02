@@ -25,7 +25,8 @@ import sbt.internal.protocol.{
   JsonRpcRequestMessage,
   JsonRpcNotificationMessage
 }
-import sbt.internal.ui.UserThread
+import sbt.internal.ui.{ UIThread, UserThread }
+import sbt.internal.util.Prompt.AskUser
 import sbt.internal.util.Terminal.TerminalImpl
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util.complete.Parser
@@ -355,7 +356,9 @@ final class NetworkChannel(
 
   def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
     event match {
-      case ConsolePromptEvent(state) if isAttached => reset(state, UserThread.Ready)
+      case ConsolePromptEvent(state) if isAttached =>
+        terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
+        reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
         if (lastSource.fold(true)(_.channelName != name)) {
           terminal.progressState.reset()

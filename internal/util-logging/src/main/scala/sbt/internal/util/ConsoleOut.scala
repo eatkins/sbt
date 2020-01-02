@@ -8,6 +8,7 @@
 package sbt.internal.util
 
 import java.io.{ BufferedWriter, PrintStream, PrintWriter }
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 sealed trait ConsoleOut {
@@ -73,30 +74,49 @@ object ConsoleOut {
 
   def terminalOut: ConsoleOut = new ConsoleOut {
     override val lockObject: AnyRef = System.out
-    override def print(s: String): Unit = Terminal.get.printStream.print(s)
-    override def println(s: String): Unit = Terminal.get.printStream.println(s)
+    override def print(s: String): Unit = {
+      System.err.println(s"Aargh print '$s'")
+      Terminal.get.printStream.print(s)
+    }
+    override def println(s: String): Unit = {
+      System.err.println(s"Aargh println '$s'")
+      Terminal.get.printStream.println(s)
+    }
     override def println(): Unit = Terminal.get.printStream.println()
     override def flush(): Unit = Terminal.get.printStream.flush()
   }
 
-  def terminalOut(terminal: Terminal): ConsoleOut = new ConsoleOut {
-    override val lockObject: AnyRef = terminal
-    override def print(s: String): Unit = terminal.printStream.print(s)
-    override def println(s: String): Unit = terminal.printStream.println(s)
-    override def println(): Unit = terminal.printStream.println()
-    override def flush(): Unit = terminal.printStream.flush()
+  private[this] val consoleOutPerTerminal = new ConcurrentHashMap[Terminal, ConsoleOut]
+  def terminalOut(terminal: Terminal): ConsoleOut = consoleOutPerTerminal.get(terminal) match {
+    case null =>
+      val res = new ConsoleOut {
+        override val lockObject: AnyRef = terminal
+        override def print(s: String): Unit = terminal.printStream.print(s)
+        override def println(s: String): Unit = terminal.printStream.println(s)
+        override def println(): Unit = terminal.printStream.println()
+        override def flush(): Unit = terminal.printStream.flush()
+      }
+      consoleOutPerTerminal.put(terminal, res)
+      res
+    case c => c
   }
   def printStreamOut(out: PrintStream): ConsoleOut = new ConsoleOut {
     val lockObject = out
     def print(s: String): Unit = out.print(s)
-    def println(s: String): Unit = out.println(s)
+    def println(s: String): Unit = {
+      out.println(s)
+    }
     def println(): Unit = out.println()
     def flush(): Unit = out.flush()
   }
   def printWriterOut(out: PrintWriter): ConsoleOut = new ConsoleOut {
     val lockObject = out
     def print(s: String) = out.print(s)
-    def println(s: String) = { out.println(s); flush() }
+    def println(s: String) = {
+      out.println(s)
+      flush()
+    }
+
     def println() = { out.println(); flush() }
     def flush() = { out.flush() }
   }

@@ -52,7 +52,6 @@ private[sbt] final class CommandExchange {
   private val commandChannelQueue = new LinkedBlockingQueue[CommandChannel]
   private val maintenanceChannelQueue = new LinkedBlockingQueue[MaintenanceTask]
   private val nextChannelId: AtomicInteger = new AtomicInteger(0)
-  private[this] val activePrompt = new AtomicBoolean(false)
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val lastState = new AtomicReference[State]
   private[this] val currentExec = new AtomicReference[Exec]
@@ -97,11 +96,6 @@ private[sbt] final class CommandExchange {
       slurpMessages()
       Option(commandQueue.poll) match {
         case Some(exec) =>
-          val needFinish = needToFinishPromptLine()
-          if (exec.source.fold(needFinish)(s => needFinish && s.channelName != "console0")) {
-            Terminal.console.outputStream.write(10)
-            Terminal.console.outputStream.flush()
-          }
           exec.commandLine match {
             case "shutdown" => exec.withCommandLine("exit")
             case "exit" if exec.source.fold(false)(_.channelName.startsWith("network")) =>
@@ -164,11 +158,7 @@ private[sbt] final class CommandExchange {
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
-      if (needToFinishPromptLine() && (level == Level.Debug)) {
-        Terminal.console.outputStream.write(10)
-        Terminal.console.outputStream.flush()
-      }
-      s.log.debug(s"new client connected: $name")
+      s.log.info(s"new client connected: $name")
       val channel =
         new NetworkChannel(name, socket, Project structure s, auth, instance, handlers)
       subscribe(channel)
@@ -402,11 +392,7 @@ private[sbt] final class CommandExchange {
       // Special treatment for ConsolePromptEvent since it's hand coded without codec.
       case entry: ConsolePromptEvent =>
         channels collect {
-          case c: ConsoleChannel =>
-            c.publishEventMessage(entry)
-            activePrompt.set(Terminal.systemInIsAttached)
-          case c: NetworkChannel =>
-            c.publishEventMessage(entry)
+          case c @ (_: ConsoleChannel | _: NetworkChannel) => c.publishEventMessage(entry)
         }
       case entry: ExecStatusEvent =>
         channels collect {
@@ -427,7 +413,6 @@ private[sbt] final class CommandExchange {
   private[sbt] def updateProgress(pe: ProgressEvent): Unit = {
     channels.foreach(c => ProgressState.updateProgressState(pe, c.terminal))
   }
-  private[this] def needToFinishPromptLine(): Boolean = activePrompt.compareAndSet(true, false)
   private[this] class MaintenanceThread
       extends Thread("sbt-command-exchange-maintenance")
       with AutoCloseable {

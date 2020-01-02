@@ -10,13 +10,12 @@ package sbt.internal.util
 import java.io.{ InputStream, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.Locale
-import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.locks.ReentrantLock
+import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
-import sbt.internal.util.Prompt.AskUser
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -130,7 +129,7 @@ trait Terminal extends AutoCloseable {
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
   private[sbt] def restore(): Unit = {}
   private[sbt] val progressState = new ProgressState(1)
-  private[this] val promptHolder: AtomicReference[Prompt] = new AtomicReference(AskUser)
+  private[this] val promptHolder: AtomicReference[Prompt] = new AtomicReference
   private[sbt] final def prompt: Prompt = promptHolder.get
   private[sbt] final def setPrompt(prompt: Prompt): Unit = promptHolder.set(prompt)
 }
@@ -352,16 +351,6 @@ object Terminal {
     } finally {
       ConsoleOut.setGlobalProxy(originalProxyOut)
       System.setOut(originalOut)
-    }
-  }
-
-  private[this] def withTerminal[T](f: jline.Terminal => T): T = {
-    val t = console.toJLine
-    terminalLock.lockInterruptibly()
-    try f(t)
-    finally {
-      t.restore()
-      terminalLock.unlock()
     }
   }
 
@@ -592,7 +581,10 @@ object Terminal {
 
     override val outputStream: OutputStream = new OutputStream {
       override def write(b: Int): Unit = {
-        writeLock.synchronized(lineBuffer.put(b.toByte))
+        writeLock.synchronized {
+          lineBuffer.put(b.toByte)
+          if (b == 10) flushQueue.put(())
+        }
       }
       override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
       override def write(b: Array[Byte], off: Int, len: Int): Unit = writeLock.synchronized {
@@ -625,9 +617,20 @@ object Terminal {
               if (i == 10) {
                 progressState.addBytes(buf)
                 progressState.clearBytes()
-                buf.foreach(b => out.write(b & 0xFF))
-                Prompt.render(prompt, progressState, TerminalImpl.this)
-                currentLine.set(new ArrayBuffer[Byte])
+                def write(b: Byte): Unit = out.write(b & 0xFF)
+                if (getLineHeightAndWidth._2 > 0) {
+                  if (buf.nonEmpty) {
+                    if (isAnsiSupported) {
+                      s"${ConsoleAppender.DeleteLine}${ConsoleAppender.CursorLeft1000}".getBytes
+                        .foreach(write)
+                    } else write(10)
+                  }
+                }
+                buf.foreach(write)
+                val p = Prompt.render(prompt, progressState, TerminalImpl.this, rawPrintStream)
+                val cl = new ArrayBuffer[Byte]
+                currentLine.set(cl)
+                cl ++= p.getBytes
                 new ArrayBuffer[Byte]
               } else buf += i
             }
