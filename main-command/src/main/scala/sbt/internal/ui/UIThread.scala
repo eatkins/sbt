@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicBoolean
 
+import jline.console.history.PersistentHistory
 import sbt.BasicKeys.{ historyPath, newShellPrompt }
 import sbt.State
 import sbt.internal.util.complete.{ JLineCompletion, Parser }
@@ -53,8 +54,15 @@ object UIThread {
         try {
           val res = lineReader.readLine(prompt)
           res match {
-            case null      => Left("kill channel")
-            case s: String => Right(s)
+            case null => Left("kill channel")
+            case s: String =>
+              lineReader.getHistory match {
+                case p: PersistentHistory =>
+                  p.add(s)
+                  p.flush()
+                case _ =>
+              }
+              Right(s)
           }
         } catch {
           case _: InterruptedException => Right("")

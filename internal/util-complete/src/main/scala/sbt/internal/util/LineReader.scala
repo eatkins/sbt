@@ -18,7 +18,6 @@ import scala.concurrent.duration._
 
 trait LineReader {
   def readLine(prompt: String, mask: Option[Char] = None): Option[String]
-  def redraw(): Unit = ()
 }
 
 object LineReader {
@@ -39,6 +38,7 @@ object LineReader {
     }
     h.setMaxSize(MaxHistorySize)
     cr.setHistory(h)
+    cr.setHistoryEnabled(true)
     cr
   }
 
@@ -66,13 +66,6 @@ abstract class JLine extends LineReader {
         // println("readLine: InterruptedException")
         Option("")
     }
-
-  override def redraw(): Unit = {
-    reader.getOutput.write(ConsoleAppender.DeleteLine + ConsoleAppender.clearScreen(0))
-    if (reader.getCursorBuffer.length > 0) reader.drawLine()
-    else reader.redrawLine()
-    reader.flush()
-  }
 
   private[this] def unsynchronizedReadLine(prompt: String, mask: Option[Char]): Option[String] =
     readLineWithHistory(prompt, mask) map { x =>
