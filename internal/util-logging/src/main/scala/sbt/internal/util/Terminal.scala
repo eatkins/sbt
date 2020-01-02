@@ -663,7 +663,7 @@ object Terminal {
       case bytes if bytes.isEmpty => (0, 0)
       case bytes =>
         val width = getWidth
-        val line = EscHelpers.removeEscapeSequences(new String(bytes))
+        val line = EscHelpers.stripColorsAndMoves(new String(bytes))
         val count = lineCount(line)
         (count, line.length - ((count - 1) * width))
     }
