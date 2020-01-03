@@ -545,6 +545,7 @@ final class NetworkChannel(
   import sjsonnew.BasicJsonProtocol.BooleanJsonFormat
   override def shutdown(logShutdown: Boolean): Unit = {
     log.info(s"Shutting down client connection $name")
+    terminal.close()
     StandardMain.exchange.removeChannel(this)
     pendingTerminalProperties.values.forEach { p =>
       p.add(TerminalPropertiesResponse(0, 0, false, false, false, false))
@@ -553,7 +554,6 @@ final class NetworkChannel(
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
     running.set(false)
-    terminal.close()
     out.close()
   }
   private[this] lazy val pendingTerminalProperties =
@@ -593,19 +593,31 @@ final class NetworkChannel(
   }
   private class NetworkTerminal extends TerminalImpl(inputStream, outputStream, name) {
     def getProperties: TerminalPropertiesResponse = {
-      val id = UUID.randomUUID.toString
-      val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
-      import sbt.protocol.codec.JsonProtocol._
-      pendingTerminalProperties.put(id, queue)
-      jsonRpcNotify("sbt/terminalprops", id)
-      queue.take
+      if (alive.get) {
+        val id = UUID.randomUUID.toString
+        val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
+        import sbt.protocol.codec.JsonProtocol._
+        pendingTerminalProperties.put(id, queue)
+        jsonRpcNotify("sbt/terminalprops", id)
+        queue.take
+      } else throw new InterruptedException
     }
-    override def getWidth: Int = getProperties.width
-    override def getHeight: Int = getProperties.height
-    override def isAnsiSupported: Boolean = getProperties.isAnsiSupported
-    override def isEchoEnabled: Boolean = getProperties.isEchoEnabled
-    override def isColorEnabled: Boolean = getProperties.isColorEnabled
-    override def isSupershellEnabled: Boolean = getProperties.isSupershellEnabled
+    def getProperty[T](f: TerminalPropertiesResponse => T, default: T): T = {
+      val t = Thread.currentThread
+      try {
+        blockedThreads.synchronized(blockedThreads.add(t))
+        f(getProperties)
+      } catch {
+        case _: InterruptedException => default
+      } finally blockedThreads.synchronized(blockedThreads.remove(t))
+    }
+    private[this] val blockedThreads = ConcurrentHashMap.newKeySet[Thread]
+    override def getWidth: Int = getProperty(_.width, 0)
+    override def getHeight: Int = getProperty(_.height, 0)
+    override lazy val isAnsiSupported: Boolean = getProperty(_.isAnsiSupported, false)
+    override def isEchoEnabled: Boolean = getProperty(_.isEchoEnabled, false)
+    override lazy val isColorEnabled: Boolean = getProperty(_.isColorEnabled, false)
+    override lazy val isSupershellEnabled: Boolean = getProperty(_.isSupershellEnabled, false)
     private def getCapability[T](
         capability: String,
         query: String => TerminalCapabilitiesQuery,
@@ -634,6 +646,15 @@ final class NetworkChannel(
         TerminalCapabilitiesQuery(_, boolean = None, numeric = None, string = Some(capability)),
         _.string.orNull
       )
+    override def close(): Unit = {
+      val threads = blockedThreads.synchronized {
+        val t = blockedThreads.asScala.toVector
+        blockedThreads.clear()
+        t
+      }
+      threads.foreach(_.interrupt())
+      super.close()
+    }
   }
   private[sbt] def isAttached: Boolean = attached.get
 }
