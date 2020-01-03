@@ -548,8 +548,7 @@ final class NetworkChannel(
     terminal.close()
     StandardMain.exchange.removeChannel(this)
     pendingTerminalProperties.values.forEach { p =>
-      p.add(TerminalPropertiesResponse(0, 0, false, false, false, false))
-      ()
+      Util.ignoreResult(p.offer(TerminalPropertiesResponse(0, 0, false, false, false, false)))
     }
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
