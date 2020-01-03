@@ -143,6 +143,10 @@ private[sbt] final class CommandExchange {
 
   private def newNetworkName: String = s"network-${nextChannelId.incrementAndGet()}"
 
+  private[sbt] def removeChannel(c: CommandChannel): Unit = channelBufferLock.synchronized {
+    channelBuffer -= c
+  }
+
   /**
    * Check if a server instance is running already, and start one if it isn't.
    */

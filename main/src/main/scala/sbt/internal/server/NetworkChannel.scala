@@ -545,12 +545,15 @@ final class NetworkChannel(
   import sjsonnew.BasicJsonProtocol.BooleanJsonFormat
   override def shutdown(logShutdown: Boolean): Unit = {
     log.info(s"Shutting down client connection $name")
-    pendingTerminalProperties.values.forEach(
-      _.put(TerminalPropertiesResponse(0, 0, false, false, false, false))
-    )
+    StandardMain.exchange.removeChannel(this)
+    pendingTerminalProperties.values.forEach { p =>
+      p.add(TerminalPropertiesResponse(0, 0, false, false, false, false))
+      ()
+    }
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
     running.set(false)
+    terminal.close()
     out.close()
   }
   private[this] lazy val pendingTerminalProperties =
