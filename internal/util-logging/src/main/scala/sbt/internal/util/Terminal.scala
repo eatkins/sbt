@@ -618,35 +618,22 @@ object Terminal {
         writeLock.synchronized {
           lineBuffer.drainTo(bytes)
           import scala.collection.JavaConverters._
+          import ConsoleAppender._
           val remaining = bytes.asScala.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
+            def write(b: Byte): Unit = out.write(b & 0xFF)
             if (i == 10) {
+              val p = Option(prompt).map(_.render()).getOrElse("")
+              if (p.nonEmpty && buf.nonEmpty) s"$DeleteLine$CursorLeft1000".getBytes.foreach(write)
               progressState.addBytes(buf)
               progressState.clearBytes()
 
-              def write(b: Byte): Unit = out.write(b & 0xFF)
-
-              if (getLineHeightAndWidth._2 > 0) {
-                if (buf.nonEmpty) {
-                  if (isAnsiSupported) {
-                    s"${ConsoleAppender.DeleteLine}${ConsoleAppender.CursorLeft1000}".getBytes
-                      .foreach(write)
-                  } else write(10)
-                }
-              }
-              val newBytes = buf.nonEmpty
               buf += i
               buf.foreach(write)
-              val p = if (currentLine.get.nonEmpty && newBytes) {
-                Prompt.render(
-                  new String(currentLine.get.toArray ++ buf),
-                  prompt,
-                  progressState,
-                  TerminalImpl.this,
-                  rawPrintStream
-                )
-              } else ""
               val cl = new ArrayBuffer[Byte]
-              cl ++= p.getBytes
+              if (p.nonEmpty) {
+                p.getBytes.foreach(write)
+                cl ++= p.getBytes
+              }
               currentLine.set(cl)
               new ArrayBuffer[Byte]
             } else buf += i
