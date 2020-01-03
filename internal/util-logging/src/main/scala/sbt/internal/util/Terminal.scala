@@ -604,12 +604,13 @@ object Terminal {
 
     private[sbt] def write(bytes: Int*): Unit = writeableInputStream.write(bytes: _*)
     private[this] val isStopped = new AtomicBoolean(false)
-    private[this] object WriteThread extends Thread("sbt-stdout-write-thread") {
+    private[this] object WriteThread extends Thread(s"sbt-stdout-write-thread-$name") {
       setDaemon(true)
       def close(): Unit = {
         isStopped.set(true)
-        try flushQueue.put(())
-        catch { case _: InterruptedException => }
+        interrupt()
+        runOnce()
+        join()
         ()
       }
       def runOnce(): Unit = {
@@ -690,8 +691,7 @@ object Terminal {
     override def close(): Unit = {
       isStopped.set(true)
       writeableInputStream.close()
-      WriteThread.interrupt()
-      WriteThread.runOnce()
+      WriteThread.close()
     }
   }
 }
