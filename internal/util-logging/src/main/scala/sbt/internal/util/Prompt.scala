@@ -7,8 +7,9 @@
 
 package sbt.internal.util
 
-import java.io.{ OutputStream, PrintStream }
+import java.io.OutputStream
 import java.util.concurrent.LinkedBlockingQueue
+
 import scala.collection.JavaConverters._
 
 private[sbt] sealed trait Prompt {
@@ -30,30 +31,11 @@ private[sbt] object Prompt {
     }
 
     override def render(): String = {
-      s"${ConsoleAppender.DeleteLine}${new String(bytes.asScala.toArray.map(_.toByte))}"
+      s"${ConsoleAppender.DeleteLine}${mkPrompt()}${new String(bytes.asScala.toArray.map(_.toByte))}"
     }
   }
   private[sbt] case object Running extends Prompt {
     override val mkPrompt: () => String = () => ""
     override def render(): String = ""
-  }
-  private[sbt] def render(
-      line: String,
-      prompt: Prompt,
-      progressState: ProgressState,
-      terminal: Terminal,
-      printStream: PrintStream
-  ): String = prompt match {
-    case AskUser(_) =>
-      val res = prompt.render()
-      if (res != line) {
-        printStream.print(ConsoleAppender.DeleteLine + res)
-        printStream.flush()
-        if (progressState.progressLines.get.nonEmpty) progressState.reprint(printStream)
-      }
-      res
-    case _ =>
-      if (progressState.progressLines.get.nonEmpty) progressState.reprint(printStream)
-      ""
   }
 }
