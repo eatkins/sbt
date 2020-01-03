@@ -30,7 +30,7 @@ import sbt.internal.util.Prompt.AskUser
 import sbt.internal.util.Terminal.TerminalImpl
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util.complete.Parser
-import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
+import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal, Util }
 import sbt.protocol._
 import sbt.util.{ Level, Logger }
 import sjsonnew._
@@ -609,7 +609,7 @@ final class NetworkChannel(
         f(getProperties)
       } catch {
         case _: InterruptedException => default
-      } finally blockedThreads.synchronized(blockedThreads.remove(t))
+      } finally Util.ignoreResult(blockedThreads.synchronized(blockedThreads.remove(t)))
     }
     private[this] val blockedThreads = ConcurrentHashMap.newKeySet[Thread]
     override def getWidth: Int = getProperty(_.width, 0)

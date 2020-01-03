@@ -9,7 +9,7 @@ package sbt
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import sbt.internal.util.AttributeKey
+import sbt.internal.util.{ AttributeKey, Util }
 
 /**
  * Describes restrictions on concurrent execution for a set of tasks.
@@ -138,10 +138,7 @@ object ConcurrentRestrictions {
     val pool = Executors.newCachedThreadPool { r =>
       new Thread(r, s"sbt-completion-service-pool-$id-${i.getAndIncrement()}")
     }
-    (completionService[A, R](pool, tags, warn), () => {
-      pool.shutdownNow()
-      ()
-    })
+    (completionService[A, R](pool, tags, warn), () => Util.ignoreResult(pool.shutdownNow()))
   }
 
   /**
