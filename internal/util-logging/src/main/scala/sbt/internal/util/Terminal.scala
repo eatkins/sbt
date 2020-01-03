@@ -612,52 +612,56 @@ object Terminal {
         catch { case _: InterruptedException => }
         ()
       }
-      def runOnce(): Unit =
-        try {
-          val bytes = new java.util.ArrayList[Byte]
-          writeLock.synchronized {
-            lineBuffer.drainTo(bytes)
-            import scala.collection.JavaConverters._
-            val remaining = bytes.asScala.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
-              if (i == 10) {
-                progressState.addBytes(buf)
-                progressState.clearBytes()
-                def write(b: Byte): Unit = out.write(b & 0xFF)
-                if (getLineHeightAndWidth._2 > 0) {
-                  if (buf.nonEmpty) {
-                    if (isAnsiSupported) {
-                      s"${ConsoleAppender.DeleteLine}${ConsoleAppender.CursorLeft1000}".getBytes
-                        .foreach(write)
-                    } else write(10)
-                  }
+      def runOnce(): Unit = {
+        val bytes = new java.util.ArrayList[Byte]
+        writeLock.synchronized {
+          lineBuffer.drainTo(bytes)
+          import scala.collection.JavaConverters._
+          val remaining = bytes.asScala.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
+            if (i == 10) {
+              progressState.addBytes(buf)
+              progressState.clearBytes()
+
+              def write(b: Byte): Unit = out.write(b & 0xFF)
+
+              if (getLineHeightAndWidth._2 > 0) {
+                if (buf.nonEmpty) {
+                  if (isAnsiSupported) {
+                    s"${ConsoleAppender.DeleteLine}${ConsoleAppender.CursorLeft1000}".getBytes
+                      .foreach(write)
+                  } else write(10)
                 }
-                val newBytes = buf.nonEmpty
-                buf += i
-                buf.foreach(write)
-                val p = if (currentLine.get.nonEmpty && newBytes) {
-                  Prompt.render(
-                    prompt,
-                    progressState,
-                    TerminalImpl.this,
-                    rawPrintStream
-                  )
-                } else ""
-                val cl = new ArrayBuffer[Byte]
-                cl ++= p.getBytes
-                currentLine.set(cl)
-                new ArrayBuffer[Byte]
-              } else buf += i
-            }
-            if (remaining.nonEmpty) {
-              currentLine.get ++= remaining
-              out.write(remaining.toArray)
-            }
-            out.flush()
+              }
+              val newBytes = buf.nonEmpty
+              buf += i
+              buf.foreach(write)
+              val p = if (currentLine.get.nonEmpty && newBytes) {
+                Prompt.render(
+                  new String(currentLine.get.toArray ++ buf),
+                  prompt,
+                  progressState,
+                  TerminalImpl.this,
+                  rawPrintStream
+                )
+              } else ""
+              val cl = new ArrayBuffer[Byte]
+              cl ++= p.getBytes
+              currentLine.set(cl)
+              new ArrayBuffer[Byte]
+            } else buf += i
           }
-        } catch { case _: InterruptedException => isStopped.set(true) }
+          if (remaining.nonEmpty) {
+            currentLine.get ++= remaining
+            out.write(remaining.toArray)
+          }
+          out.flush()
+        }
+      }
       @tailrec override def run(): Unit = {
-        flushQueue.take()
-        runOnce()
+        try {
+          flushQueue.take()
+          runOnce()
+        } catch { case _: InterruptedException => isStopped.set(true) }
         if (!isStopped.get) run()
       }
     }
@@ -685,6 +689,7 @@ object Terminal {
 
     override def close(): Unit = {
       isStopped.set(true)
+      writeableInputStream.close()
       WriteThread.interrupt()
       WriteThread.runOnce()
     }
