@@ -53,13 +53,14 @@ object UIThread {
         def clear(): Unit = if (terminal.isAnsiSupported) {
           val dl = ConsoleAppender.DeleteLine
           terminal.printStream.print(
-            dl + ConsoleAppender.clearScreen(0) + ConsoleAppender.CursorLeft1000
+            dl + ConsoleAppender.clearScreen(0) + ConsoleAppender.CursorLeft1000 + prompt.mkPrompt()
           )
           terminal.printStream.flush()
         }
         clear()
         try {
-          val res = lineReader.readLine(prompt.mkPrompt())
+          terminal.setPrompt(prompt)
+          val res = lineReader.readLine("")
           terminal.setPrompt(Prompt.Running)
           res match {
             case null => Left("kill channel")
