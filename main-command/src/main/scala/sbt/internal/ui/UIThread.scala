@@ -50,18 +50,19 @@ object UIThread {
       val lineReader = LineReader.createReader(history(state), terminal, prompt)
       JLineCompletion.installCustomCompletor(lineReader, parser)
       () => {
+        import ConsoleAppender._
         def clear(): Unit = if (terminal.isAnsiSupported) {
-          val dl = ConsoleAppender.DeleteLine
-          terminal.printStream.print(
-            dl + ConsoleAppender.clearScreen(0) + ConsoleAppender.CursorLeft1000 + prompt.mkPrompt()
-          )
-          terminal.printStream.flush()
+          val ps = terminal.printStream
+          ps.print(DeleteLine + clearScreen(0) + CursorLeft1000 + prompt.mkPrompt())
+          ps.flush()
         }
         clear()
         try {
           terminal.setPrompt(prompt)
           val res = lineReader.readLine("")
           terminal.setPrompt(Prompt.Running)
+          terminal.printStream.print(CursorLeft1000 + clearScreen(0))
+          terminal.printStream.flush()
           res match {
             case null => Left("kill channel")
             case s: String =>

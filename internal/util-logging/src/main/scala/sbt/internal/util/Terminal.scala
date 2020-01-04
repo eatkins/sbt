@@ -16,9 +16,10 @@ import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
-import sbt.internal.util.Prompt.AskUser
+import sbt.internal.util.ConsoleAppender.{ CursorLeft1000, DeleteLine }
 
 import scala.annotation.tailrec
+import scala.collection.immutable.VectorBuilder
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
@@ -230,7 +231,7 @@ object Terminal {
     override def read(): Int = in.read() match {
       case -1          => throw new ClosedChannelException
       case r if r >= 0 => r
-      case r           => -1
+      case _           => -1
     }
   }
 
@@ -250,7 +251,7 @@ object Terminal {
 
   /**
    * Runs a thunk ensuring that the terminal has echo enabled. Most of the time sbt should have
-   * echo mode on except when it is explicitly set to raw mode via [[withRawSystemIn]].
+   * echo mode on except when it is explicitly set to raw mode via [[Terminal.withRawSystemIn]].
    *
    * @param f the thunk to run
    * @tparam T the result type of the thunk
@@ -412,10 +413,10 @@ object Terminal {
     System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH).indexOf("windows") >= 0
   private[this] object WrappedSystemIn extends InputStream {
     private[this] val in = nonBlockingIn
-    override def available(): Int = if (attached.get) in.available else 0
+    override def available(): Int = if (attached.get) in.available() else 0
     override def read(): Int = synchronized {
       if (attached.get) {
-        val res = in.read
+        val res = in.read()
         if (res == -1) attached.set(false)
         res
       } else -1
@@ -488,11 +489,7 @@ object Terminal {
   fixTerminalProperty()
 
   private[sbt] def createReader(term: Terminal, prompt: Prompt): ConsoleReader = {
-    val os = prompt match {
-      case a @ AskUser(_) => a.wrappedOutputStream(term.outputStream)
-      case _              => term.outputStream
-    }
-    new ConsoleReader(term.inputStream, os, term.toJLine) {
+    new ConsoleReader(term.inputStream, prompt.wrappedOutputStream(term), term.toJLine) {
       override def readLine(prompt: String, mask: Character): String =
         term.withRawSystemIn(super.readLine(prompt, mask))
       override def readLine(prompt: String): String = term.withRawSystemIn(super.readLine(prompt))
@@ -577,7 +574,7 @@ object Terminal {
       extends Terminal {
     private[this] val currentLine = new AtomicReference(new ArrayBuffer[Byte])
     private[this] val lineBuffer = new LinkedBlockingQueue[Byte]
-    private[this] val flushQueue = new LinkedBlockingQueue[Unit]
+    private[this] val flushQueue = new LinkedBlockingQueue[Seq[Byte]]
     private[this] val writeLock = new AnyRef
     private[this] val writeableInputStream = in match {
       case w: WriteableInputStream => w
@@ -588,7 +585,7 @@ object Terminal {
       override def write(b: Int): Unit = {
         writeLock.synchronized {
           lineBuffer.put(b.toByte)
-          if (b == 10) flushQueue.put(())
+          if (b == 10) flush()
         }
       }
       override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
@@ -597,39 +594,48 @@ object Terminal {
         val hi = math.min(math.max(off + len, 0), b.length)
         (lo until hi).foreach(i => lineBuffer.put(b(i)))
       }
-      override def flush(): Unit = writeLock.synchronized(flushQueue.put(()))
+      val pBytes = s"scala-compile".getBytes
+      override def flush(): Unit = writeLock.synchronized {
+        val res = new VectorBuilder[Byte]
+        while (!lineBuffer.isEmpty) res += lineBuffer.poll
+        val bytes = res.result
+//        if (!bytes.lastOption.contains(10.toByte) && bytes.nonEmpty) {
+//          new Exception(s"flush ${bytes.lastOption} ${bytes.map(_.toChar)}")
+//            .printStackTrace(System.err)
+//        }
+        if (bytes.nonEmpty) flushQueue.put(res.result())
+      }
     }
     override private[sbt] val printStream: PrintStream = new PrintStream(outputStream, true)
     override def inputStream: InputStream = writeableInputStream
 
     private[sbt] def write(bytes: Int*): Unit = writeableInputStream.write(bytes: _*)
     private[this] val isStopped = new AtomicBoolean(false)
+    import scala.collection.JavaConverters._
     private[this] object WriteThread extends Thread(s"sbt-stdout-write-thread-$name") {
       setDaemon(true)
       def close(): Unit = {
         isStopped.set(true)
         interrupt()
-        runOnce()
+        runOnce(lineBuffer.asScala.toVector)
         join()
         ()
       }
-      def runOnce(): Unit = {
-        val bytes = new java.util.ArrayList[Byte]
+      private[this] val clear = s"$DeleteLine$CursorLeft1000"
+      def runOnce(bytes: Seq[Byte]): Unit = {
         writeLock.synchronized {
-          lineBuffer.drainTo(bytes)
-          import scala.collection.JavaConverters._
-          import ConsoleAppender._
-          val remaining = bytes.asScala.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
+          val remaining = bytes.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
             def write(b: Byte): Unit = out.write(b & 0xFF)
             if (i == 10) {
-              val p = Option(prompt).map(_.render()).getOrElse("")
-              if (p.nonEmpty && buf.nonEmpty) s"$DeleteLine$CursorLeft1000".getBytes.foreach(write)
               progressState.addBytes(buf)
               progressState.clearBytes()
-
-              buf += i
+              if (buf.nonEmpty && isAnsiSupported) clear.getBytes.foreach(write)
               buf.foreach(write)
+              write(10)
               val cl = new ArrayBuffer[Byte]
+              val p = Option(prompt)
+                .map(_.render())
+                .getOrElse(if (getLineHeightAndWidth._2 > 0) clear else "")
               if (p.nonEmpty) {
                 p.getBytes.foreach(write)
                 cl ++= p.getBytes
@@ -646,10 +652,8 @@ object Terminal {
         }
       }
       @tailrec override def run(): Unit = {
-        try {
-          flushQueue.take()
-          runOnce()
-        } catch { case _: InterruptedException => isStopped.set(true) }
+        try runOnce(flushQueue.take())
+        catch { case _: InterruptedException => isStopped.set(true) }
         if (!isStopped.get) run()
       }
     }

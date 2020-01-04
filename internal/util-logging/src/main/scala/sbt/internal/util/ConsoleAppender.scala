@@ -464,7 +464,7 @@ class ConsoleAppender private[ConsoleAppender] (
           )
         message.linesIterator.foreach { line =>
           builder.ensureCapacity(
-            labelColor.length + label.length + messageColor.length + line.length + reset.length * 3 + 3
+            labelColor.length + label.length + messageColor.length + line.length + 1 + reset.length * 3 + 3
           )
           builder.setLength(0)
 
@@ -474,6 +474,7 @@ class ConsoleAppender private[ConsoleAppender] (
           fmted(labelColor, label)
           builder.append("] ")
           fmted(messageColor, line)
+          builder.append('\n')
           write(builder.toString)
         }
       }
@@ -487,7 +488,7 @@ class ConsoleAppender private[ConsoleAppender] (
   private def write(msg: String): Unit = {
     val toWrite =
       if (!useFormat || !ansiCodesSupported) EscHelpers.removeEscapeSequences(msg) else msg
-    out.println(toWrite)
+    out.print(toWrite)
   }
 
   private def appendMessage(level: Level.Value, msg: Message): Unit =
