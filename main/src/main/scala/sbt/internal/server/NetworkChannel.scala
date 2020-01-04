@@ -357,12 +357,16 @@ final class NetworkChannel(
   def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
     event match {
       case ConsolePromptEvent(state) if isAttached =>
-        terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
+        terminal.prompt match {
+          case _: AskUser =>
+          case _          => terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
+        }
         reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
-        if (lastSource.fold(true)(_.channelName != name)) {
-          terminal.progressState.reset()
-        } else stopThread()
+        terminal.progressState.reset()
+//        if (lastSource.fold(true)(_.channelName != name)) {
+//          terminal.progressState.reset()
+//        } else stopThread()
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)

@@ -23,9 +23,8 @@ private[sbt] object Prompt {
     private[this] val bytes = new LinkedBlockingQueue[Int]
     override def wrappedOutputStream(terminal: Terminal): OutputStream = new OutputStream {
       override def write(b: Int): Unit = {
-        if (b == 10) {
-          bytes.clear()
-        } else bytes.put(b)
+        if (b == 10) bytes.clear()
+        else bytes.put(b)
         terminal.withPrintStream { p =>
           p.write(b)
           p.flush()
@@ -34,9 +33,7 @@ private[sbt] object Prompt {
       override def flush(): Unit = terminal.withPrintStream(_.flush())
     }
 
-    override def render(): String = {
-      s"${ConsoleAppender.DeleteLine}${new String(bytes.asScala.toArray.map(_.toByte))}"
-    }
+    override def render(): String = new String(bytes.asScala.toArray.map(_.toByte))
   }
   private[sbt] case object Running extends Prompt {
     override val mkPrompt: () => String = () => ""

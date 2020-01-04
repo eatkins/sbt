@@ -28,8 +28,10 @@ private[sbt] final class ConsoleChannel(val name: String) extends CommandChannel
       case ConsolePromptEvent(state) =>
         // Need to stop thread because the ConsoleChannel logs remote commands which screw up
         // the prompt.
-        terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
-        stopThread()
+        terminal.prompt match {
+          case _: AskUser =>
+          case p          => terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
+        }
         reset(state, UserThread.Ready)
       case ConsoleUnpromptEvent(lastSource, state) =>
         if (lastSource.fold(true)(_.channelName != name)) {
