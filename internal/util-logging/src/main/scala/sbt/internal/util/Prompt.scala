@@ -15,19 +15,23 @@ import scala.collection.JavaConverters._
 private[sbt] sealed trait Prompt {
   def mkPrompt: () => String
   def render(): String
+  def wrappedOutputStream(terminal: Terminal): OutputStream
 }
 
 private[sbt] object Prompt {
   private[sbt] case class AskUser(override val mkPrompt: () => String) extends Prompt {
     private[this] val bytes = new LinkedBlockingQueue[Int]
-    def wrappedOutputStream(os: OutputStream): OutputStream = new OutputStream {
+    override def wrappedOutputStream(terminal: Terminal): OutputStream = new OutputStream {
       override def write(b: Int): Unit = {
         if (b == 10) {
           bytes.clear()
         } else bytes.put(b)
-        os.write(b)
+        terminal.withPrintStream { p =>
+          p.write(b)
+          p.flush()
+        }
       }
-      override def flush(): Unit = os.flush()
+      override def flush(): Unit = terminal.withPrintStream(_.flush())
     }
 
     override def render(): String = {
@@ -37,5 +41,6 @@ private[sbt] object Prompt {
   private[sbt] case object Running extends Prompt {
     override val mkPrompt: () => String = () => ""
     override def render(): String = ""
+    override def wrappedOutputStream(terminal: Terminal): OutputStream = terminal.outputStream
   }
 }
