@@ -60,9 +60,10 @@ object UIThread {
         try {
           terminal.setPrompt(prompt)
           val res = lineReader.readLine("")
-          terminal.setPrompt(Prompt.Running)
+          terminal.printStream.write(Int.MinValue)
           terminal.printStream.print(CursorLeft1000 + clearScreen(0))
           terminal.printStream.flush()
+          terminal.setPrompt(Prompt.Running)
           res match {
             case null => Left("kill channel")
             case s: String =>

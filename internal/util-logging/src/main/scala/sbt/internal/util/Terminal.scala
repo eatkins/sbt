@@ -584,7 +584,8 @@ object Terminal {
     override val outputStream: OutputStream = new OutputStream {
       override def write(b: Int): Unit = {
         writeLock.synchronized {
-          lineBuffer.put(b.toByte)
+          if (b == Int.MinValue) currentLine.set(new ArrayBuffer[Byte])
+          else lineBuffer.put(b.toByte)
           if (b == 10) flush()
         }
       }
@@ -633,21 +634,25 @@ object Terminal {
               buf.foreach(write)
               write(10)
               val cl = new ArrayBuffer[Byte]
-              val p = Option(prompt)
-                .map(_.render())
-                .getOrElse(if (getLineHeightAndWidth._2 > 0) clear else "")
-              if (p.nonEmpty) {
-                p.getBytes.foreach(write)
-                cl ++= p.getBytes
+              val pmpt = Option(prompt).map(_.render()).getOrElse("")
+              if (pmpt.nonEmpty) {
+                pmpt.getBytes.foreach(write)
+//                System.err.println(
+//                  s"setting current line to ${pmpt.getBytes.map(_.toChar)} ${pmpt.length}"
+//                )
+                cl ++= pmpt.getBytes
               }
               currentLine.set(cl)
+              progressState.reprint(rawPrintStream)
               new ArrayBuffer[Byte]
             } else buf += i
           }
           if (remaining.nonEmpty) {
+            //System.err.println(s"adding ${remaining.map(_.toChar)} ${remaining.length}")
             currentLine.get ++= remaining
             out.write(remaining.toArray)
           }
+          //System.err.println(s"cl ${currentLine.get.map(_.toChar)} ${currentLine.get.length}")
           out.flush()
         }
       }
