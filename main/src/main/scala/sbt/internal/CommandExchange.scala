@@ -92,6 +92,7 @@ private[sbt] final class CommandExchange {
             commandQueue.add(x)
             slurpMessages()
         }
+      state.foreach(s => channels.foreach(_.publishEventMessage(ConsolePromptEvent(s))))
       commandChannelQueue.poll(1, TimeUnit.SECONDS)
       slurpMessages()
       Option(commandQueue.poll) match {

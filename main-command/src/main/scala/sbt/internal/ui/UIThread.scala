@@ -16,6 +16,7 @@ import sbt.BasicKeys.{ historyPath, newShellPrompt }
 import sbt.State
 import sbt.internal.util.complete.{ JLineCompletion, Parser }
 import sbt.internal.util.{ ConsoleAppender, LineReader, ProgressEvent, Prompt, Terminal }
+import ConsoleAppender.{ ClearScreenFromCursorToBottom, DeleteLine }
 
 import scala.annotation.tailrec
 
@@ -51,17 +52,15 @@ object UIThread {
       JLineCompletion.installCustomCompletor(lineReader, parser)
       () => {
         import ConsoleAppender._
-        def clear(): Unit = if (terminal.isAnsiSupported) {
-          val ps = terminal.printStream
-          ps.print(DeleteLine + clearScreen(0) + CursorLeft1000)
-          ps.flush()
-        }
-        clear()
+        val clear =
+          if (terminal.isAnsiSupported) DeleteLine + ClearScreenFromCursorToBottom + CursorLeft1000
+          else "\n"
         try {
           terminal.setPrompt(prompt)
-          val res = lineReader.readLine(prompt.mkPrompt())
-          terminal.printStream.write(Int.MinValue)
+          val p = prompt.mkPrompt()
+          val res = lineReader.readLine(clear + p)
           terminal.setPrompt(Prompt.Running)
+          terminal.printStream.write(Int.MinValue)
           res match {
             case null => Left("kill channel")
             case s: String =>
@@ -86,6 +85,6 @@ object UIThread {
       case Some(pf) => pf(terminal, s)
       case None =>
         def ansi(s: String): String = if (terminal.isAnsiSupported) s"$s" else ""
-        s"${ansi(ConsoleAppender.DeleteLine)}> ${ansi(ConsoleAppender.clearScreen(0))}"
+        s"${ansi(DeleteLine)}> ${ansi(ClearScreenFromCursorToBottom)}"
     }
 }

@@ -563,6 +563,7 @@ private[sbt] final class ProgressState(
   def reset(): Unit = {
     progressLines.set(Nil)
     padding.set(0)
+    currentLineBytes.set(new ArrayBuffer[Byte])
   }
   private[util] def clearBytes(): Unit = {
     val pad = padding.get
@@ -582,7 +583,14 @@ private[sbt] final class ProgressState(
     }
   }
 
-  private[util] def reprint(printStream: PrintStream): Unit = {
+  private[util] def printPrompt(terminal: Terminal, printStream: PrintStream): Unit =
+    if (terminal.prompt != Prompt.Running) {
+      val prefix = if (terminal.isAnsiSupported) s"$DeleteLine$CursorLeft1000" else ""
+      val pmpt = prefix.getBytes ++ terminal.prompt.render().getBytes
+      pmpt.foreach(b => printStream.write(b & 0xFF))
+    }
+  private[util] def reprint(terminal: Terminal, printStream: PrintStream): Unit = {
+    printPrompt(terminal, printStream)
     if (progressLines.get.nonEmpty) {
       val lines = printProgress(0, 0)
       printStream.print(ClearScreenAfterCursor + lines)
@@ -596,7 +604,7 @@ private[sbt] final class ProgressState(
       val left = cursorLeft(1000) // resets the position to the left
       val offset = width > 0
       val pad = math.max(padding.get - height, 0)
-      val start = clearScreen(0) + (if (offset) ConsoleAppender.cursorRight(1000) + "\n" else "")
+      val start = ClearScreenAfterCursor + (if (offset) cursorRight(1000) + "\n" else "")
       val totalSize = currentLength + blankZone + pad
       val blank = left + s"\n$DeleteLine" * (totalSize - currentLength)
       val lines = previousLines.mkString(DeleteLine, s"\n$DeleteLine", s"\n$DeleteLine")
@@ -605,7 +613,7 @@ private[sbt] final class ProgressState(
       val resetCursor = resetCursorUp + resetCursorRight
       start + blank + lines + resetCursor
     } else {
-      clearScreen(0)
+      ClearScreenAfterCursor
     }
   }
 }
@@ -631,12 +639,16 @@ private[sbt] object ProgressState {
         val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))
         val previousLines = state.progressLines.getAndSet(info)
         val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
-
-        val (height, width) = terminal.getLineHeightAndWidth
+        val (height, width) = terminal.prompt match {
+          case Prompt.Running =>
+            terminal.getLastLine.map(terminal.getLineHeightAndWidth).getOrElse((0, 0))
+          case a => terminal.getLineHeightAndWidth(a.render())
+        }
         val prevSize = prevLength + state.padding.get
 
         val newPadding = math.max(0, prevSize - currentLength)
         state.padding.set(newPadding)
+        state.printPrompt(terminal, ps)
         ps.print(state.printProgress(height, width))
         ps.flush()
       }
