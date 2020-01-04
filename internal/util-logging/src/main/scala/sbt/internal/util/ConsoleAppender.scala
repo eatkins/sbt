@@ -585,8 +585,8 @@ private[sbt] final class ProgressState(
   private[util] def reprint(printStream: PrintStream): Unit = {
     if (progressLines.get.nonEmpty) {
       val lines = printProgress(0, 0)
-      printStream.print(ClearScreenAfterCursor + "\n" + lines)
-    } else printStream.write('\n')
+      printStream.print(ClearScreenAfterCursor + lines)
+    }
   }
 
   private[util] def printProgress(height: Int, width: Int): String = {
@@ -643,31 +643,4 @@ private[sbt] object ProgressState {
     }
   }
 
-<<<<<<< HEAD
-  private[sbt] def set(state: ProgressState): Unit = progressState.set(state)
-
-  private[util] def printProgress(height: Int, width: Int): String = progressState.get match {
-    case null => ""
-    case state =>
-      val previousLines = state.progressLines.get
-      if (previousLines.nonEmpty) {
-        val currentLength = previousLines.foldLeft(0)(_ + Terminal.lineCount(_))
-        val left = cursorLeft(1000) // resets the position to the left
-        val offset = width > 0
-        val pad = math.max(state.padding.get - height, 0)
-        val start = ClearScreenAfterCursor + (if (offset) "\n" else "")
-        val totalSize = currentLength + state.blankZone + pad
-        val blank = left + s"\n$DeleteLine" * (totalSize - currentLength)
-        val lines = previousLines.mkString(DeleteLine, s"\n$DeleteLine", s"\n$DeleteLine")
-        val resetCursorUp = cursorUp(totalSize + (if (offset) 1 else 0))
-        val resetCursorRight = left + (if (offset) cursorRight(width) else "")
-        val resetCursor = resetCursorUp + resetCursorRight
-        start + blank + lines + resetCursor
-      } else {
-        ClearScreenAfterCursor
-      }
-  }
-
-=======
->>>>>>> progress refactor
 }
