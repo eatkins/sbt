@@ -35,7 +35,7 @@ private[sbt] object Prompt {
     }
 
     override def render(): String = {
-      s"${ConsoleAppender.DeleteLine}${mkPrompt()}${new String(bytes.asScala.toArray.map(_.toByte))}"
+      s"${ConsoleAppender.DeleteLine}${new String(bytes.asScala.toArray.map(_.toByte))}"
     }
   }
   private[sbt] case object Running extends Prompt {
