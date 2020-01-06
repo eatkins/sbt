@@ -460,7 +460,7 @@ object Terminal {
     }
     term.restore()
     term.setEchoEnabled(true)
-    new JLineTerminal(term, nonBlockingIn, originalOut)
+    new ConsoleTerminal(term, nonBlockingIn, originalOut)
   }
 
   private[util] def reset(): Unit = {
@@ -505,7 +505,7 @@ object Terminal {
   private[sbt] def deprecatedTeminal: jline.Terminal = console.toJLine
   private[sbt] implicit class TerminalOps(private val term: Terminal) extends AnyVal {
     def toJLine: jline.Terminal with jline.Terminal2 = term match {
-      case t: JLineTerminal => t.term
+      case t: ConsoleTerminal => t.term
       case _ =>
         new jline.Terminal with jline.Terminal2 {
           override def init(): Unit = {}
@@ -535,7 +535,7 @@ object Terminal {
         }
     }
   }
-  private class JLineTerminal(
+  private class ConsoleTerminal(
       val term: jline.Terminal with jline.Terminal2,
       in: InputStream,
       out: OutputStream
