@@ -634,21 +634,25 @@ object Terminal {
               buf.foreach(write)
               write(10)
               val cl = new ArrayBuffer[Byte]
-              val pmpt = Option(prompt).map(_.render()).getOrElse("").getBytes
-              pmpt.foreach(write)
-              cl ++= pmpt
+              val pmpt = Option(prompt).map(_.render()).getOrElse("")
+              if (pmpt.nonEmpty) {
+                pmpt.getBytes.foreach(write)
+//                System.err.println(
+//                  s"setting current line to ${pmpt.getBytes.map(_.toChar)} ${pmpt.length}"
+//                )
+                cl ++= pmpt.getBytes
+              }
               currentLine.set(cl)
               progressState.reprint(rawPrintStream)
               new ArrayBuffer[Byte]
             } else buf += i
           }
           if (remaining.nonEmpty) {
-            val cl = currentLine.get
-            if (!cl.containsSlice(remaining)) {
-              cl ++= remaining
-              out.write(remaining.toArray)
-            }
+            //System.err.println(s"adding ${remaining.map(_.toChar)} ${remaining.length}")
+            currentLine.get ++= remaining
+            out.write(remaining.toArray)
           }
+          //System.err.println(s"cl ${currentLine.get.map(_.toChar)} ${currentLine.get.length}")
           out.flush()
         }
       }
