@@ -69,15 +69,7 @@ abstract class CommandChannel extends HasUserThread {
   private[this] val level = new AtomicReference[Level.Value](Level.Info)
   private[sbt] final def setLevel(l: Level.Value): Unit = level.set(l)
   private[sbt] final def logLevel: Level.Value = level.get
-  private[this] lazy val appender = MainAppender.defaultScreen(terminal)
-  private[this] def mkLogger() = {
-    val log = LogExchange.logger(name, None, None)
-    LogExchange.unbindLoggerAppenders(name)
-    LogExchange.bindLoggerAppenders(name, List(appender -> logLevel))
-    log
-  }
   private[this] def setLevel(value: Level.Value, cmd: String): Boolean = {
-    System.err.println(s"$name set level to $value (was $level)")
     level.set(value)
     append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
   }
