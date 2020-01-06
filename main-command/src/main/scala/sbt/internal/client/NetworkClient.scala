@@ -90,8 +90,10 @@ trait NetworkClientImpl { self =>
               case Some(jvalue) => Converter.fromJson[Boolean](jvalue).getOrElse(true)
               case _            => false
             }
-            if (running.compareAndSet(true, false) && log)
+            if (running.compareAndSet(true, false) && log) {
+              System.err.println()
               console.appendLog(Level.Info, "Remote server exited. Shutting down.")
+            }
             inputThread.close()
             stdinBytes.offer(-1)
             mainThread.interrupt()

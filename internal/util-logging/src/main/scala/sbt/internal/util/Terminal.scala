@@ -588,7 +588,6 @@ object Terminal {
         writeLock.synchronized {
           if (b == Int.MinValue) currentLine.set(new ArrayBuffer[Byte])
           else lineBuffer.put(b.toByte)
-          if (b == 10) System.err.println(s"lb $lineBuffer")
         }
       }
       override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
@@ -596,15 +595,12 @@ object Terminal {
         val lo = math.max(0, off)
         val hi = math.min(math.max(off + len, 0), b.length)
         (lo until hi).foreach(i => lineBuffer.put(b(i)))
-        //if (b.contains(10.toByte)) System.err.println(s"lb $lineBuffer")
       }
       override def flush(): Unit = writeLock.synchronized {
         val res = new VectorBuilder[Byte]
         while (!lineBuffer.isEmpty) res += lineBuffer.poll
         val bytes = res.result
         if (bytes.nonEmpty) {
-//          if (!bytes.lastOption.contains(10.toByte))
-//            new Exception(s"fuck $bytes").printStackTrace(System.err)
           flushQueue.put(res.result())
         }
       }
