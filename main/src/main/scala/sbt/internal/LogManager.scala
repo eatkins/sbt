@@ -248,10 +248,12 @@ object LogManager {
     val gl = s1.globalLogging
     LogExchange.unbindLoggerAppenders(gl.full.name)
     LogExchange.bindLoggerAppenders(gl.full.name, (gl.backed -> level) :: Nil)
+    System.err.println(s"FUCK ${s1.get(Keys.logLevel.key)}")
     s1
   }
 
-  def progressLogger(appender: Appender): ManagedLogger = {
+  @deprecated("No longer used.", "1.4.0")
+  private[sbt] def progressLogger(appender: Appender): ManagedLogger = {
     val log = LogExchange.logger("progress", None, None)
     LogExchange.unbindLoggerAppenders("progress")
     LogExchange.bindLoggerAppenders(

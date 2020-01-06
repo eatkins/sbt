@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
 import sbt.internal.ui.HasUserThread
-import sbt.internal.util.{ MainAppender, ManagedLogger, ProgressEvent, Terminal }
+import sbt.internal.util.{ MainAppender, ManagedLogger, Terminal }
 import sbt.protocol.EventMessage
 import sbt.util.{ Level, LogExchange }
 import sjsonnew.JsonFormat
@@ -67,34 +67,19 @@ abstract class CommandChannel extends HasUserThread {
   def shutdown(): Unit = shutdown(true)
   def name: String
   private[this] val level = new AtomicReference[Level.Value](Level.Info)
-  private[this] val loggerHolder = new AtomicReference[Option[(ManagedLogger, Level.Value)]](None)
-  private[sbt] final def setLevel(l: Level.Value): Unit = loggerHolder.get match {
-    case Some((_, level)) if l == level =>
-    case _ =>
-      level.set(l)
-      mkLogger
-      ()
-  }
+  private[sbt] final def setLevel(l: Level.Value): Unit = level.set(l)
   private[sbt] final def logLevel: Level.Value = level.get
   private[this] lazy val appender = MainAppender.defaultScreen(terminal)
-  private[this] def mkLogger = loggerHolder.get match {
-    case Some((l, level)) if level == logLevel => l
-    case _ =>
-      val log = LogExchange.logger(name, None, None)
-      LogExchange.unbindLoggerAppenders(name)
-      LogExchange.bindLoggerAppenders(name, List(appender -> Level.Info))
-      loggerHolder.set(Some(log -> logLevel))
-      log
+  private[this] def mkLogger() = {
+    val log = LogExchange.logger(name, None, None)
+    LogExchange.unbindLoggerAppenders(name)
+    LogExchange.bindLoggerAppenders(name, List(appender -> logLevel))
+    log
   }
-  private[sbt] final def logger: ManagedLogger = {
-    loggerHolder.get match {
-      case Some((l, _)) => l
-      case None         => mkLogger
-    }
-  }
-  private[this] def setLevel(value: Level.Value, name: String): Boolean = {
+  private[this] def setLevel(value: Level.Value, cmd: String): Boolean = {
+    System.err.println(s"$name set level to $value (was $level)")
     level.set(value)
-    append(Exec(name, Some(Exec.newExecId), Some(CommandSource(name))))
+    append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
   }
   private[sbt] def onLine: String => Boolean = {
     case "error" => setLevel(Level.Error, "error")

@@ -93,7 +93,7 @@ private[sbt] final class CommandExchange {
             slurpMessages()
         }
       state.foreach(s => channels.foreach(_.publishEventMessage(ConsolePromptEvent(s))))
-      commandChannelQueue.poll(1, TimeUnit.SECONDS)
+      commandChannelQueue.take
       slurpMessages()
       Option(commandQueue.poll) match {
         case Some(exec) =>
@@ -151,14 +151,12 @@ private[sbt] final class CommandExchange {
   /**
    * Check if a server instance is running already, and start one if it isn't.
    */
-  private[sbt] def runServer(state: State): State = {
-    val s = Option(lastState.get).getOrElse(state)
+  private[sbt] def runServer(s: State): State = {
     lazy val port = s.get(serverPort).getOrElse(5001)
     lazy val host = s.get(serverHost).getOrElse("127.0.0.1")
     lazy val auth: Set[ServerAuthentication] =
       s.get(serverAuthentication).getOrElse(Set(ServerAuthentication.Token))
     lazy val connectionType = s.get(serverConnectionType).getOrElse(ConnectionType.Tcp)
-    def level: Level.Value = s.get(serverLogLevel).orElse(s.get(logLevel)).getOrElse(Level.Info)
     lazy val handlers = s.get(fullServerHandlers).getOrElse(Nil)
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
