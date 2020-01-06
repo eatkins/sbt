@@ -431,15 +431,17 @@ private[sbt] final class CommandExchange {
               case "attach"                 => mt.channel.publishEventMessage(ConsolePromptEvent(lastState.get))
               case k if k == "kill channel" => mt.channel.shutdown(false)
               case k if k.startsWith("kill") =>
-                val execID = k.split("kill[ ]+").lastOption
-                if (currentExec.get.execId.fold(false)(execID.contains)) {
-                  if (currentExec.get.commandLine.startsWith("console")) {
-                    val kill = s" // console session killed by remote client"
-                    Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
-                    Terminal.get.write(13, 4)
-                  } else {
-                    NetworkChannel.cancel(execID, execID.getOrElse("0"))
-                  }
+                val name = k.split("kill[ ]+").lastOption
+                currentExec.get match {
+                  case null =>
+                  case e if name.contains(e.commandLine) =>
+                    if (currentExec.get.commandLine.startsWith("console")) {
+                      val kill = s" // console session killed by remote client"
+                      Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
+                      Terminal.get.write(13, 4)
+                    } else {
+                      NetworkChannel.cancel(e.execId, e.execId.getOrElse("0"))
+                    }
                 }
               case _ =>
             }

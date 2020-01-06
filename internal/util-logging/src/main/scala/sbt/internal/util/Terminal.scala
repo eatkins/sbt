@@ -129,6 +129,40 @@ trait Terminal extends AutoCloseable {
 }
 
 object Terminal {
+  implicit class TerminalOps(private val term: Terminal) extends AnyVal {
+    def ansi(richString: => String, string: => String): String =
+      if (term.isAnsiSupported) richString else string
+    private[sbt] def toJLine: jline.Terminal with jline.Terminal2 = term match {
+      case t: ConsoleTerminal => t.term
+      case _ =>
+        new jline.Terminal with jline.Terminal2 {
+          override def init(): Unit = {}
+          override def restore(): Unit = {}
+          override def reset(): Unit = {}
+          override def isSupported: Boolean = true
+          override def getWidth: Int = term.getWidth
+          override def getHeight: Int = term.getHeight
+          override def isAnsiSupported: Boolean = term.isAnsiSupported
+          override def wrapOutIfNeeded(out: OutputStream): OutputStream = out
+          override def wrapInIfNeeded(in: InputStream): InputStream = in
+          override def hasWeirdWrap: Boolean = false
+          override def isEchoEnabled: Boolean = term.isEchoEnabled
+          override def setEchoEnabled(enabled: Boolean): Unit = {}
+          override def disableInterruptCharacter(): Unit = {}
+          override def enableInterruptCharacter(): Unit = {}
+          override def getOutputEncoding: String = null
+          override def getBooleanCapability(capability: String): Boolean = {
+            term.getBooleanCapability(capability)
+          }
+          override def getNumericCapability(capability: String): Integer = {
+            term.getNumericCapability(capability)
+          }
+          override def getStringCapability(capability: String): String = {
+            term.getStringCapability(capability)
+          }
+        }
+    }
+  }
   private[sbt] def lineCount(width: Int, line: String): Int = {
     val lines = EscHelpers.stripColorsAndMoves(line).split('\n')
     def count(l: String): Int = {
@@ -503,38 +537,6 @@ object Terminal {
 
   @deprecated("For compatibility only", "1.4.0")
   private[sbt] def deprecatedTeminal: jline.Terminal = console.toJLine
-  private[sbt] implicit class TerminalOps(private val term: Terminal) extends AnyVal {
-    def toJLine: jline.Terminal with jline.Terminal2 = term match {
-      case t: ConsoleTerminal => t.term
-      case _ =>
-        new jline.Terminal with jline.Terminal2 {
-          override def init(): Unit = {}
-          override def restore(): Unit = {}
-          override def reset(): Unit = {}
-          override def isSupported: Boolean = true
-          override def getWidth: Int = term.getWidth
-          override def getHeight: Int = term.getHeight
-          override def isAnsiSupported: Boolean = term.isAnsiSupported
-          override def wrapOutIfNeeded(out: OutputStream): OutputStream = out
-          override def wrapInIfNeeded(in: InputStream): InputStream = in
-          override def hasWeirdWrap: Boolean = false
-          override def isEchoEnabled: Boolean = term.isEchoEnabled
-          override def setEchoEnabled(enabled: Boolean): Unit = {}
-          override def disableInterruptCharacter(): Unit = {}
-          override def enableInterruptCharacter(): Unit = {}
-          override def getOutputEncoding: String = null
-          override def getBooleanCapability(capability: String): Boolean = {
-            term.getBooleanCapability(capability)
-          }
-          override def getNumericCapability(capability: String): Integer = {
-            term.getNumericCapability(capability)
-          }
-          override def getStringCapability(capability: String): String = {
-            term.getStringCapability(capability)
-          }
-        }
-    }
-  }
   private class ConsoleTerminal(
       val term: jline.Terminal with jline.Terminal2,
       in: InputStream,
