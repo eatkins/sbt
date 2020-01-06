@@ -16,7 +16,7 @@ import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
-import sbt.internal.util.ConsoleAppender.{ clearScreen, CursorLeft1000, DeleteLine }
+import sbt.internal.util.ConsoleAppender.{ CursorLeft1000, DeleteLine }
 
 import scala.annotation.tailrec
 import scala.collection.immutable.VectorBuilder
@@ -622,7 +622,7 @@ object Terminal {
         join()
         ()
       }
-      private[this] val clear = s"$DeleteLine${clearScreen(0)}$CursorLeft1000"
+      private[this] val clear = s"$DeleteLine$CursorLeft1000"
       def runOnce(bytes: Seq[Byte]): Unit = {
         writeLock.synchronized {
           val remaining = bytes.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
