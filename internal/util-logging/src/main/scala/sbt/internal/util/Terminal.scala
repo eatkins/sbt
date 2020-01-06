@@ -16,11 +16,7 @@ import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
-import sbt.internal.util.ConsoleAppender.{
-  ClearScreenFromCursorToBottom,
-  CursorLeft1000,
-  DeleteLine
-}
+import sbt.internal.util.ConsoleAppender.{ ClearScreenFromCursorToBottom, CursorLeft1000 }
 
 import scala.annotation.tailrec
 import scala.collection.immutable.VectorBuilder
@@ -590,7 +586,7 @@ object Terminal {
         writeLock.synchronized {
           if (b == Int.MinValue) currentLine.set(new ArrayBuffer[Byte])
           else lineBuffer.put(b.toByte)
-          if (b == 10) flush()
+          if (b == 10) System.err.println(s"lb $lineBuffer")
         }
       }
       override def write(b: Array[Byte]): Unit = write(b, 0, b.length)
@@ -598,12 +594,17 @@ object Terminal {
         val lo = math.max(0, off)
         val hi = math.min(math.max(off + len, 0), b.length)
         (lo until hi).foreach(i => lineBuffer.put(b(i)))
+        //if (b.contains(10.toByte)) System.err.println(s"lb $lineBuffer")
       }
       override def flush(): Unit = writeLock.synchronized {
         val res = new VectorBuilder[Byte]
         while (!lineBuffer.isEmpty) res += lineBuffer.poll
         val bytes = res.result
-        if (bytes.nonEmpty) flushQueue.put(res.result())
+        if (bytes.nonEmpty) {
+//          if (!bytes.lastOption.contains(10.toByte))
+//            new Exception(s"fuck $bytes").printStackTrace(System.err)
+          flushQueue.put(res.result())
+        }
       }
     }
     override private[sbt] val printStream: PrintStream = new PrintStream(outputStream, true)
@@ -621,27 +622,32 @@ object Terminal {
         join()
         ()
       }
-      private[this] val clear = s"$DeleteLine$ClearScreenFromCursorToBottom$CursorLeft1000"
+      private[this] val clear = s"$CursorLeft1000$ClearScreenFromCursorToBottom"
       def runOnce(bytes: Seq[Byte]): Unit = {
+        def write(b: Byte): Unit = out.write(b & 0xFF)
         writeLock.synchronized {
           val remaining = bytes.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
-            def write(b: Byte): Unit = out.write(b & 0xFF)
             if (i == 10) {
               progressState.addBytes(buf)
               progressState.clearBytes()
-              if (buf.nonEmpty && isAnsiSupported) clear.getBytes.foreach(write)
+              val cl = currentLine.get
+              if (buf.nonEmpty && isAnsiSupported && cl.isEmpty) clear.getBytes.foreach(write)
               buf.foreach(write)
               write(10)
+              currentLine.get match {
+                case s if s.nonEmpty => currentLine.set(new ArrayBuffer[Byte])
+                case _               =>
+              }
               progressState.reprint(TerminalImpl.this, rawPrintStream)
               new ArrayBuffer[Byte]
             } else buf += i
           }
           if (remaining.nonEmpty) {
-            //System.err.println(s"adding ${remaining.map(_.toChar)} ${remaining.length}")
-            currentLine.get ++= remaining
+            val cl = currentLine.get
+            if (isAnsiSupported && cl.isEmpty) clear.getBytes.foreach(write)
+            cl ++= remaining
             out.write(remaining.toArray)
           }
-          //System.err.println(s"cl ${currentLine.get.map(_.toChar)} ${currentLine.get.length}")
           out.flush()
         }
       }
@@ -660,9 +666,9 @@ object Terminal {
       (count, position - ((count - 1) * width))
     }
 
-    override def getLastLine: Option[String] = currentLine.get.toArray match {
+    override def getLastLine: Option[String] = currentLine.get match {
       case bytes if bytes.isEmpty => None
-      case bytes                  => Some(new String(bytes))
+      case bytes                  => Some(new String(bytes.toArray))
     }
 
     private[this] val rawPrintStream: PrintStream = new PrintStream(out, true) {
