@@ -16,7 +16,11 @@ import java.util.concurrent.{ Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
-import sbt.internal.util.ConsoleAppender.{ clearScreen, CursorLeft1000, DeleteLine }
+import sbt.internal.util.ConsoleAppender.{
+  ClearScreenFromCursorToBottom,
+  CursorLeft1000,
+  DeleteLine
+}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.VectorBuilder
@@ -49,7 +53,7 @@ trait Terminal extends AutoCloseable {
    *
    * @return the (height, width) pair
    */
-  def getLineHeightAndWidth: (Int, Int)
+  def getLineHeightAndWidth(line: String): (Int, Int)
 
   /**
    * Returns the number of lines that the input string will cover given the current width of the
@@ -58,15 +62,7 @@ trait Terminal extends AutoCloseable {
    * @param line the input line
    * @return the number of lines that the line will cover on the terminal
    */
-  def lineCount(line: String): Int = {
-    val width = getWidth
-    val lines = EscHelpers.removeEscapeSequences(line).split('\n')
-    def count(l: String): Int = {
-      val len = l.length
-      if (width > 0 && len > 0) (len - 1 + width) / width else 0
-    }
-    lines.tail.foldLeft(lines.headOption.fold(0)(count))(_ + count(_))
-  }
+  def lineCount(line: String): Int = Terminal.lineCount(getWidth, line)
 
   /**
    *
@@ -131,12 +127,20 @@ trait Terminal extends AutoCloseable {
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
   private[sbt] def restore(): Unit = {}
   private[sbt] val progressState = new ProgressState(1)
-  private[this] val promptHolder: AtomicReference[Prompt] = new AtomicReference
+  private[this] val promptHolder: AtomicReference[Prompt] = new AtomicReference(Prompt.Running)
   private[sbt] final def prompt: Prompt = promptHolder.get
   private[sbt] final def setPrompt(prompt: Prompt): Unit = promptHolder.set(prompt)
 }
 
 object Terminal {
+  private[sbt] def lineCount(width: Int, line: String): Int = {
+    val lines = EscHelpers.stripColorsAndMoves(line).split('\n')
+    def count(l: String): Int = {
+      val len = l.length
+      if (width > 0 && len > 0) (len - 1 + width) / width else 0
+    }
+    lines.tail.foldLeft(lines.headOption.fold(0)(count))(_ + count(_))
+  }
 
   def close(): Unit = {
     if (System.console == null) {
@@ -170,7 +174,7 @@ object Terminal {
    *
    * @return the (height, width) pair
    */
-  def getLineHeightAndWidth: (Int, Int) = console.getLineHeightAndWidth
+  def getLineHeightAndWidth(line: String): (Int, Int) = console.getLineHeightAndWidth(line)
   def getBooleanCapability(capability: String): Boolean = console.getBooleanCapability(capability)
   def getNumericCapability(capability: String): Int = console.getNumericCapability(capability)
   def getStringCapability(capability: String): String = console.getStringCapability(capability)
@@ -284,7 +288,7 @@ object Terminal {
     private def t: Terminal = currentTerminal.get
     override def getWidth: Int = t.getWidth
     override def getHeight: Int = t.getHeight
-    override def getLineHeightAndWidth: (Int, Int) = t.getLineHeightAndWidth
+    override def getLineHeightAndWidth(line: String): (Int, Int) = t.getLineHeightAndWidth(line)
     override def lineCount(line: String): Int = t.lineCount(line)
     override def inputStream: InputStream = t.inputStream
     override def outputStream: OutputStream = t.outputStream
@@ -595,15 +599,10 @@ object Terminal {
         val hi = math.min(math.max(off + len, 0), b.length)
         (lo until hi).foreach(i => lineBuffer.put(b(i)))
       }
-      val pBytes = s"scala-compile".getBytes
       override def flush(): Unit = writeLock.synchronized {
         val res = new VectorBuilder[Byte]
         while (!lineBuffer.isEmpty) res += lineBuffer.poll
         val bytes = res.result
-//        if (!bytes.lastOption.contains(10.toByte) && bytes.nonEmpty) {
-//          new Exception(s"flush ${bytes.lastOption} ${bytes.map(_.toChar)}")
-//            .printStackTrace(System.err)
-//        }
         if (bytes.nonEmpty) flushQueue.put(res.result())
       }
     }
@@ -622,7 +621,7 @@ object Terminal {
         join()
         ()
       }
-      private[this] val clear = s"$DeleteLine${clearScreen(0)}$CursorLeft1000"
+      private[this] val clear = s"$DeleteLine$ClearScreenFromCursorToBottom$CursorLeft1000"
       def runOnce(bytes: Seq[Byte]): Unit = {
         writeLock.synchronized {
           val remaining = bytes.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
@@ -633,17 +632,7 @@ object Terminal {
               if (buf.nonEmpty && isAnsiSupported) clear.getBytes.foreach(write)
               buf.foreach(write)
               write(10)
-              val cl = new ArrayBuffer[Byte]
-              val pmpt = Option(prompt).map(_.render()).getOrElse("")
-              if (pmpt.nonEmpty) {
-                pmpt.getBytes.foreach(write)
-//                System.err.println(
-//                  s"setting current line to ${pmpt.getBytes.map(_.toChar)} ${pmpt.length}"
-//                )
-                cl ++= pmpt.getBytes
-              }
-              currentLine.set(cl)
-              progressState.reprint(rawPrintStream)
+              progressState.reprint(TerminalImpl.this, rawPrintStream)
               new ArrayBuffer[Byte]
             } else buf += i
           }
@@ -664,13 +653,11 @@ object Terminal {
     }
     WriteThread.start()
 
-    override def getLineHeightAndWidth: (Int, Int) = currentLine.get.toArray match {
-      case bytes if bytes.isEmpty => (0, 0)
-      case bytes =>
-        val width = getWidth
-        val line = EscHelpers.stripColorsAndMoves(new String(bytes))
-        val count = lineCount(line)
-        (count, line.length - ((count - 1) * width))
+    override def getLineHeightAndWidth(line: String): (Int, Int) = {
+      val width = getWidth
+      val position = EscHelpers.cursorPosition(line)
+      val count = (position + width - 1) / width
+      (count, position - ((count - 1) * width))
     }
 
     override def getLastLine: Option[String] = currentLine.get.toArray match {
