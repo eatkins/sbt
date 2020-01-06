@@ -52,9 +52,7 @@ object UIThread {
       JLineCompletion.installCustomCompletor(lineReader, parser)
       () => {
         import ConsoleAppender._
-        val clear =
-          if (terminal.isAnsiSupported) DeleteLine + ClearScreenFromCursorToBottom + CursorLeft1000
-          else "\n"
+        val clear = terminal.ansi(DeleteLine + ClearScreenFromCursorToBottom + CursorLeft1000, "")
         try {
           terminal.setPrompt(prompt)
           val p = prompt.mkPrompt()
@@ -70,7 +68,11 @@ object UIThread {
                   p.flush()
                 case _ =>
               }
-              Right(s)
+              s match {
+                case c if c.startsWith("kill ") => Left(c)
+                case "shutdown"                 => Left("shutdown")
+                case cmd                        => Right(cmd)
+              }
           }
         } catch {
           case _: InterruptedException => Right("")

@@ -552,18 +552,21 @@ private[sbt] final class ProgressState(
     val padding: AtomicInteger,
     val blankZone: Int,
     val currentLineBytes: AtomicReference[ArrayBuffer[Byte]],
+    val currentCommand: AtomicReference[String],
 ) {
   def this(blankZone: Int) =
     this(
       new AtomicReference(Nil),
       new AtomicInteger(0),
       blankZone,
-      new AtomicReference(new ArrayBuffer[Byte])
+      new AtomicReference(new ArrayBuffer[Byte]),
+      new AtomicReference("")
     )
   def reset(): Unit = {
     progressLines.set(Nil)
     padding.set(0)
     currentLineBytes.set(new ArrayBuffer[Byte])
+    currentCommand.set("")
   }
   private[util] def clearBytes(): Unit = {
     val pad = padding.get
@@ -629,11 +632,19 @@ private[sbt] object ProgressState {
    */
   private[sbt] def updateProgressState(pe: ProgressEvent, terminal: Terminal): Unit = {
     val state = terminal.progressState
+    val isRunning = terminal.prompt == Prompt.Running
+    pe.command.foreach(state.currentCommand.set)
     if (terminal.isSupershellEnabled) {
       terminal.withPrintStream { ps =>
-        val info = pe.items.map { item =>
-          val elapsed = item.elapsedMicros / 1000000L
-          s"  | => ${item.name} ${elapsed}s"
+        val info = if (isRunning) {
+          pe.items.map { item =>
+            val elapsed = item.elapsedMicros / 1000000L
+            s"  | => ${item.name} ${elapsed}s"
+          }
+        } else {
+          pe.command.toSeq.map { cmd =>
+            s"sbt server is running `$cmd`. Type `kill $cmd` to stop evaluation."
+          }
         }
 
         val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))

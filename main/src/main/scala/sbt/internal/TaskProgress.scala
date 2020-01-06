@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 /**
  * implements task progress display on the shell.
  */
-private[sbt] final class TaskProgress(execID: Option[String])
+private[sbt] final class TaskProgress(exec: Option[Exec])
     extends AbstractTaskExecuteProgress
     with ExecuteProgress[Task] {
   @deprecated("Use the constructor taking an ExecID.", "1.4.0")
@@ -114,8 +114,9 @@ private[sbt] final class TaskProgress(execID: Option[String])
         .map { case (task, elapsed) => ProgressItem(taskName(task), elapsed) }
         .sortBy(_.elapsedMicros),
       Some(ltc),
-      None,
-      None
+      exec.flatMap(_.source.map(_.channelName)),
+      exec.flatMap(_.execId),
+      exec.map(_.commandLine)
     )
     if (active.nonEmpty) maybeStartThread()
     if (containsSkipTasks(active)) {
