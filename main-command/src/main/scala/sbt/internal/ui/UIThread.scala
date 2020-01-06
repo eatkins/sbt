@@ -57,8 +57,6 @@ object UIThread {
           terminal.setPrompt(prompt)
           val p = prompt.mkPrompt()
           val res = lineReader.readLine(clear + p)
-          terminal.setPrompt(Prompt.Running)
-          terminal.printStream.write(Int.MinValue)
           res match {
             case null => Left("kill channel")
             case s: String =>
@@ -71,7 +69,10 @@ object UIThread {
               s match {
                 case c if c.startsWith("kill ") => Left(c)
                 case "shutdown"                 => Left("shutdown")
-                case cmd                        => Right(cmd)
+                case cmd =>
+                  terminal.setPrompt(Prompt.Running)
+                  terminal.printStream.write(Int.MinValue)
+                  Right(cmd)
               }
           }
         } catch {

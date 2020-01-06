@@ -12,7 +12,7 @@ import java.net.URI
 import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
 import java.util.Properties
 import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sbt.BasicCommandStrings.{ Shell, TemplateCommand }
 import sbt.Project.LoadAction
@@ -122,12 +122,23 @@ object StandardMain {
     pool.foreach(_.shutdownNow())
   }
 
+  private[this] val isShutdown = new AtomicBoolean(false)
+  private[this] val mainThread = new AtomicReference[Thread]
+  private[sbt] def shutdown(): Unit = mainThread.get match {
+    case null =>
+    case t =>
+      if (isShutdown.compareAndSet(false, true)) t.interrupt()
+  }
   def runManaged(s: State): xsbti.MainResult = {
     val previous = TrapExit.installManager()
     try {
       val hook = ShutdownHooks.add(closeRunnable)
       try {
+        mainThread.set(Thread.currentThread)
         MainLoop.runLogged(s)
+      } catch {
+        case _: InterruptedException if isShutdown.get =>
+          new xsbti.Exit { override def code(): Int = 0 }
       } finally {
         try DefaultBackgroundJobService.shutdown()
         finally hook.close()

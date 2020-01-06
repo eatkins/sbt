@@ -422,6 +422,15 @@ private[sbt] final class CommandExchange {
     setDaemon(true)
     start()
     private[this] val isStopped = new AtomicBoolean(false)
+    private[this] def cancel(e: Exec): Unit = {
+      if (e.commandLine.startsWith("console")) {
+        val kill = s" // console session killed by remote client"
+        Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
+        Terminal.get.write(13, 4)
+      } else {
+        NetworkChannel.cancel(e.execId, e.execId.getOrElse("0"))
+      }
+    }
     override def run(): Unit = {
       @tailrec def impl(): Unit = {
         maintenanceChannelQueue.take match {
@@ -432,17 +441,15 @@ private[sbt] final class CommandExchange {
               case k if k == "kill channel" => mt.channel.shutdown(false)
               case k if k.startsWith("kill") =>
                 val name = k.split("kill[ ]+").lastOption
-                currentExec.get match {
-                  case null =>
-                  case e if name.contains(e.commandLine) =>
-                    if (currentExec.get.commandLine.startsWith("console")) {
-                      val kill = s" // console session killed by remote client"
-                      Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
-                      Terminal.get.write(13, 4)
-                    } else {
-                      NetworkChannel.cancel(e.execId, e.execId.getOrElse("0"))
-                    }
-                }
+                Option(currentExec.get).filter(e => name.contains(e.commandLine)).foreach(cancel)
+              case "shutdown" =>
+                Option(currentExec.get).foreach(cancel)
+                commandQueue.clear()
+                commandChannelQueue.clear()
+                channels.headOption.foreach(c => commandChannelQueue.add(c))
+                commandQueue.add(
+                  Exec("shutdown", Some(Exec.newExecId), Some(CommandSource("console0")))
+                )
               case _ =>
             }
         }
