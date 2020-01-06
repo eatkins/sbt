@@ -74,14 +74,8 @@ object ConsoleOut {
 
   def terminalOut: ConsoleOut = new ConsoleOut {
     override val lockObject: AnyRef = System.out
-    override def print(s: String): Unit = {
-      System.err.println(s"Aargh print '$s'")
-      Terminal.get.printStream.print(s)
-    }
-    override def println(s: String): Unit = {
-      System.err.println(s"Aargh println '$s'")
-      Terminal.get.printStream.println(s)
-    }
+    override def print(s: String): Unit = Terminal.get.printStream.print(s)
+    override def println(s: String): Unit = Terminal.get.printStream.println(s)
     override def println(): Unit = Terminal.get.printStream.println()
     override def flush(): Unit = Terminal.get.printStream.flush()
   }
