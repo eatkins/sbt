@@ -10,16 +10,16 @@ package sbt
 import java.io.PrintWriter
 import java.util.Properties
 
-import sbt.internal.{ Aggregation, CommandChannel, ConsoleUnpromptEvent, ShutdownHooks }
 import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.server.NetworkChannel
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Terminal }
+import sbt.internal.{ Aggregation, CommandChannel, ConsoleUnpromptEvent, ShutdownHooks }
 import sbt.io.{ IO, Using }
+import sbt.nio.Keys._
 import sbt.protocol._
 import sbt.util.Logger
-import sbt.nio.Keys._
 
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
