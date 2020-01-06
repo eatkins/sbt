@@ -131,7 +131,9 @@ object MainLoop {
   /** Runs the next sequence of commands that doesn't require global logging changes. */
   @tailrec def run(state: State): RunNext =
     state.next match {
-      case State.Continue       => run(next(state))
+      case State.Continue => {
+        run(next(state))
+      }
       case State.ClearGlobalLog => new ClearGlobalLog(state.continue)
       case State.KeepLastLog    => new KeepGlobalLog(state.continue)
       case ret: State.Return    => new Return(ret.result)
@@ -223,7 +225,7 @@ object MainLoop {
         newState.remove(sbt.Keys.currentTaskProgress)
       }
       // The split on space is to handle 'reboot full' and 'reboot'.
-      state.currentCommand.flatMap(_.commandLine.trim.split(" ").headOption) match {
+      val res = state.currentCommand.flatMap(_.commandLine.trim.split(" ").headOption) match {
         case Some("reload") =>
           // Reset the hasCheckedMetaBuild parameter so that the next call to checkBuildSources
           // updates the previous cache for checkBuildSources / fileInputStamps but doesn't log.
@@ -242,6 +244,7 @@ object MainLoop {
             case _ => process()
           }
       }
+      res
     } catch {
       case err: JsonRpcResponseError =>
         StandardMain.exchange.respondError(err, exec.execId, channelName.map(CommandSource(_)))
