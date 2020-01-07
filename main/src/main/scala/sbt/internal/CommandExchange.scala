@@ -448,7 +448,7 @@ private[sbt] final class CommandExchange {
                 commandChannelQueue.clear()
                 channels.headOption.foreach(c => commandChannelQueue.add(c))
                 commandQueue.add(
-                  Exec("shutdown", Some(Exec.newExecId), Some(CommandSource("console0")))
+                  Exec("exit", Some(Exec.newExecId), Some(CommandSource("console0")))
                 )
               case _ =>
             }
