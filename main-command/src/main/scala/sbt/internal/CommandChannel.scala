@@ -12,9 +12,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
 import sbt.internal.ui.HasUserThread
-import sbt.internal.util.{ MainAppender, ManagedLogger, Terminal }
+import sbt.internal.util.Terminal
 import sbt.protocol.EventMessage
-import sbt.util.{ Level, LogExchange }
+import sbt.util.Level
+import scala.collection.JavaConverters._
 import sjsonnew.JsonFormat
 
 /**
@@ -24,15 +25,18 @@ import sjsonnew.JsonFormat
  */
 abstract class CommandChannel extends HasUserThread {
   private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
-  private val registered: java.util.Set[java.util.Queue[CommandChannel]] = new java.util.HashSet
+  private val registered: java.util.Set[java.util.Queue[Exec]] = new java.util.HashSet
   private val maintenance: java.util.Set[java.util.Queue[MaintenanceTask]] = new java.util.HashSet
   private[sbt] final def register(
-      queue: java.util.Queue[CommandChannel],
+      queue: java.util.Queue[Exec],
       maintenanceQueue: java.util.Queue[MaintenanceTask]
   ): Unit =
     registered.synchronized {
       registered.add(queue)
-      if (!commandQueue.isEmpty) queue.add(this)
+      if (!commandQueue.isEmpty) {
+        queue.addAll(commandQueue)
+        commandQueue.clear()
+      }
       maintenance.add(maintenanceQueue)
       ()
     }
@@ -51,9 +55,8 @@ abstract class CommandChannel extends HasUserThread {
   private[sbt] def terminal: Terminal
   def append(exec: Exec): Boolean = registered.synchronized {
     exec.commandLine.nonEmpty && {
-      val res = commandQueue.add(exec)
-      if (res) registered.forEach(q => q.synchronized { q.add(this); () })
-      res
+      if (registered.isEmpty) commandQueue.add(exec)
+      else registered.asScala.forall(_.add(exec))
     }
   }
   def poll: Option[Exec] = Option(commandQueue.poll)

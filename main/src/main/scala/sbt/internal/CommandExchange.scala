@@ -11,7 +11,7 @@ package internal
 import java.io.IOException
 import java.net.Socket
 import java.util.concurrent.atomic._
-import java.util.concurrent.{ ConcurrentLinkedQueue, LinkedBlockingQueue, TimeUnit }
+import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
 
 import sbt.BasicKeys._
 import sbt.nio.Watch.NullLogger
@@ -19,12 +19,12 @@ import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
 import sbt.internal.util.codec.JValueFormats
-import sbt.internal.util.{ ObjectEvent, ProgressEvent, ProgressState, StringEvent, Terminal }
+import sbt.internal.util._
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
 import sbt.nio.Watch.NullLogger
 import sbt.protocol.{ EventMessage, ExecStatusEvent }
-import sbt.util.{ Level, Logger }
+import sbt.util.Logger
 import sjsonnew.JsonFormat
 import sjsonnew.shaded.scalajson.ast.unsafe._
 
@@ -46,10 +46,9 @@ private[sbt] final class CommandExchange {
   private var server: Option[ServerInstance] = None
   private val firstInstance: AtomicBoolean = new AtomicBoolean(true)
   private var consoleChannel: Option[ConsoleChannel] = None
-  private val commandQueue: ConcurrentLinkedQueue[Exec] = new ConcurrentLinkedQueue()
+  private val commandQueue: LinkedBlockingQueue[Exec] = new LinkedBlockingQueue[Exec]
   private val channelBuffer: ListBuffer[CommandChannel] = new ListBuffer()
   private val channelBufferLock = new AnyRef {}
-  private val commandChannelQueue = new LinkedBlockingQueue[CommandChannel]
   private val maintenanceChannelQueue = new LinkedBlockingQueue[MaintenanceTask]
   private val nextChannelId: AtomicInteger = new AtomicInteger(0)
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
@@ -70,7 +69,7 @@ private[sbt] final class CommandExchange {
 
   def subscribe(c: CommandChannel): Unit = channelBufferLock.synchronized {
     channelBuffer.append(c)
-    c.register(commandChannelQueue, maintenanceChannelQueue)
+    c.register(commandQueue, maintenanceChannelQueue)
   }
 
   private[sbt] def withState[T](f: State => T): T = f(lastState.get)
@@ -85,17 +84,13 @@ private[sbt] final class CommandExchange {
   ): Exec = {
     state.foreach(lastState.set)
     @tailrec def impl(deadline: Option[Deadline]): Exec = {
-      @tailrec def slurpMessages(): Unit =
-        channels.foldLeft(Option.empty[Exec]) { _ orElse _.poll } match {
-          case None => ()
-          case Some(x) =>
-            commandQueue.add(x)
-            slurpMessages()
-        }
       state.foreach(s => channels.foreach(_.publishEventMessage(ConsolePromptEvent(s))))
-      commandChannelQueue.take
-      slurpMessages()
-      Option(commandQueue.poll) match {
+      def poll: Option[Exec] =
+        Option(deadline match {
+          case Some(d: Deadline) => commandQueue.poll(d.timeLeft.toMillis, TimeUnit.MILLISECONDS)
+          case _                 => commandQueue.take
+        })
+      poll match {
         case Some(exec) =>
           exec.commandLine match {
             case "shutdown" => exec.withCommandLine("exit")
@@ -445,11 +440,8 @@ private[sbt] final class CommandExchange {
               case "shutdown" =>
                 Option(currentExec.get).foreach(cancel)
                 commandQueue.clear()
-                commandChannelQueue.clear()
-                channels.headOption.foreach(c => commandChannelQueue.add(c))
-                commandQueue.add(
-                  Exec("exit", Some(Exec.newExecId), Some(CommandSource("console0")))
-                )
+                val exit = Exec("exit", Some(Exec.newExecId), Some(CommandSource(mt.channel.name)))
+                commandQueue.add(exit)
               case _ =>
             }
         }
