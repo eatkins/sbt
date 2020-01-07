@@ -657,11 +657,12 @@ object Terminal {
     }
     WriteThread.start()
 
-    override def getLineHeightAndWidth(line: String): (Int, Int) = {
-      val width = getWidth
-      val position = EscHelpers.cursorPosition(line)
-      val count = (position + width - 1) / width
-      (count, position - ((count - 1) * width))
+    override def getLineHeightAndWidth(line: String): (Int, Int) = getWidth match {
+      case width if width > 0 =>
+        val position = EscHelpers.cursorPosition(line)
+        val count = (position + width - 1) / width
+        (count, position - ((count - 1) * width))
+      case _ => (0, 0)
     }
 
     override def getLastLine: Option[String] = currentLine.get match {
