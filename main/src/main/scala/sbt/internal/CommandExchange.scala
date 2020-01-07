@@ -140,7 +140,7 @@ private[sbt] final class CommandExchange {
   private def newNetworkName: String = s"network-${nextChannelId.incrementAndGet()}"
 
   private[sbt] def removeChannel(c: CommandChannel): Unit = channelBufferLock.synchronized {
-    channelBuffer -= c
+    Util.ignoreResult(channelBuffer -= c)
   }
 
   /**
@@ -423,7 +423,7 @@ private[sbt] final class CommandExchange {
         Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
         Terminal.get.write(13, 4)
       } else {
-        NetworkChannel.cancel(e.execId, e.execId.getOrElse("0"))
+        Util.ignoreResult(NetworkChannel.cancel(e.execId, e.execId.getOrElse("0")))
       }
     }
     override def run(): Unit = {

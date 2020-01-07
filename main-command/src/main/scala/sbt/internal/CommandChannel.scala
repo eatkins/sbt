@@ -11,10 +11,11 @@ package internal
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
-import sbt.internal.ui.HasUserThread
+import sbt.internal.ui.{ HasUserThread, UIThread }
 import sbt.internal.util.Terminal
 import sbt.protocol.EventMessage
 import sbt.util.Level
+
 import scala.collection.JavaConverters._
 import sjsonnew.JsonFormat
 
@@ -92,6 +93,8 @@ abstract class CommandChannel extends HasUserThread {
     })
     true
   }
+
+  override private[sbt] def makeWatchThread(s: State): UIThread = ???
 }
 
 // case class Exec(commandLine: String, source: Option[CommandSource])

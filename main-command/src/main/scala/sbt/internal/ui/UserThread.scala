@@ -15,6 +15,7 @@ import sbt.internal.util.{ ProgressEvent, Terminal }
 private[sbt] object UserThread {
   sealed trait UIState
   case object Ready extends UIState
+  case object Watch extends UIState
 }
 
 private[sbt] trait HasUserThread {
@@ -27,6 +28,7 @@ private[sbt] trait HasUserThread {
     case null => terminal.progressState.reset()
     case t    => t.onProgressEvent(pe, terminal)
   }
+  private[sbt] def makeWatchThread(s: State): UIThread
 
   private[sbt] def makeAskUserThread(s: State, uiState: UserThread.UIState): UIThread =
     uiState match {
@@ -38,6 +40,7 @@ private[sbt] trait HasUserThread {
           onLine,
           onMaintenance
         )
+      case UserThread.Watch => makeWatchThread(s)
     }
 
   private[sbt] def reset(state: State, uiState: UserThread.UIState): Unit = {
