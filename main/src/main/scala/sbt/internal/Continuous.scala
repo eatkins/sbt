@@ -10,6 +10,7 @@ package internal
 
 import java.io.{ ByteArrayInputStream, IOException, InputStream, File => _ }
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
 
 import sbt.BasicCommandStrings._
@@ -34,6 +35,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration.FiniteDurationIsOrdered
 import scala.concurrent.duration._
 import scala.util.Try
+import scala.util.control.NonFatal
 
 /**
  * Provides the implementation of the `~` command and `watch` task. The implementation is quite
@@ -101,8 +103,8 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   private[sbt] def continuous: Command =
     Command(ContinuousExecutePrefix, continuousBriefHelp, continuousDetail)(continuousParser) {
       case (s, (initialCount, commands)) =>
-        println(s"huh ${s.currentCommand}")
-        s"${ContinuousCommands.preWatch} $initialCount ${commands.mkString("; ")}" :: s
+        val channel = s.currentCommand.flatMap(_.source.map(_.channelName)).getOrElse("anonymous")
+        s"${ContinuousCommands.preWatch} $channel ${commands.mkString("; ")}" :: s
       //runToTermination(s, commands, initialCount, isCommand = true)
     }
 
@@ -318,11 +320,9 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       isCommand: Boolean
   ): State = withCharBufferedStdIn { in =>
     implicit val extracted: Extracted = Project.extract(state)
-    val repo = if ("polling" == SysProp.watchMode) {
-      val service = new PollingWatchService(extracted.getOpt(pollInterval).getOrElse(500.millis))
-      FileTreeRepository.legacy((_: Any) => {}, service)
-    } else {
-      FileTreeRepository.default
+    val repo = state.get(globalFileTreeRepository) match {
+      case Some(r) => localRepo(r)
+      case _       => throw new IllegalStateException(s"No file tree repository was found for $state")
     }
     val fileStampCache = new FileStamp.Cache
     repo.addObserver(t => fileStampCache.invalidate(t.path))
@@ -1104,6 +1104,31 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       underlying.register(glob)
     override def close(): Unit = underlying.close()
   }
+
+  /*
+   * Creates a FileTreeRepository where it is safe to call close without inadvertently cancelling
+   * still active watches.
+   */
+  private[this] def localRepo[T](r: FileTreeRepository[T]): FileTreeRepository[T] =
+    new FileTreeRepository[T] {
+      private[this] val closeables = ConcurrentHashMap.newKeySet[AutoCloseable]
+      override def addObserver(observer: Observer[FileEvent[T]]): AutoCloseable = {
+        val ac = r.addObserver(observer)
+        closeables.add(ac)
+        () => {
+          closeables.remove(ac)
+          ac.close()
+        }
+      }
+
+      override def register(glob: Glob): Either[IOException, Observable[FileEvent[T]]] =
+        r.register(glob)
+      override def close(): Unit = closeables.forEach { c =>
+        try c.close()
+        catch { case NonFatal(_) => }
+      }
+      override def list(path: Path): Seq[(Path, T)] = r.list(path)
+    }
 }
 
 private[sbt] object ContinuousCommands {
@@ -1128,7 +1153,7 @@ private[sbt] object ContinuousCommands {
               }
             case None => state
           }
-          StashOnFailure :: cmd :: FailureWall :: s"__postWatch $name" :: PopOnFailure :: s
+          StashOnFailure :: cmd :: FailureWall :: s"__postWatch $channel" :: PopOnFailure :: s
         }
     }
   }) { case (_, newState) => newState() }
