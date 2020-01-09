@@ -17,14 +17,14 @@ import sbt.BasicCommandStrings._
 import sbt.Def._
 import sbt.Keys._
 import sbt.Scope.Global
-import sbt.internal.Continuous.FileStampRepository
+import sbt.internal.Continuous.{ ContinuousState, FileStampRepository }
 import sbt.internal.LabeledFunctions._
 import sbt.internal.io.WatchState
 import sbt.internal.nio._
-import sbt.internal.util.complete.DefaultParsers.{ OptSpace, any, matched }
+import sbt.internal.util.complete.DefaultParsers.{ IntBasic, OptSpace, Space, any, matched }
 import sbt.internal.util.complete.Parser._
 import sbt.internal.util.complete.{ Parser, Parsers }
-import sbt.internal.util.{ AttributeKey, Terminal }
+import sbt.internal.util.{ AttributeKey, Terminal, Util }
 import sbt.nio.Keys.{ fileInputs, _ }
 import sbt.nio.Watch.{ Creation, Deletion, ShowOptions, Update }
 import sbt.nio.file.{ FileAttributes, Glob }
@@ -105,7 +105,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     Command(ContinuousExecutePrefix, continuousBriefHelp, continuousDetail)(continuousParser) {
       case (s, (initialCount, commands)) =>
         val channel = s.currentCommand.flatMap(_.source.map(_.channelName)).getOrElse("anonymous")
-        s"${ContinuousCommands.preWatch} $channel ${commands.mkString("; ")}" :: s
+        s"${ContinuousCommands.setupWatch} $channel $initialCount ${commands.mkString("; ")}" :: s
       //runToTermination(s, commands, initialCount, isCommand = true)
     }
 
@@ -305,14 +305,18 @@ private[sbt] object Continuous extends DeprecatedContinuous {
             val configs = getAllConfigs(valid.map(v => v._1 -> v._2))
             val callbacks =
               aggregate(configs, logger, in, s, currentCount, isCommand, commands, fileStampCache)
-            val task = () => {
-              currentCount.getAndIncrement()
-              callbacks.beforeCommand()
-              // abort as soon as one of the tasks fails
-              valid.takeWhile { case (_, _, task) => task() }
-              updateLegacyWatchState(s, configs.flatMap(_.inputs().map(_.glob)), currentCount.get())
-              ()
-            }
+            val task = () =>
+              Util.ignoreResult {
+                currentCount.getAndIncrement()
+                callbacks.beforeCommand()
+                // abort as soon as one of the tasks fails
+                valid.takeWhile { case (_, _, task) => task() }
+                updateLegacyWatchState(
+                  s,
+                  configs.flatMap(_.inputs().map(_.glob)),
+                  currentCount.get()
+                )
+              }
             try {
               // Here we enter the Watched.watch state machine. We will not return until one of the
               // state machine callbacks returns Watched.CancelWatch, Watched.Custom, Watched.HandleError
@@ -1068,76 +1072,126 @@ private[sbt] object Continuous extends DeprecatedContinuous {
 
   private[sbt] final class ContinuousState(
       val count: Int,
-      val persistStamps: Boolean,
-      val filestampCache: FileStamp.Cache
-  )
+      val command: String,
+      val beforeCommand: State => State,
+      val afterCommand: State => State,
+      val afterWatch: State => State,
+  ) {
+    def withCount(c: Int): ContinuousState =
+      new ContinuousState(c, command, beforeCommand, afterCommand, afterWatch)
+  }
 }
 
 private[sbt] object ContinuousCommands {
   private[sbt] def value: Seq[Command] =
-    preWatchCommand :: postWatchCommand :: stopWatchCommand :: Nil
-  private[this] val watchFileStampCaches = new ConcurrentHashMap[String, FileStamp.Cache]
+    setupWatchCommand :: preWatchCommand :: postWatchCommand :: stopWatchCommand :: Nil
   private[sbt] val watchStateCallbacks =
     AttributeKey[java.util.Map[String, (State => State, State => State)]](
       "sbt-watch-state-callbacks",
       "",
       Int.MaxValue
     )
+  private[this] val watchStates = new ConcurrentHashMap[String, ContinuousState]
+  private[sbt] val setupWatch = "__setupWatch"
   private[sbt] val preWatch = "__preWatch"
   private[sbt] val postWatch = "__postWatch"
   private[sbt] val beforeCommand = "__beforeCommand"
   private[sbt] val stopWatch = "__stopCommand"
   private[this] def nameParser: Parser[String] = matched(charClass(_.isLetterOrDigit).+)
 
-  private[this] val initializeWatchState: FileStamp.Cache => State => State = cache =>
-    state => {
-      val extracted = Project.extract(state)
-      val repo = state.get(globalFileTreeRepository) match {
-        case Some(r) => localRepo(r)
-        case _       => throw new IllegalStateException(s"No file tree repository was found for $state")
+  private[this] val stashedRepo = AttributeKey[FileTreeRepository[FileAttributes]](
+    "stashed-file-tree-repository",
+    "",
+    Int.MaxValue
+  )
+  private[this] val setupWatchState: (String, Int, String) => State => Unit =
+    (channelName, count, command) =>
+      state => {
+        watchStates.get(channelName) match {
+          case null =>
+            val extracted = Project.extract(state)
+            val repo = state.get(globalFileTreeRepository) match {
+              case Some(r) => localRepo(r)
+              case _ =>
+                throw new IllegalStateException(s"No file tree repository was found for $state")
+            }
+            val cache = new FileStamp.Cache
+            repo.addObserver(t => cache.invalidate(t.path))
+            val persistFileStamps = extracted.get(watchPersistFileStamps)
+            val cachingRepo: FileTreeRepository[FileAttributes] =
+              if (persistFileStamps) repo else new FileStampRepository(cache, repo)
+            val s = new ContinuousState(
+              count,
+              command,
+              state => {
+                val original = state
+                  .get(globalFileTreeRepository)
+                  .getOrElse(
+                    throw new IllegalStateException(
+                      s"No global file tree repository for state $state"
+                    )
+                  )
+                val stateWithRepo =
+                  state.put(globalFileTreeRepository, cachingRepo).put(stashedRepo, original)
+                if (persistFileStamps) stateWithRepo.put(persistentFileStampCache, cache)
+                else stateWithRepo
+              },
+              state => {
+                watchStates.get(channelName) match {
+                  case null =>
+                  case ws   => watchStates.put(channelName, ws.withCount(ws.count + 1))
+                }
+                val restoredState = state.get(stashedRepo) match {
+                  case None    => throw new IllegalStateException(s"No stashed repository for $state")
+                  case Some(r) => state.put(globalFileTreeRepository, r)
+                }
+                restoredState.remove(persistentFileStampCache)
+              },
+              state => {
+                repo.close()
+                state
+              }
+            )
+            Util.ignoreResult(watchStates.put(channelName, s))
+          case cs =>
+            val msg =
+              s"Tried to start new watch while channel, '$channelName', was already watching '${cs.command}'"
+            throw new IllegalStateException(msg)
+        }
       }
-      repo.addObserver(t => cache.invalidate(t.path))
-      val persistFileStamps = extracted.get(watchPersistFileStamps)
-      val cachingRepo: FileTreeRepository[FileAttributes] =
-        if (persistFileStamps) repo else new FileStampRepository(cache, repo)
-      val stateWithRepo = state.put(globalFileTreeRepository, cachingRepo)
-      Continuous.addLegacyWatchSetting(
-        if (persistFileStamps) stateWithRepo.put(persistentFileStampCache, cache)
-        else stateWithRepo
-      )
-    }
-  private[this] val afterCommand: State => State = state => {
-    state.get(globalFileTreeRepository).foreach(_.close())
-    val repo = state
-      .get(stashedGlobalFileTreeRepository)
-      .getOrElse(throw new IllegalStateException("No global file tree repository found"))
-    state.remove(persistentFileStampCache).put(globalFileTreeRepository, repo)
-  }
-
-  private[this] val preWatchCommand = Command.arb(state => {
-    ((matched(preWatch) <~ OptSpace) ~> nameParser ~ (OptSpace ~> matched(any.*))).examples().map {
-      case (channel, cmd) =>
+  private[this] val setupWatchCommand = Command.arb(state => {
+    ((matched(setupWatch) <~ Space.+) ~> nameParser ~ (Space.+ ~> IntBasic) ~ (Space.+ ~> matched(
+      any.*
+    ))).examples().map {
+      case ((channel, count), cmd) =>
         () => {
-          val filestampCache = new FileStamp.Cache
-          val cache = watchFileStampCaches.putIfAbsent(channel, filestampCache) match {
-            case null => filestampCache
-            case c    => c
-          }
-          val init = initializeWatchState(cache)(state)
-          StashOnFailure :: cmd :: FailureWall :: s"__postWatch $channel" :: PopOnFailure :: init
+          setupWatchState(channel, count, cmd)(state)
+          StashOnFailure :: s"$preWatch $channel" :: cmd :: FailureWall :: PopOnFailure ::
+            s"$postWatch $channel" :: state
         }
     }
   }) { case (_, newState) => newState() }
+  private[this] val preWatchCommand = Command.arb(state => {
+    ((matched(preWatch) <~ OptSpace) ~> nameParser).examples().map { channel => () =>
+      watchStates.get(channel) match {
+        case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
+        case cs   => cs.beforeCommand(state)
+      }
+    }
+  }) { case (_, newState) => newState() }
   private[this] val postWatchCommand = Command.arb(state => {
-    (matched(postWatch) <~ OptSpace).examples().map { _ => () =>
-      afterCommand(state)
+    ((matched(postWatch) <~ OptSpace) ~> nameParser).examples().map { channel => () =>
+      watchStates.get(channel) match {
+        case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
+        case cs   => cs.afterCommand(state)
+      }
     }
   }) { case (_, newState) => newState() }
   private[this] val stopWatchCommand = Command.arb(state => {
     ((matched(stopWatch) <~ OptSpace) ~> nameParser).examples().map { channel => () =>
-      {
-        watchFileStampCaches.remove(channel)
-        state
+      watchStates.get(channel) match {
+        case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
+        case cs   => cs.afterWatch(state)
       }
     }
   }) { (_, s) =>
