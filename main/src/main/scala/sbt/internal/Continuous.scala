@@ -12,14 +12,7 @@ import java.io.{ ByteArrayInputStream, IOException, InputStream, File => _ }
 import java.nio.file.Path
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
 
-import sbt.BasicCommandStrings.{
-  ContinuousExecutePrefix,
-  FailureWall,
-  PopOnFailure,
-  StashOnFailure,
-  continuousBriefHelp,
-  continuousDetail
-}
+import sbt.BasicCommandStrings._
 import sbt.Def._
 import sbt.Keys._
 import sbt.Scope.Global
@@ -28,7 +21,6 @@ import sbt.internal.io.WatchState
 import sbt.internal.nio._
 import sbt.internal.util.complete.DefaultParsers.{ OptSpace, any, matched }
 import sbt.internal.util.complete.Parser._
-import sbt.internal.util.complete.Parsers._
 import sbt.internal.util.complete.{ Parser, Parsers }
 import sbt.internal.util.{ AttributeKey, Terminal, Util }
 import sbt.nio.Keys.{ fileInputs, _ }
@@ -109,7 +101,9 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   private[sbt] def continuous: Command =
     Command(ContinuousExecutePrefix, continuousBriefHelp, continuousDetail)(continuousParser) {
       case (s, (initialCount, commands)) =>
-        runToTermination(s, commands, initialCount, isCommand = true)
+        println(s"huh ${s.currentCommand}")
+        s"${ContinuousCommands.preWatch} $initialCount ${commands.mkString("; ")}" :: s
+      //runToTermination(s, commands, initialCount, isCommand = true)
     }
 
   /**
@@ -326,8 +320,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     implicit val extracted: Extracted = Project.extract(state)
     val repo = if ("polling" == SysProp.watchMode) {
       val service = new PollingWatchService(extracted.getOpt(pollInterval).getOrElse(500.millis))
-      FileTreeRepository
-        .legacy((_: Any) => {}, service)
+      FileTreeRepository.legacy((_: Any) => {}, service)
     } else {
       FileTreeRepository.default
     }
@@ -1115,40 +1108,41 @@ private[sbt] object Continuous extends DeprecatedContinuous {
 
 private[sbt] object ContinuousCommands {
   private[this] val watchStateCallbacks =
-    AttributeKey[java.util.Map[Int, (State => State, State => State)]](
+    AttributeKey[java.util.Map[String, (State => State, State => State)]](
       "sbt-watch-state-callbacks",
       "",
       Int.MaxValue
     )
-  private[this] val preWatch = Command.arb(state => {
-    (matched("__preWatch ") ~> IntBasic ~ (OptSpace ~> matched(any.*))).examples().map {
-      case (i, cmd) =>
-        val s = state.get(watchStateCallbacks) match {
-          case Some(map) =>
-            map.get(i) match {
-              case null     => state
-              case (pre, _) => pre(state)
-            }
-          case None => state
+  private[sbt] val preWatch = "__preWatch"
+  private[sbt] val postWatch = "__postWatch"
+  private[this] def nameParser: Parser[String] = matched(charClass(_.isLetterOrDigit).+)
+  private[this] val preWatchCommand = Command.arb(state => {
+    ((matched(preWatch) <~ OptSpace) ~> nameParser ~ (OptSpace ~> matched(any.*))).examples().map {
+      case (channel, cmd) =>
+        () => {
+          val s = state.get(watchStateCallbacks) match {
+            case Some(map) =>
+              map.get(channel) match {
+                case null     => state
+                case (pre, _) => pre(state)
+              }
+            case None => state
+          }
+          StashOnFailure :: cmd :: FailureWall :: s"__postWatch $name" :: PopOnFailure :: s
         }
-        () => StashOnFailure :: cmd :: FailureWall :: s"__postWatch $i" :: PopOnFailure :: s
     }
   }) { case (_, newState) => newState() }
-  private[this] val postWatch = Command.arb(state => {
-    (matched("__postWatch ") ~> IntBasic).examples().map { i =>
+  private[this] val postWatchCommand = Command.arb(state => {
+    ((matched(postWatch) <~ OptSpace) ~> nameParser).examples().map { channel =>
       state.get(watchStateCallbacks) match {
         case Some(map) =>
-          map.get(i) match {
+          map.get(channel) match {
             case null      => () => state
             case (_, post) => () => post(state)
           }
-        case None =>
-          () => {
-            println("cool")
-            state
-          }
+        case None => () => state
       }
     }
   }) { case (_, newState) => newState() }
-  private[sbt] def value: Seq[Command] = preWatch :: postWatch :: Nil
+  private[sbt] def value: Seq[Command] = preWatchCommand :: postWatchCommand :: Nil
 }
