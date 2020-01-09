@@ -15,12 +15,14 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import sbt.BasicCommandStrings.{ Shell, TemplateCommand }
+import sbt.Keys.pollInterval
 import sbt.Project.LoadAction
 import sbt.compiler.EvalImports
 import sbt.internal.Aggregation.AnyKeys
 import sbt.internal.CommandStrings.BootCommand
 import sbt.internal._
 import sbt.internal.inc.ScalaInstance
+import sbt.internal.nio.{ FileTreeRepository, PollingWatchService }
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ Parser, SizeParser }
@@ -865,9 +867,22 @@ object BuiltinCommands {
         .setProject(session, structure, s2)
         .put(sbt.nio.Keys.hasCheckedMetaBuild, new AtomicBoolean(false))
     )
-    LintUnused.lintUnusedFunc(s3)
+    val s4 = setupGlobalFileTreeRepository(s3)
+    LintUnused.lintUnusedFunc(s4)
   }
 
+  private val setupGlobalFileTreeRepository: State => State = { state =>
+    state.get(sbt.nio.Keys.globalFileTreeRepository).foreach(_.close())
+    val extracted = Project.extract(state)
+    import scala.concurrent.duration._
+    val repo = if ("polling" == SysProp.watchMode) {
+      val service = new PollingWatchService(extracted.getOpt(pollInterval).getOrElse(500.millis))
+      FileTreeRepository.legacy((_: Any) => {}, service)
+    } else {
+      FileTreeRepository.default
+    }
+    state.put(sbt.nio.Keys.globalFileTreeRepository, repo)
+  }
   private val addCacheStoreFactoryFactory: State => State = (s: State) => {
     val size = Project
       .extract(s)
