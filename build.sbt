@@ -341,7 +341,7 @@ lazy val utilPosition = (project in file("internal") / "util-position")
 
 lazy val utilLogging = (project in file("internal") / "util-logging")
   .enablePlugins(ContrabandPlugin, JsonCodecPlugin)
-  .dependsOn(utilInterface)
+  .dependsOn(utilInterface, collectionProj)
   .settings(
     utilCommonSettings,
     name := "Util Logging",
@@ -888,7 +888,8 @@ lazy val mainProj = (project in file("main"))
         |done
         |if [[ -z $${cmd} ]]
         |then
-        |  exec java -cp ${classpath.mkString(java.io.File.pathSeparator)} sbt.internal.client.SimpleClient $$@
+        |  exec java -cp ${classpath
+                        .mkString(java.io.File.pathSeparator)} sbt.internal.client.SimpleClient $$@
         |else
         |  exec $$cmd "$${args[@]}"
         |fi
