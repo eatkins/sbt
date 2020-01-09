@@ -123,18 +123,11 @@ object StandardMain {
   }
 
   private[this] val isShutdown = new AtomicBoolean(false)
-  private[this] val mainThread = new AtomicReference[Thread]
-  private[sbt] def shutdown(): Unit = mainThread.get match {
-    case null =>
-    case t =>
-      if (isShutdown.compareAndSet(false, true)) t.interrupt()
-  }
   def runManaged(s: State): xsbti.MainResult = {
     val previous = TrapExit.installManager()
     try {
       val hook = ShutdownHooks.add(closeRunnable)
       try {
-        mainThread.set(Thread.currentThread)
         MainLoop.runLogged(s)
       } catch {
         case _: InterruptedException if isShutdown.get =>
