@@ -141,6 +141,12 @@ object Keys {
     "Provides a view into the file system that may or may not cache the tree in memory",
     Int.MaxValue
   )
+  private[sbt] val stashedGlobalFileTreeRepository =
+    AttributeKey[FileTreeRepository[FileAttributes]](
+      "stashed-global-file-tree-repository",
+      "Provides a view into the file system that may or may not cache the tree in memory",
+      Int.MaxValue
+    )
   private[sbt] val dynamicDependency = settingKey[Unit](
     "Leaves a breadcrumb that the scoped task is evaluated inside of a dynamic task"
   ).withRank(Invisible)
