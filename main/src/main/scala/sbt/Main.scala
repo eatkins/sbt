@@ -12,7 +12,7 @@ import java.net.URI
 import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
 import java.util.Properties
 import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.util.concurrent.atomic.AtomicBoolean
 
 import sbt.BasicCommandStrings.{ Shell, TemplateCommand }
 import sbt.Keys.pollInterval

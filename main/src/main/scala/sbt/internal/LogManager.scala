@@ -10,22 +10,13 @@ package internal
 
 import java.io.PrintWriter
 
-import Def.ScopedKey
-import Scope.GlobalScope
-import Keys.{ logLevel, logManager, persistLogLevel, persistTraceLevel, sLog, traceLevel }
-import sbt.internal.util.{
-  AttributeKey,
-  ConsoleAppender,
-  ConsoleOut,
-  MainAppender,
-  ManagedLogger,
-  ProgressState,
-  Settings,
-  SuppressedTraceContext
-}
-import MainAppender._
-import sbt.util.{ Level, LogExchange, Logger }
 import org.apache.logging.log4j.core.Appender
+import sbt.Def.ScopedKey
+import sbt.Keys._
+import sbt.Scope.GlobalScope
+import sbt.internal.util.MainAppender._
+import sbt.internal.util._
+import sbt.util.{ Level, LogExchange, Logger }
 
 sealed abstract class LogManager {
   def apply(
