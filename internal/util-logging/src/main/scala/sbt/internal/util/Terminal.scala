@@ -400,17 +400,39 @@ object Terminal {
       Executors.newSingleThreadExecutor(r => new Thread(r, s"sbt-$name-input-reader"))
     private[this] val buffer = new LinkedBlockingQueue[Int]
     private[this] val readFuture = new AtomicReference[java.util.concurrent.Future[_]]()
-    private[this] val runnable: Runnable = () =>
-      try buffer.put(in.read)
-      finally readFuture.set(null)
-    override def read(): Int = {
+    private[this] val waitingLocks = new LinkedBlockingQueue[AnyRef]()
+    private[this] val runnable: Runnable = () => {
+      val b =
+        try in.read
+        finally readFuture.set(null)
+      waitingLocks.synchronized {
+        buffer.put(b)
+        waitingLocks.poll match {
+          case null =>
+          case lock => lock.synchronized(lock.notify())
+        }
+        if (!waitingLocks.isEmpty) submitRead()
+      }
+    }
+    private[this] def submitRead(): Unit =
       readFuture.synchronized(readFuture.get match {
         case null => readFuture.set(executor.submit(runnable))
         case _    =>
       })
-      buffer.take match {
-        case -1 => throw new ClosedChannelException
-        case b  => b
+    override def read(): Int = {
+      val t = Thread.currentThread
+      try {
+        val lock = new AnyRef
+        waitingLocks.synchronized(waitingLocks.add(lock))
+        submitRead()
+        while (buffer.isEmpty) lock.synchronized(lock.wait())
+        buffer.take match {
+          case -1 => throw new ClosedChannelException
+          case b  => b
+        }
+      } finally {
+        waitingLocks.synchronized(waitingLocks.remove(t))
+        ()
       }
     }
 
