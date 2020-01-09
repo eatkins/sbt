@@ -430,10 +430,7 @@ object Terminal {
           case -1 => throw new ClosedChannelException
           case b  => b
         }
-      } finally {
-        waitingLocks.synchronized(waitingLocks.remove(t))
-        ()
-      }
+      } finally Util.ignoreResult(waitingLocks.synchronized(waitingLocks.remove(t)))
     }
 
     override def available(): Int = buffer.size
