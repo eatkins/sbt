@@ -1153,7 +1153,8 @@ private[sbt] object ContinuousCommands {
   private[this] def noComplete[T](p: Parser[T]): Parser[T] = p.examples()
   private[this] val space = noComplete(Space)
   private[this] def cmdParser(s: String): Parser[String] = noComplete(matched(s)) <~ space
-  private[this] def nameParser: Parser[String] = noComplete(matched(charClass(_.isLetterOrDigit).+))
+  private[this] def channelParser: Parser[String] =
+    noComplete(matched(charClass(c => c.isLetterOrDigit || c == '-').+))
 
   private[this] val stashedRepo = AttributeKey[FileTreeRepository[FileAttributes]](
     "stashed-file-tree-repository",
@@ -1222,7 +1223,7 @@ private[sbt] object ContinuousCommands {
       name: String
   )(updateState: (String, State) => State): Command =
     Command.arb { state =>
-      (cmdParser(name) ~> nameParser).map(channel => () => updateState(channel, state))
+      (cmdParser(name) ~> channelParser).map(channel => () => updateState(channel, state))
     } { case (_, newState) => newState() }
   private[this] val runWatchCommand = watchCommand(runWatch) { (channel, state) =>
     watchStates.get(channel) match {
