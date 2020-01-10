@@ -341,7 +341,12 @@ object Watch {
    * @return the exit [[Watch.Action]] that can be used to potentially modify the build state and
    *         the count of the number of iterations that were run. If
    */
-  def apply(task: () => Unit, onStart: NextAction, nextAction: NextAction): Watch.Action = {
+  def apply(
+      task: () => Unit,
+      onStart: NextAction,
+      nextAction: NextAction,
+      recursive: Boolean
+  ): Watch.Action = {
     def safeNextAction(delegate: NextAction): Watch.Action =
       try delegate()
       catch {
@@ -360,11 +365,21 @@ object Watch {
       safeNextAction(onStart) match {
         case Ignore =>
           next() match {
-            case Trigger => impl()
-            case action  => action
+            case Trigger =>
+              if (recursive) impl()
+              else {
+                task()
+                Watch.Trigger
+              }
+            case action => action
           }
-        case Trigger => impl()
-        case a       => a
+        case Trigger =>
+          if (recursive) impl()
+          else {
+            task()
+            Watch.Trigger
+          }
+        case a => a
       }
     }
     try impl()
