@@ -54,7 +54,7 @@ abstract class CommandChannel extends HasUserThread {
   private[sbt] final def initiateMaintenance(task: String): Unit = {
     maintenance.forEach(q => q.synchronized { q.add(new MaintenanceTask(this, task)); () })
   }
-  private[sbt] def mkUIThread: (State, Terminal, String => Boolean, String => Boolean) => UIThread
+  private[sbt] def mkUIThread: (State, CommandChannel) => UIThread
   private[sbt] def terminal: Terminal
   def append(exec: Exec): Boolean = registered.synchronized {
     exec.commandLine.nonEmpty && {
@@ -83,7 +83,7 @@ abstract class CommandChannel extends HasUserThread {
     level.set(value)
     append(Exec(cmd, Some(Exec.newExecId), Some(CommandSource(name))))
   }
-  private[sbt] def onLine: String => Boolean = {
+  private[sbt] def onCommand: String => Boolean = {
     case "error" => setLevel(Level.Error, "error")
     case "debug" => setLevel(Level.Debug, "debug")
     case "info"  => setLevel(Level.Info, "info")
@@ -117,8 +117,7 @@ abstract class CommandChannel extends HasUserThread {
     } else stopThread()
   }
 
-  override private[sbt] def makeUIThread(s: State) =
-    mkUIThread(s, terminal, onLine, onMaintenance)
+  override private[sbt] def makeUIThread(s: State) = mkUIThread(s, this)
 }
 
 // case class Exec(commandLine: String, source: Option[CommandSource])
