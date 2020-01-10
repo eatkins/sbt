@@ -12,7 +12,7 @@ import java.nio.channels.ClosedChannelException
 import java.util.Locale
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.locks.ReentrantLock
-import java.util.concurrent.{ Executors, LinkedBlockingQueue }
+import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
@@ -117,7 +117,6 @@ trait Terminal extends AutoCloseable {
 
   private[sbt] def withRawSystemIn[T](f: => T): T = f
   private[sbt] def withCanonicalIn[T](f: => T): T = f
-  private[sbt] def withEcho[T](f: => T): T = f
   private[sbt] def write(bytes: Int*): Unit
   private[sbt] def printStream: PrintStream
   private[sbt] def withPrintStream[T](f: PrintStream => T): T
@@ -284,26 +283,6 @@ object Terminal {
   private[sbt] def restore(): Unit = console.toJLine.restore()
 
   /**
-   * Runs a thunk ensuring that the terminal has echo enabled. Most of the time sbt should have
-   * echo mode on except when it is explicitly set to raw mode via [[Terminal.withRawSystemIn]].
-   *
-   * @param f the thunk to run
-   * @tparam T the result type of the thunk
-   * @return the result of the thunk
-   */
-  private[sbt] def withEcho[T](toggle: Boolean)(f: => T): T = {
-    val previous = console.isEchoEnabled
-    terminalLock.lockInterruptibly()
-    try {
-      console.toJLine.setEchoEnabled(toggle)
-      f
-    } finally {
-      console.toJLine.setEchoEnabled(previous)
-      terminalLock.unlock()
-    }
-  }
-
-  /**
    *
    * @param f the thunk to run
    * @tparam T the result type of the thunk
@@ -332,7 +311,6 @@ object Terminal {
     override def getStringCapability(capability: String): String = t.getStringCapability(capability)
     override def withRawSystemIn[T](f: => T): T = t.withRawSystemIn(f)
     override def withCanonicalIn[T](f: => T): T = t.withCanonicalIn(f)
-    override def withEcho[T](f: => T): T = t.withEcho(f)
     override def printStream: PrintStream = t.printStream
     override def withPrintStream[T](f: PrintStream => T): T = t.withPrintStream(f)
     override def restore(): Unit = t.restore()
@@ -478,15 +456,34 @@ object Terminal {
 
   private[this] def wrap(terminal: jline.Terminal): Terminal = {
     val term: jline.Terminal with jline.Terminal2 = new jline.Terminal with jline.Terminal2 {
+      /*
+       * JLine spams the log with stacktraces if we directly interrupt the thread that is shelling
+       * out to run an stty command. To avoid this, run certain commands on a background thread.
+       */
+      private[this] def doInBackground[T](f: => T): Unit = {
+        val result = new ArrayBlockingQueue[Either[Throwable, Any]](1)
+        new Thread("sbt-terminal-background-work-thread") {
+          setDaemon(true)
+          start()
+          override def run(): Unit = {
+            try result.put(Right(f))
+            catch { case t: Throwable => result.put(Left(t)) }
+          }
+        }
+        result.take match {
+          case Left(e) => throw e
+          case _       =>
+        }
+      }
       private[this] val hasConsole = System.console != null
       private[this] def alive = hasConsole && attached.get
       private[this] val term2: jline.Terminal2 = terminal match {
         case t: jline.Terminal2 => t
         case _                  => new DefaultTerminal2(terminal)
       }
-      override def init(): Unit = if (alive) terminal.init()
-      override def restore(): Unit = if (alive) terminal.restore()
-      override def reset(): Unit = if (alive) terminal.reset()
+      override def init(): Unit = if (alive) doInBackground(terminal.init())
+      override def restore(): Unit = if (alive) doInBackground(terminal.restore())
+      override def reset(): Unit = if (alive) doInBackground(terminal.reset())
       override def isSupported: Boolean = terminal.isSupported
       override def getWidth: Int = terminal.getWidth
       override def getHeight: Int = terminal.getHeight
@@ -495,9 +492,12 @@ object Terminal {
       override def wrapInIfNeeded(in: InputStream): InputStream = terminal.wrapInIfNeeded(in)
       override def hasWeirdWrap: Boolean = terminal.hasWeirdWrap
       override def isEchoEnabled: Boolean = terminal.isEchoEnabled
-      override def setEchoEnabled(enabled: Boolean): Unit = if (alive) {
-        terminal.setEchoEnabled(enabled)
-      }
+
+      /*
+       * Do this on a background thread so that jline doesn't spam the logs if interrupted
+       */
+      override def setEchoEnabled(enabled: Boolean): Unit =
+        if (alive) doInBackground(terminal.setEchoEnabled(enabled))
       override def disableInterruptCharacter(): Unit =
         if (alive) terminal.disableInterruptCharacter()
       override def enableInterruptCharacter(): Unit =
