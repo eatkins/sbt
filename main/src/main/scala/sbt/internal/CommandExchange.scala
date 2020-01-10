@@ -150,8 +150,23 @@ private[sbt] final class CommandExchange {
   ): (State, Terminal, String => Boolean, String => Boolean) => UIThread = {
     (state, terminal, onLine, onMaintenance) =>
       ContinuousCommands.watchStateFor(name) match {
-        case Some(_) => ???
-        case None    => new AskUserThread(name, state, terminal, onLine, onMaintenance)
+        case Some(cs) =>
+          new UIThread {
+            override private[sbt] def reader: UIThread.Reader = () => {
+              terminal.printStream.println(s"watching!")
+              Thread.sleep(3000)
+              Right(s"${ContinuousCommands.stopWatch} $name")
+            }
+            override private[sbt] def handleInput(s: Either[String, String]): Boolean = s match {
+              case Left(m)  => onMaintenance(m)
+              case Right(c) => onLine(c)
+            }
+            override private[sbt] def onProgressEvent(
+                pe: ProgressEvent,
+                terminal: Terminal
+            ): Unit = {}
+          }
+        case None => new AskUserThread(name, state, terminal, onLine, onMaintenance)
       }
   }
 
