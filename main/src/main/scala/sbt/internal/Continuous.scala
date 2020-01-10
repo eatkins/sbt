@@ -21,7 +21,7 @@ import sbt.internal.Continuous.{ ContinuousState, FileStampRepository }
 import sbt.internal.LabeledFunctions._
 import sbt.internal.io.WatchState
 import sbt.internal.nio._
-import sbt.internal.util.complete.DefaultParsers.{ IntBasic, OptSpace, Space, any, matched }
+import sbt.internal.util.complete.DefaultParsers.{ IntBasic, Space, any, matched }
 import sbt.internal.util.complete.Parser._
 import sbt.internal.util.complete.{ Parser, Parsers }
 import sbt.internal.util.{ AttributeKey, Terminal, Util }
@@ -1075,7 +1075,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       val command: String,
       val beforeCommand: State => State,
       val afterCommand: State => State,
-      val afterWatch: State => State,
+      val afterWatch: () => Unit,
   ) {
     def withCount(c: Int): ContinuousState =
       new ContinuousState(c, command, beforeCommand, afterCommand, afterWatch)
@@ -1092,12 +1092,17 @@ private[sbt] object ContinuousCommands {
       Int.MaxValue
     )
   private[this] val watchStates = new ConcurrentHashMap[String, ContinuousState]
+  /*
+   * Prefix these command names with __ to hide them from tab completion.
+   */
   private[sbt] val setupWatch = "__setupWatch"
   private[sbt] val preWatch = "__preWatch"
   private[sbt] val postWatch = "__postWatch"
-  private[sbt] val beforeCommand = "__beforeCommand"
-  private[sbt] val stopWatch = "__stopCommand"
-  private[this] def nameParser: Parser[String] = matched(charClass(_.isLetterOrDigit).+)
+  private[sbt] val stopWatch = "__stopWatch"
+  private[this] def noComplete[T](p: Parser[T]): Parser[T] = p.examples()
+  private[this] val space = noComplete(Space)
+  private[this] def cmdParser(s: String): Parser[String] = noComplete(matched(s)) <~ space
+  private[this] def nameParser: Parser[String] = noComplete(matched(charClass(_.isLetterOrDigit).+))
 
   private[this] val stashedRepo = AttributeKey[FileTreeRepository[FileAttributes]](
     "stashed-file-tree-repository",
@@ -1147,9 +1152,9 @@ private[sbt] object ContinuousCommands {
                 }
                 restoredState.remove(persistentFileStampCache)
               },
-              state => {
+              () => {
+                watchStates.remove(channelName)
                 repo.close()
-                state
               }
             )
             Util.ignoreResult(watchStates.put(channelName, s))
@@ -1159,10 +1164,14 @@ private[sbt] object ContinuousCommands {
             throw new IllegalStateException(msg)
         }
       }
+  @inline private[this] def watchStateFor(channel: String): ContinuousState =
+    watchStates.get(channel) match {
+      case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
+      case s    => s
+    }
   private[this] val setupWatchCommand = Command.arb(state => {
-    ((matched(setupWatch) <~ Space.+) ~> nameParser ~ (Space.+ ~> IntBasic) ~ (Space.+ ~> matched(
-      any.*
-    ))).examples().map {
+    (cmdParser(setupWatch) ~> nameParser ~ noComplete(space ~> IntBasic) ~
+      (space ~> noComplete(matched(any.*)))).map {
       case ((channel, count), cmd) =>
         () => {
           setupWatchState(channel, count, cmd)(state)
@@ -1172,31 +1181,20 @@ private[sbt] object ContinuousCommands {
     }
   }) { case (_, newState) => newState() }
   private[this] val preWatchCommand = Command.arb(state => {
-    ((matched(preWatch) <~ OptSpace) ~> nameParser).examples().map { channel => () =>
-      watchStates.get(channel) match {
-        case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
-        case cs   => cs.beforeCommand(state)
-      }
+    (cmdParser(preWatch) ~> nameParser).map { channel => () =>
+      watchStateFor(channel).beforeCommand(state)
     }
   }) { case (_, newState) => newState() }
   private[this] val postWatchCommand = Command.arb(state => {
-    ((matched(postWatch) <~ OptSpace) ~> nameParser).examples().map { channel => () =>
-      watchStates.get(channel) match {
-        case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
-        case cs   => cs.afterCommand(state)
-      }
+    (cmdParser(postWatch) ~> nameParser).map { channel => () =>
+      watchStateFor(channel).afterCommand(state)
     }
   }) { case (_, newState) => newState() }
-  private[this] val stopWatchCommand = Command.arb(state => {
-    ((matched(stopWatch) <~ OptSpace) ~> nameParser).examples().map { channel => () =>
-      watchStates.get(channel) match {
-        case null => throw new IllegalStateException(s"No watch state for channel '$channel'")
-        case cs   => cs.afterWatch(state)
-      }
+  private[this] val stopWatchCommand = Command.arb(_ => {
+    (cmdParser(stopWatch) ~> nameParser).map { channel => () =>
+      watchStateFor(channel).afterWatch()
     }
-  }) { (_, s) =>
-    s()
-  }
+  }) { case (s, v) => v(); s }
   /*
    * Creates a FileTreeRepository where it is safe to call close without inadvertently cancelling
    * still active watches.
