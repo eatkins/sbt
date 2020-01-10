@@ -323,7 +323,8 @@ private[sbt] object Continuous extends DeprecatedContinuous {
               // state machine callbacks returns Watched.CancelWatch, Watched.Custom, Watched.HandleError
               // or Watched.ReloadException. The task defined above will be run at least once. It will be run
               // additional times whenever the state transition callbacks return Watched.Trigger.
-              val terminationAction = Watch(task, callbacks.onStart, callbacks.nextEvent)
+              val terminationAction =
+                Watch(task, callbacks.onStart, callbacks.nextEvent, recursive = true)
               terminationAction match {
                 case e: Watch.HandleUnexpectedError =>
                   logger.error("Caught unexpected error running continuous build:")
@@ -1246,9 +1247,15 @@ private[sbt] object ContinuousCommands {
   ) extends Thread(s"sbt-$name-watch-ui-thread")
       with UIThread {
     override private[sbt] def reader: UIThread.Reader = () => {
-      channel.terminal.printStream.println(s"${channel.name} waiting on ${cs.commands}")
-      channel.terminal.withRawSystemIn(channel.terminal.inputStream.read)
-      Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
+      //channel.terminal.printStream.println(s"${channel.name} waiting on ${cs.commands}")
+      def stop = Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
+      Watch.apply(() => (), cs.callbacks.onStart, cs.callbacks.nextEvent, recursive = false) match {
+        case Watch.Trigger       => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
+        case Watch.Reload        => Right("reload")
+        case Watch.Run(commands) => stop.map(_ +: commands mkString ";")
+        case Watch.CancelWatch   => stop
+        case _                   => System.err.println("whoops"); stop
+      }
     }
     override private[sbt] def onProgressEvent(
         pe: ProgressEvent,
