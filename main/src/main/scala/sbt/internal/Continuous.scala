@@ -1247,7 +1247,6 @@ private[sbt] object ContinuousCommands {
   ) extends Thread(s"sbt-$name-watch-ui-thread")
       with UIThread {
     override private[sbt] def reader: UIThread.Reader = () => {
-      //channel.terminal.printStream.println(s"${channel.name} waiting on ${cs.commands}")
       def stop = Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
       Watch.apply(() => (), cs.callbacks.onStart, cs.callbacks.nextEvent, recursive = false) match {
         case Watch.Trigger       => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
