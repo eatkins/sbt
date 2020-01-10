@@ -23,7 +23,7 @@ private[sbt] trait HasUserThread {
   private[this] val askUserThread = new AtomicReference[UIThread]
   def name: String
   private[sbt] def terminal: Terminal
-  private[sbt] def onLine: String => Boolean
+  private[sbt] def onCommand: String => Boolean
   private[sbt] def onMaintenance: String => Boolean
   private[sbt] final def onProgressEvent(pe: ProgressEvent): Unit = askUserThread.get match {
     case null => terminal.progressState.reset()
@@ -34,13 +34,11 @@ private[sbt] trait HasUserThread {
   private[sbt] def onConsoleUnpromptEvent(consoleunPromptEvent: ConsoleUnpromptEvent): Unit
   private[sbt] def reset(state: State, uiState: UserThread.UIState): Unit = {
     askUserThread.synchronized {
-      askUserThread.get match {
-        case _ =>
-          askUserThread.getAndSet(null) match {
-            case null =>
-            case t    => t.close()
-          }
-          askUserThread.set(makeUIThread(state))
+      val newThread = makeUIThread(state)
+      askUserThread.getAndSet(newThread) match {
+        case null                                  => newThread.start()
+        case t if t.getClass == newThread.getClass => askUserThread.set(t)
+        case _                                     => newThread.start()
       }
     }
   }

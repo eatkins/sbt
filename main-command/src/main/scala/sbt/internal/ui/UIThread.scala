@@ -17,16 +17,20 @@ import sbt.State
 import sbt.internal.util.complete.{ JLineCompletion, Parser }
 import sbt.internal.util.{ ConsoleAppender, LineReader, ProgressEvent, Prompt, Terminal }
 import ConsoleAppender.{ ClearScreenFromCursorToBottom, DeleteLine }
+import sbt.internal.CommandChannel
 
 import scala.annotation.tailrec
 
 trait UIThread extends Thread with AutoCloseable { self: Thread =>
+  private[sbt] def channel: CommandChannel
   private[sbt] def reader: UIThread.Reader
-  private[sbt] def handleInput(s: Either[String, String]): Boolean
+  private[this] final def handleInput(s: Either[String, String]): Boolean = s match {
+    case Left(m)    => channel.onMaintenance(m)
+    case Right(cmd) => channel.onCommand(cmd)
+  }
   private[this] val isStopped = new AtomicBoolean(false)
   private[sbt] def onProgressEvent(pe: ProgressEvent, terminal: Terminal): Unit
   self.setDaemon(true)
-  self.start()
   override abstract def run(): Unit = {
     @tailrec def impl(): Unit = {
       val res = reader.readLine()
@@ -38,6 +42,7 @@ trait UIThread extends Thread with AutoCloseable { self: Thread =>
   override def close(): Unit = {
     isStopped.set(true)
     interrupt()
+    join(5000)
   }
 }
 

@@ -48,9 +48,7 @@ final class NetworkChannel(
     handlers: Seq[ServerHandler],
     override private[sbt] val mkUIThread: (
         State,
-        Terminal,
-        String => Boolean,
-        String => Boolean
+        CommandChannel,
     ) => UIThread
 ) extends CommandChannel
     with LanguageServerProtocol {
@@ -70,7 +68,7 @@ final class NetworkChannel(
       auth,
       instance,
       handlers,
-      (s, t, onLine, onMaintenance) => new AskUserThread(name, s, t, onLine, onMaintenance)
+      (s, c) => new AskUserThread(s, c)
     )
   import NetworkChannel._
 

@@ -14,12 +14,7 @@ import sjsonnew.JsonFormat
 
 private[sbt] final class ConsoleChannel(
     val name: String,
-    override private[sbt] val mkUIThread: (
-        State,
-        Terminal,
-        String => Boolean,
-        String => Boolean
-    ) => UIThread
+    override private[sbt] val mkUIThread: (State, CommandChannel) => UIThread
 ) extends CommandChannel {
   override private[sbt] def terminal = Terminal.console
 

@@ -21,10 +21,11 @@ import sbt.internal.Continuous.{ ContinuousState, FileStampRepository }
 import sbt.internal.LabeledFunctions._
 import sbt.internal.io.WatchState
 import sbt.internal.nio._
+import sbt.internal.ui.UIThread
 import sbt.internal.util.complete.DefaultParsers.{ Space, matched }
 import sbt.internal.util.complete.Parser._
 import sbt.internal.util.complete.{ Parser, Parsers }
-import sbt.internal.util.{ AttributeKey, Terminal, Util }
+import sbt.internal.util.{ AttributeKey, ProgressEvent, Terminal, Util }
 import sbt.nio.Keys.{ fileInputs, _ }
 import sbt.nio.Watch.{ Creation, Deletion, ShowOptions, Update }
 import sbt.nio.file.{ FileAttributes, Glob }
@@ -1234,11 +1235,26 @@ private[sbt] object ContinuousCommands {
         (pre ::: cs.commands.toList ::: post) ::: state
     }
   }
-  @inline private[sbt] def watchStateFor(channel: String): Option[ContinuousState] =
-    watchStates.get(channel) match {
+  private[sbt] def watchUIThreadFor(channel: CommandChannel): Option[UIThread] =
+    watchStates.get(channel.name) match {
       case null => None
-      case s    => Some(s)
+      case cs   => Some(new WatchUIThread(channel, cs))
     }
+  private[this] class WatchUIThread(
+      override private[sbt] val channel: CommandChannel,
+      cs: ContinuousState,
+  ) extends Thread(s"sbt-$name-watch-ui-thread")
+      with UIThread {
+    override private[sbt] def reader: UIThread.Reader = () => {
+      channel.terminal.printStream.println(s"${channel.name} waiting on ${cs.commands}")
+      channel.terminal.withRawSystemIn(channel.terminal.inputStream.read)
+      Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
+    }
+    override private[sbt] def onProgressEvent(
+        pe: ProgressEvent,
+        terminal: Terminal
+    ): Unit = {}
+  }
   @inline
   private[this] def watchState(channel: String): ContinuousState = watchStates.get(channel) match {
     case null => throw new IllegalStateException(s"No watch state for $channel")
