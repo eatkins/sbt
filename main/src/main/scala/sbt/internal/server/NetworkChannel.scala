@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
 
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
-import sbt.internal.util.{ ManagedLogger, ObjectEvent, StringEvent, Terminal }
+import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.protocol.{
@@ -25,8 +25,7 @@ import sbt.internal.protocol.{
   JsonRpcRequestMessage,
   JsonRpcNotificationMessage
 }
-import sbt.internal.ui.{ UIThread, UserThread }
-import sbt.internal.util.Prompt.AskUser
+import sbt.internal.ui.{ AskUserThread, UIThread }
 import sbt.internal.util.Terminal.TerminalImpl
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util.complete.Parser
@@ -47,6 +46,12 @@ final class NetworkChannel(
     auth: Set[ServerAuthentication],
     instance: ServerInstance,
     handlers: Seq[ServerHandler],
+    override private[sbt] val mkUIThread: (
+        State,
+        Terminal,
+        String => Boolean,
+        String => Boolean
+    ) => UIThread
 ) extends CommandChannel
     with LanguageServerProtocol {
   def this(
@@ -57,7 +62,16 @@ final class NetworkChannel(
       instance: ServerInstance,
       handlers: Seq[ServerHandler],
       log: Logger
-  ) = this(name, connection, structure, auth, instance, handlers)
+  ) =
+    this(
+      name,
+      connection,
+      structure,
+      auth,
+      instance,
+      handlers,
+      (s, t, onLine, onMaintenance) => new AskUserThread(name, s, t, onLine, onMaintenance)
+    )
   import NetworkChannel._
 
   private[this] val inputBuffer = new LinkedBlockingQueue[Byte]()
@@ -354,19 +368,9 @@ final class NetworkChannel(
     }
   }
 
-  def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
+  override def publishEventMessage(event: EventMessage): Unit = if (alive.get) {
+    super.publishEventMessage(event)
     event match {
-      case ConsolePromptEvent(state) if isAttached =>
-        terminal.prompt match {
-          case _: AskUser =>
-          case _          => terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
-        }
-        reset(state, UserThread.Ready)
-      case ConsoleUnpromptEvent(lastSource, state) =>
-        terminal.progressState.reset()
-//        if (lastSource.fold(true)(_.channelName != name)) {
-//          terminal.progressState.reset()
-//        } else stopThread()
       case _ if isLanguageServerProtocol =>
         event match {
           case entry: LogEvent        => logMessage(entry.level, entry.message)

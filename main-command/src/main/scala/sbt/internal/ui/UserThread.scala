@@ -10,6 +10,7 @@ package sbt.internal.ui
 import java.util.concurrent.atomic.AtomicReference
 
 import sbt.State
+import sbt.internal.{ ConsolePromptEvent, ConsoleUnpromptEvent }
 import sbt.internal.util.{ ProgressEvent, Terminal }
 
 private[sbt] object UserThread {
@@ -28,31 +29,18 @@ private[sbt] trait HasUserThread {
     case null => terminal.progressState.reset()
     case t    => t.onProgressEvent(pe, terminal)
   }
-  private[sbt] def makeWatchThread(s: State): UIThread
-
-  private[sbt] def makeAskUserThread(s: State, uiState: UserThread.UIState): UIThread =
-    uiState match {
-      case UserThread.Ready =>
-        new AskUserThread(
-          name,
-          s,
-          terminal,
-          onLine,
-          onMaintenance
-        )
-      case UserThread.Watch => makeWatchThread(s)
-    }
-
+  private[sbt] def makeUIThread(s: State): UIThread
+  private[sbt] def onConsolePromptEvent(consolePromptEvent: ConsolePromptEvent): Unit
+  private[sbt] def onConsoleUnpromptEvent(consoleunPromptEvent: ConsoleUnpromptEvent): Unit
   private[sbt] def reset(state: State, uiState: UserThread.UIState): Unit = {
     askUserThread.synchronized {
       askUserThread.get match {
-        case a: AskUserThread if a.isAlive && uiState == UserThread.Ready =>
         case _ =>
           askUserThread.getAndSet(null) match {
             case null =>
             case t    => t.close()
           }
-          askUserThread.set(makeAskUserThread(state, uiState))
+          askUserThread.set(makeUIThread(state))
       }
     }
   }
