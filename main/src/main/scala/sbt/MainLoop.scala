@@ -12,7 +12,6 @@ import java.util.Properties
 
 import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcResponseError
-import sbt.internal.server.NetworkChannel
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Terminal }
 import sbt.internal.{ Aggregation, CommandChannel, ConsoleUnpromptEvent, ShutdownHooks }

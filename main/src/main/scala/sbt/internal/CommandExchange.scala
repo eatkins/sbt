@@ -18,6 +18,7 @@ import sbt.nio.Watch.NullLogger
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
+import sbt.internal.ui.{ AskUserThread, UIThread }
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util._
 import sbt.io.syntax._
@@ -124,7 +125,8 @@ private[sbt] final class CommandExchange {
 
   def run(s: State): State = {
     if (consoleChannel.isEmpty) {
-      val console0 = new ConsoleChannel("console0")
+      val name = "console0"
+      val console0 = new ConsoleChannel(name, mkAskUser(name))
       consoleChannel = Some(console0)
       subscribe(console0)
     }
@@ -143,6 +145,16 @@ private[sbt] final class CommandExchange {
     Util.ignoreResult(channelBuffer -= c)
   }
 
+  private[this] def mkAskUser(
+      name: String
+  ): (State, Terminal, String => Boolean, String => Boolean) => UIThread = {
+    (state, terminal, onLine, onMaintenance) =>
+      ContinuousCommands.watchStateFor(name) match {
+        case Some(_) => ???
+        case None    => new AskUserThread(name, state, terminal, onLine, onMaintenance)
+      }
+  }
+
   /**
    * Check if a server instance is running already, and start one if it isn't.
    */
@@ -158,7 +170,15 @@ private[sbt] final class CommandExchange {
       val name = newNetworkName
       s.log.info(s"new client connected: $name")
       val channel =
-        new NetworkChannel(name, socket, Project structure s, auth, instance, handlers)
+        new NetworkChannel(
+          name,
+          socket,
+          Project structure s,
+          auth,
+          instance,
+          handlers,
+          mkAskUser(name)
+        )
       subscribe(channel)
     }
     if (server.isEmpty && firstInstance.get) {
@@ -280,8 +300,10 @@ private[sbt] final class CommandExchange {
 
   private[sbt] def getLoggerFor(exec: Exec): Option[ManagedLogger] =
     channels.find(c => exec.source.map(_.channelName).contains(c.name)) match {
-      case Some(c) => println(s"fuck found $c"); Some(c.logger)
-      case None    => println(s"no channel for $exec"); None
+      case Some(c) =>
+        println(s"fuck found $c"); /*Some(c.logger) */
+        None
+      case None => println(s"no channel for $exec"); None
     }
 
   // This is an interface to directly notify events.

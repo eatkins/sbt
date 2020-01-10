@@ -68,6 +68,7 @@ public final class MetaBuildLoader extends URLClassLoader {
     final Set<File> bottomClasspath = new LinkedHashSet<>();
 
     {
+      int interfaceIndex = 0;
       for (final File file : cp) {
         if (pattern.matcher(file.getName()).find()) {
           interfaceURLs[interfaceIndex] = file.toURI().toURL();
