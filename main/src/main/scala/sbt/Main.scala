@@ -774,7 +774,7 @@ object BuiltinCommands {
   private[this] def doLoadFailed(s: State, loadArg: String): State = {
     s.log.warn("Project loading failed: (r)etry, (q)uit, (l)ast, or (i)gnore? (default: r)")
     val terminal = Terminal.console
-    val result = terminal.withRawSystemIn(terminal.withEcho(terminal.inputStream.read)) match {
+    val result = terminal.withRawSystemIn(terminal.inputStream.read) match {
       case -1 => 'q'.toInt
       case b  => b
     }
