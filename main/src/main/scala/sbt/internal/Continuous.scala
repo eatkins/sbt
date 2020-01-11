@@ -10,8 +10,15 @@ package internal
 
 import java.io.{ ByteArrayInputStream, IOException, InputStream, File => _ }
 import java.nio.file.Path
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{
+  Callable,
+  ConcurrentHashMap,
+  ExecutorService,
+  Executors,
+  Future,
+  LinkedBlockingQueue
+}
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
 
 import sbt.BasicCommandStrings._
 import sbt.Def._
@@ -463,15 +470,24 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     val project = extracted.currentRef
     val beforeCommand = () => configs.foreach(_.watchSettings.beforeCommand())
     val onStart: () => Watch.Action =
-      getOnStart(project, commands, configs, logger, count, extracted)
+      getOnStart(project, commands, configs, rawLogger, count, extracted)
     val (message, parser, altParser) = getWatchInputOptions(configs, extracted)
-    val nextInputEvent: () => Watch.Action =
-      parseInputEvents(parser, altParser, state, inputStream, logger)
+    val nextInputEvent: ExecutorService => Option[Watch.Action] = {
+      val poll = !Util.isNonCygwinWindows && configs.exists(_.watchSettings.pollSystemIn)
+      parseInputEvents(parser, altParser, state, logger, poll)
+    }
     val (nextFileEvent, cleanupFileMonitor): (() => Option[(Watch.Event, Watch.Action)], () => Unit) =
       getFileEvents(configs, logger, state, count, commands, fileStampCache)
+    val executor = Executors.newFixedThreadPool(3, {
+      val count = new AtomicInteger(0)
+      r => new Thread(r, s"sbt-watch-event-thread-${count.incrementAndGet}")
+    })
     val nextEvent: () => Watch.Action =
-      combineInputAndFileEvents(nextInputEvent, nextFileEvent, message, logger, logger)
-    val onExit = () => cleanupFileMonitor()
+      combineInputAndFileEvents(nextInputEvent, nextFileEvent, message, logger, logger, executor)
+    val onExit = () => {
+      cleanupFileMonitor()
+      executor.shutdown()
+    }
     val onTermination = getOnTermination(configs, isCommand)
     new Callbacks(nextEvent, beforeCommand, onExit, onStart, onTermination)
   }
@@ -713,25 +729,41 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     }
 
     (() => {
-      val events = antiEntropyMonitor.poll(30.milliseconds)
-      val actions = events.flatMap(onEvent)
-      if (actions.exists(_._2 != Watch.Ignore)) {
-        val builder = new StringBuilder
-        val min = actions.minBy {
-          case (e, a) =>
-            if (builder.nonEmpty) builder.append(", ")
-            val path = e.path
-            builder.append(path)
-            builder.append(" -> ")
-            builder.append(a.toString)
-            a
-        }
-        logger.debug(s"Received file event actions: $builder. Returning: $min")
-        if (min._2 == Watch.Trigger) onTrigger(min._1)
-        if (min._2 == Watch.ShowOptions) None else Some(min)
-      } else None
+      val interrupted = new AtomicBoolean(false)
+      def getEvent: Option[(Watch.Event, Watch.Action)] = {
+        val events =
+          try antiEntropyMonitor.poll(Duration.Inf)
+          catch { case _: InterruptedException => interrupted.set(true); Nil }
+        val actions = events.flatMap(onEvent)
+        if (actions.exists(_._2 != Watch.Ignore)) {
+          val builder = new StringBuilder
+          val min = actions.minBy {
+            case (e, a) =>
+              if (builder.nonEmpty) builder.append(", ")
+              val path = e.path
+              builder.append(path)
+              builder.append(" -> ")
+              builder.append(a.toString)
+              a
+          }
+          logger.debug(s"Received file event actions: $builder. Returning: $min")
+          if (min._2 == Watch.Trigger) onTrigger(min._1)
+          if (min._2 == Watch.ShowOptions) None else Some(min)
+        } else None
+      }
+
+      @tailrec def impl(): Option[(Watch.Event, Watch.Action)] = getEvent match {
+        case None =>
+          if (interrupted.get || Thread.interrupted) None
+          else impl()
+        case r => r
+      }
+
+      impl()
     }, () => monitor.close())
   }
+
+  private[this] val readFuture = new AtomicReference[Future[Option[Byte]]]
 
   /**
    * Each task has its own input parser that can be used to modify the watch based on the input
@@ -752,11 +784,9 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       parser: Parser[Watch.Action],
       alternative: Option[(TaskKey[InputStream], InputStream => Watch.Action)],
       state: State,
-      inputStream: InputStream,
-      logger: Logger
-  )(
-      implicit extracted: Extracted
-  ): () => Watch.Action = {
+      logger: Logger,
+      poll: Boolean,
+  )(implicit extracted: Extracted): ExecutorService => Option[Watch.Action] = {
     /*
      * This parses the buffer until all possible actions are extracted. By draining the input
      * to a state where it does not parse an action, we can wait until we receive new input
@@ -790,49 +820,104 @@ private[sbt] object Continuous extends DeprecatedContinuous {
             () => handler(is)
         }
         .getOrElse(() => Watch.Ignore)
-      string: String => (default(string) :: alt() :: Nil).min
+      string: String =>
+        ((if (string.nonEmpty) default(string) else Watch.Ignore) :: alt() :: Nil).min
     }
-    () => {
-      val stringBuilder = new StringBuilder
-      while (inputStream.available > 0) stringBuilder += inputStream.read().toChar
-      val newBytes = stringBuilder.toString
-      val parse: ActionParser => Watch.Action = parser => parser(newBytes)
-      val event = parse(inputHandler)
-      if (event != Watch.Ignore) logger.debug(s"Received input event: $event.")
-      event
+    executor => {
+      val interrupted = new AtomicBoolean(false)
+      @tailrec def impl(): Option[Watch.Action] = {
+        def getNextByte: Callable[Option[Byte]] =
+          () =>
+            try {
+              if (poll || alternative.isDefined) {
+                if (!Terminal.systemInIsAttached) None
+                else {
+                  while (Terminal.wrappedSystemIn.available == 0) {
+                    Thread.sleep(10)
+                  }
+                  Some(Terminal.wrappedSystemIn.read.toByte)
+                }
+              } else Some(Terminal.wrappedSystemIn.read.toByte)
+            } finally readFuture.synchronized(readFuture.set(null))
+        val action =
+          try {
+            interrupted.set(false)
+            val future = readFuture.synchronized {
+              val previous = readFuture.get
+              if (Terminal.systemInIsAttached && previous == null) {
+                val newFuture = executor.submit(getNextByte)
+                readFuture.set(newFuture)
+                Some(newFuture)
+              } else Option(previous)
+            }
+            val byte = future.flatMap(_.get)
+            val parse: ActionParser => Watch.Action = parser =>
+              parser(byte.fold("")(_.toChar.toString))
+            parse(inputHandler)
+          } catch {
+            case _: InterruptedException =>
+              interrupted.set(true)
+              readFuture.synchronized(readFuture.get) match {
+                case null =>
+                case f    => f.cancel(true)
+              }
+              Watch.Ignore
+          }
+        action match {
+          case Watch.Ignore =>
+            val stop = interrupted.get || Thread.interrupted
+            if ((!Terminal.systemInIsAttached || alternative.isDefined) && !stop) impl()
+            else None
+          case r => Some(r)
+        }
+      }
+
+      Terminal.withRawSystemIn(impl())
     }
   }
 
   private def combineInputAndFileEvents(
-      nextInputAction: () => Watch.Action,
+      nextInputAction: ExecutorService => Option[Watch.Action],
       nextFileEvent: () => Option[(Watch.Event, Watch.Action)],
       options: String,
       logger: Logger,
-      rawLogger: Logger
+      rawLogger: Logger,
+      executor: ExecutorService
   ): () => Watch.Action = () => {
-    val (inputAction: Watch.Action, fileEvent: Option[(Watch.Event, Watch.Action)] @unchecked) =
-      Seq(nextInputAction, nextFileEvent).map(_.apply()).toIndexedSeq match {
-        case Seq(ia: Watch.Action, fe @ Some(_)) => (ia, fe)
-        case Seq(ia: Watch.Action, None)         => (ia, None)
+    val events = new LinkedBlockingQueue[Either[Watch.Action, (Watch.Event, Watch.Action)]]
+
+    def submit(f: => Unit): Future[_] = executor.submit((() => f): Runnable)
+    val inputJob = submit(nextInputAction(executor).foreach(a => events.put(Left(a))))
+    val fileJob = submit(nextFileEvent().foreach(e => events.put(Right(e))))
+    try {
+      val (inputAction: Watch.Action, fileEvent: Option[(Watch.Event, Watch.Action)]) =
+        events.take() match {
+          case Left(a)  => (a, None)
+          case Right(e) => (Watch.Ignore, Some(e))
+        }
+      val min: Watch.Action = (fileEvent.map(_._2).toSeq :+ inputAction).min
+      lazy val inputMessage =
+        s"Received input event: $inputAction." +
+          (if (inputAction != min) s" Dropping in favor of file event: $min" else "")
+      if (inputAction != Watch.Ignore) logger.debug(inputMessage)
+      fileEvent
+        .collect {
+          case (event, action) if action != Watch.Ignore =>
+            s"Received file event $action for $event." +
+              (if (action != min) s" Dropping in favor of input event: $min" else "")
+        }
+        .foreach(logger.debug(_))
+      min match {
+        case ShowOptions =>
+          ConsoleOut.systemOut.println("")
+          rawLogger.info(options)
+          Watch.Ignore
+        case m => m
       }
-    val min: Watch.Action = (fileEvent.map(_._2).toSeq :+ inputAction).min
-    lazy val inputMessage =
-      s"Received input event: $inputAction." +
-        (if (inputAction != min) s" Dropping in favor of file event: $min" else "")
-    if (inputAction != Watch.Ignore) logger.debug(inputMessage)
-    fileEvent
-      .collect {
-        case (event, action) if action != Watch.Ignore =>
-          s"Received file event $action for $event." +
-            (if (action != min) s" Dropping in favor of input event: $min" else "")
-      }
-      .foreach(logger.debug(_))
-    min match {
-      case ShowOptions =>
-        println("") // This is so the [info] tag appears at the head of a newline
-        rawLogger.info(options)
-        Watch.Ignore
-      case m => m
+    } finally {
+      inputJob.cancel(true)
+      fileJob.cancel(true)
+      ()
     }
   }
 
@@ -906,6 +991,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       key.get(watchOnIteration)
     val onTermination: Option[(Watch.Action, String, Int, State) => State] =
       key.get(watchOnTermination)
+    val pollSystemIn: Boolean = key.get(watchPollSystemIn).getOrElse(false)
     val startMessage: StartMessage = getStartMessage(key)
     val trackMetaBuild: Boolean =
       key.get(onChangedBuildSource).fold(false)(_ == ReloadOnSourceChanges)
@@ -987,7 +1073,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
      * reverse order if the task is set.
      *
      * @param settingKey the [[SettingKey]] to extract
-     * @param extracted the provided [[Extracted]] instance
+     * @param extracted  the provided [[Extracted]] instance
      * @tparam T the type of the [[SettingKey]]
      * @return the optional value of the [[SettingKey]] if it is defined at the input
      *         [[ScopedKey]] instance's scope or task scope.
@@ -1008,7 +1094,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
      * from that scope otherwise we fallback on the [[ScopedKey]] instance's scope. We use the
      * reverse order if the task is set.
      *
-     * @param taskKey the [[TaskKey]] to extract
+     * @param taskKey   the [[TaskKey]] to extract
      * @param extracted the provided [[Extracted]] instance
      * @tparam T the type of the [[SettingKey]]
      * @return the optional value of the [[SettingKey]] if it is defined at the input
