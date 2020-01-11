@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import sbt.BasicCommandStrings._
 import sbt.Def._
 import sbt.Keys._
-import sbt.Scope.Global
 import sbt.internal.Continuous.{ ContinuousState, FileStampRepository }
 import sbt.internal.LabeledFunctions._
 import sbt.internal.io.WatchState
@@ -25,7 +24,7 @@ import sbt.internal.ui.UIThread
 import sbt.internal.util.complete.DefaultParsers.{ Space, matched }
 import sbt.internal.util.complete.Parser._
 import sbt.internal.util.complete.{ Parser, Parsers }
-import sbt.internal.util.{ AttributeKey, ProgressEvent, Terminal, Util }
+import sbt.internal.util._
 import sbt.nio.Keys.{ fileInputs, _ }
 import sbt.nio.Watch.{ Creation, Deletion, ShowOptions, Update }
 import sbt.nio.file.{ FileAttributes, Glob }
@@ -118,9 +117,10 @@ private[sbt] object Continuous extends DeprecatedContinuous {
    */
   private[sbt] def continuousTask: Def.Initialize[InputTask[StateTransform]] =
     Def.inputTask {
-      val (initialCount, commands) = continuousParser.parsed
-      val newState = runToTermination(state.value, commands, initialCount, isCommand = false)
-      StateTransform(_ => newState)
+//      val (initialCount, commands) = continuousParser.parsed
+//      val newState = runToTermination(state.value, commands, initialCount, isCommand = false)
+//      StateTransform(_ => newState)
+      StateTransform(identity)
     }
 
   private[sbt] val dynamicInputs = taskKey[Option[mutable.Set[DynamicInput]]](
@@ -274,80 +274,80 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     f(s, valid, invalid)
   }
 
-  private[sbt] def runToTermination(
-      state: State,
-      commands: Seq[String],
-      count: Int,
-      isCommand: Boolean
-  ): State = {
-    val in = Terminal.get.inputStream
-    implicit val extracted: Extracted = Project.extract(state)
-    val repo = state.get(globalFileTreeRepository) match {
-      case Some(r) => r
-      case _       => throw new IllegalStateException(s"No file tree repository was found for $state")
-    }
-    val fileStampCache = new FileStamp.Cache
-    repo.addObserver(t => fileStampCache.invalidate(t.path))
-    val persistFileStamps = extracted.get(watchPersistFileStamps)
-    val cachingRepo: FileTreeRepository[FileAttributes] =
-      if (persistFileStamps) repo else new FileStampRepository(fileStampCache, repo)
-    try {
-      val stateWithRepo = state.put(globalFileTreeRepository, cachingRepo)
-      val fullState =
-        addLegacyWatchSetting(
-          if (persistFileStamps) stateWithRepo.put(persistentFileStampCache, fileStampCache)
-          else stateWithRepo
-        )
-      setup(fullState, commands) { (s, valid, invalid) =>
-        EvaluateTask.withStreams(extracted.structure, s)(_.use(streams in Global) { streams =>
-          implicit val logger: Logger = streams.log
-          if (invalid.isEmpty) {
-            val currentCount = new AtomicInteger(count)
-            val configs = getAllConfigs(valid.map(v => v._1 -> v._2))
-            val callbacks =
-              aggregate(configs, logger, in, s, currentCount, isCommand, commands, fileStampCache)
-            val task = () =>
-              Util.ignoreResult {
-                currentCount.getAndIncrement()
-                callbacks.beforeCommand()
-                // abort as soon as one of the tasks fails
-                valid.takeWhile { case (_, _, task) => task() }
-                updateLegacyWatchState(
-                  s,
-                  configs.flatMap(_.inputs().map(_.glob)),
-                  currentCount.get()
-                )
-              }
-            try {
-              // Here we enter the Watched.watch state machine. We will not return until one of the
-              // state machine callbacks returns Watched.CancelWatch, Watched.Custom, Watched.HandleError
-              // or Watched.ReloadException. The task defined above will be run at least once. It will be run
-              // additional times whenever the state transition callbacks return Watched.Trigger.
-              val terminationAction =
-                Watch(task, callbacks.onStart, callbacks.nextEvent, recursive = true)
-              terminationAction match {
-                case e: Watch.HandleUnexpectedError =>
-                  logger.error("Caught unexpected error running continuous build:")
-                  e.throwable.getStackTrace.foreach(e => logger.error(e.toString))
-                case _ =>
-              }
-              val fullCommand = commands.mkString("; ")
-              callbacks.onTermination(terminationAction, fullCommand, currentCount.get(), state)
-            } finally {
-              callbacks.onExit()
-            }
-          } else {
-            // At least one of the commands in the multi command string could not be parsed, so we
-            // log an error and exit.
-            val invalidCommands = invalid.mkString("'", "', '", "'")
-            logger.error(s"Terminating watch due to invalid command(s): $invalidCommands")
-            state.fail
-          }
-        })
-      }
-    } finally repo.close()
-  }
-
+//  private[sbt] def runToTermination(
+//      state: State,
+//      commands: Seq[String],
+//      count: Int,
+//      isCommand: Boolean
+//  ): State = {
+//    val in = Terminal.get.inputStream
+//    implicit val extracted: Extracted = Project.extract(state)
+//    val repo = state.get(globalFileTreeRepository) match {
+//      case Some(r) => r
+//      case _       => throw new IllegalStateException(s"No file tree repository was found for $state")
+//    }
+//    val fileStampCache = new FileStamp.Cache
+//    repo.addObserver(t => fileStampCache.invalidate(t.path))
+//    val persistFileStamps = extracted.get(watchPersistFileStamps)
+//    val cachingRepo: FileTreeRepository[FileAttributes] =
+//      if (persistFileStamps) repo else new FileStampRepository(fileStampCache, repo)
+//    try {
+//      val stateWithRepo = state.put(globalFileTreeRepository, cachingRepo)
+//      val fullState =
+//        addLegacyWatchSetting(
+//          if (persistFileStamps) stateWithRepo.put(persistentFileStampCache, fileStampCache)
+//          else stateWithRepo
+//        )
+//      setup(fullState, commands) { (s, valid, invalid) =>
+//        EvaluateTask.withStreams(extracted.structure, s)(_.use(streams in Global) { streams =>
+//          implicit val logger: Logger = streams.log
+//          if (invalid.isEmpty) {
+//            val currentCount = new AtomicInteger(count)
+//            val configs = getAllConfigs(valid.map(v => v._1 -> v._2))
+//            val callbacks =
+//              aggregate(configs, logger, in, s, currentCount, isCommand, commands, fileStampCache)
+//            val task = () =>
+//              Util.ignoreResult {
+//                currentCount.getAndIncrement()
+//                callbacks.beforeCommand()
+//                // abort as soon as one of the tasks fails
+//                valid.takeWhile { case (_, _, task) => task() }
+//                updateLegacyWatchState(
+//                  s,
+//                  configs.flatMap(_.inputs().map(_.glob)),
+//                  currentCount.get()
+//                )
+//              }
+//            try {
+//              // Here we enter the Watched.watch state machine. We will not return until one of the
+//              // state machine callbacks returns Watched.CancelWatch, Watched.Custom, Watched.HandleError
+//              // or Watched.ReloadException. The task defined above will be run at least once. It will be run
+//              // additional times whenever the state transition callbacks return Watched.Trigger.
+//              val terminationAction =
+//                Watch(task, callbacks.onStart, callbacks.nextEvent, recursive = true)
+//              terminationAction match {
+//                case e: Watch.HandleUnexpectedError =>
+//                  logger.error("Caught unexpected error running continuous build:")
+//                  e.throwable.getStackTrace.foreach(e => logger.error(e.toString))
+//                case _ =>
+//              }
+//              val fullCommand = commands.mkString("; ")
+//              callbacks.onTermination(terminationAction, fullCommand, currentCount.get(), state)
+//            } finally {
+//              callbacks.onExit()
+//            }
+//          } else {
+//            // At least one of the commands in the multi command string could not be parsed, so we
+//            // log an error and exit.
+//            val invalidCommands = invalid.mkString("'", "', '", "'")
+//            logger.error(s"Terminating watch due to invalid command(s): $invalidCommands")
+//            state.fail
+//          }
+//        })
+//      }
+//    } finally repo.close()
+//  }
+//
   // This is defined so we can assign a task key to a command to parse the WatchSettings.
   private[this] val globalWatchSettingKey =
     taskKey[Unit]("Internal task key. Not actually used.").withRank(KeyRanks.Invisible)
@@ -398,22 +398,20 @@ private[sbt] object Continuous extends DeprecatedContinuous {
 
   private[sbt] def getCallbacks(
       s: State,
+      channelName: String,
       commands: Seq[String],
       terminal: Terminal,
       fileStampCache: FileStamp.Cache
   ): Callbacks = {
     implicit val extracted: Extracted = Project.extract(s)
-    implicit val logger: Logger = new Logger {
-      override def trace(t: => Throwable): Unit = {}
-
-      override def success(message: => String): Unit = {}
-
-      override def log(level: Level.Value, message: => String): Unit = {}
-    }
+    implicit val logger: Logger = LogExchange.logger(channelName + "-watch")
     setup(s, commands) { (_, valid, invalid) =>
       if (invalid.isEmpty) {
         val currentCount = new AtomicInteger(0)
         val configs = getAllConfigs(valid.map(v => v._1 -> v._2))
+        val appender = ConsoleAppender(channelName + "-watch", terminal)
+        val level = configs.minBy(_.watchSettings.logLevel).watchSettings.logLevel
+        LogExchange.bindLoggerAppenders(channelName + "-watch", (appender -> level) :: Nil)
         aggregate(
           configs,
           logger,
@@ -445,14 +443,14 @@ private[sbt] object Continuous extends DeprecatedContinuous {
    * [[Watch.Ignore]], which is the lowest priority [[Watch.Action]].
    *
    * @param configs the [[Config]] instances
-   * @param rawLogger the default sbt logger instance
+   * @param logger the default sbt logger instance
    * @param state the current state
    * @param extracted the [[Extracted]] instance for the current build
    * @return the [[Callbacks]] to pass into [[Watch.apply]]
    */
   private def aggregate(
       configs: Seq[Config],
-      rawLogger: Logger,
+      logger: Logger,
       inputStream: InputStream,
       state: State,
       count: AtomicInteger,
@@ -463,17 +461,16 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       implicit extracted: Extracted
   ): Callbacks = {
     val project = extracted.currentRef
-    val logger = setLevel(rawLogger, configs.map(_.watchSettings.logLevel).min, state)
     val beforeCommand = () => configs.foreach(_.watchSettings.beforeCommand())
     val onStart: () => Watch.Action =
-      getOnStart(project, commands, configs, rawLogger, count, extracted)
+      getOnStart(project, commands, configs, logger, count, extracted)
     val (message, parser, altParser) = getWatchInputOptions(configs, extracted)
     val nextInputEvent: () => Watch.Action =
       parseInputEvents(parser, altParser, state, inputStream, logger)
     val (nextFileEvent, cleanupFileMonitor): (() => Option[(Watch.Event, Watch.Action)], () => Unit) =
-      getFileEvents(configs, rawLogger, state, count, commands, fileStampCache)
+      getFileEvents(configs, logger, state, count, commands, fileStampCache)
     val nextEvent: () => Watch.Action =
-      combineInputAndFileEvents(nextInputEvent, nextFileEvent, message, logger, rawLogger)
+      combineInputAndFileEvents(nextInputEvent, nextFileEvent, message, logger, logger)
     val onExit = () => cleanupFileMonitor()
     val onTermination = getOnTermination(configs, isCommand)
     new Callbacks(nextEvent, beforeCommand, onExit, onStart, onTermination)
@@ -856,35 +853,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     }
   }
 
-  /**
-   * Generates a custom logger for the watch process that is able to log at a different level
-   * from the provided logger.
-   *
-   * @param logger the delegate logger.
-   * @param logLevel the log level for watch events
-   * @return the wrapped logger.
-   */
-  private def setLevel(logger: Logger, logLevel: Level.Value, state: State): Logger = {
-    val delegateLevel: Level.Value = state.get(Keys.logLevel.key).getOrElse(Level.Info)
-    /*
-     * The delegate logger may be set to, say, info level, but we want it to print out debug
-     * messages if the logLevel variable above is Debug. To do this, we promote Debug messages
-     * to the Info level (or Warn or Error if that's what the input logger is set to).
-     */
-    new Logger {
-      override def trace(t: => Throwable): Unit = logger.trace(t)
-
-      override def success(message: => String): Unit = logger.success(message)
-
-      override def log(level: Level.Value, message: => String): Unit = {
-        val levelString = if (level < delegateLevel) s"[$level] " else ""
-        val newMessage = s"[watch] $levelString$message"
-        val watchLevel = if (level < delegateLevel && level >= logLevel) delegateLevel else level
-        logger.log(watchLevel, newMessage)
-      }
-    }
-  }
-
   private type WatchOnEvent = (Int, Watch.Event) => Watch.Action
 
   /**
@@ -1108,16 +1076,17 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   private[sbt] final class ContinuousState(
       val count: Int,
       val commands: Seq[String],
-      val beforeCommand: State => State,
+      beforeCommandImpl: (State, mutable.Set[DynamicInput]) => State,
       val afterCommand: State => State,
       val afterWatch: () => Unit,
       val callbacks: Callbacks,
       val dynamicInputs: mutable.Set[DynamicInput]
   ) {
+    def beforeCommand(state: State): State = beforeCommandImpl(state, dynamicInputs)
     def this(
         count: Int,
         commands: Seq[String],
-        beforeCommand: State => State,
+        beforeCommand: (State, mutable.Set[DynamicInput]) => State,
         afterCommand: State => State,
         afterWatch: () => Unit,
         callbacks: Callbacks
@@ -1126,7 +1095,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       new ContinuousState(
         c,
         commands,
-        beforeCommand,
+        beforeCommandImpl,
         afterCommand,
         afterWatch,
         callbacks,
@@ -1178,12 +1147,16 @@ private[sbt] object ContinuousCommands {
           val persistFileStamps = extracted.get(watchPersistFileStamps)
           val cachingRepo: FileTreeRepository[FileAttributes] =
             if (persistFileStamps) repo else new FileStampRepository(cache, repo)
+          val terminal = StandardMain.exchange
+            .channelForName(channelName)
+            .map(_.terminal)
+            .getOrElse(Terminal.get)
           def cb: Continuous.Callbacks =
-            Continuous.getCallbacks(state, commands, Terminal.get, cache)
+            Continuous.getCallbacks(state, channelName, commands, terminal, cache)
           val s = new ContinuousState(
             count,
             commands,
-            state => {
+            (state, dynamicInputs) => {
               val original = state
                 .get(globalFileTreeRepository)
                 .getOrElse(
@@ -1193,8 +1166,10 @@ private[sbt] object ContinuousCommands {
                 )
               val stateWithRepo =
                 state.put(globalFileTreeRepository, cachingRepo).put(stashedRepo, original)
-              if (persistFileStamps) stateWithRepo.put(persistentFileStampCache, cache)
-              else stateWithRepo
+              val stateWithCache =
+                if (persistFileStamps) stateWithRepo.put(persistentFileStampCache, cache)
+                else stateWithRepo
+              stateWithCache.put(Continuous.DynamicInputs, dynamicInputs)
             },
             state => {
               watchStates.get(channelName) match {
@@ -1205,10 +1180,11 @@ private[sbt] object ContinuousCommands {
                 case None    => throw new IllegalStateException(s"No stashed repository for $state")
                 case Some(r) => state.put(globalFileTreeRepository, r)
               }
-              restoredState.remove(persistentFileStampCache)
+              restoredState.remove(persistentFileStampCache).remove(Continuous.DynamicInputs)
             },
             () => {
               watchStates.remove(channelName)
+              LogExchange.unbindLoggerAppenders(channelName + "-watch")
               repo.close()
             },
             cb
@@ -1244,14 +1220,14 @@ private[sbt] object ContinuousCommands {
   private[this] class WatchUIThread(
       override private[sbt] val channel: CommandChannel,
       cs: ContinuousState,
-  ) extends Thread(s"sbt-$name-watch-ui-thread")
+  ) extends Thread(s"sbt-${channel.name}-watch-ui-thread")
       with UIThread {
     override private[sbt] def reader: UIThread.Reader = () => {
       def stop = Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
       Watch.apply(() => (), cs.callbacks.onStart, cs.callbacks.nextEvent, recursive = false) match {
         case Watch.Trigger       => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
         case Watch.Reload        => Right("reload")
-        case Watch.Run(commands) => stop.map(_ +: commands mkString ";")
+        case Watch.Run(commands) => stop.map(_ +: commands.map(_.commandLine) mkString ";")
         case Watch.CancelWatch   => stop
         case _                   => System.err.println("whoops"); stop
       }

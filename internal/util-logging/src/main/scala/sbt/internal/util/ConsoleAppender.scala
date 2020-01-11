@@ -263,6 +263,19 @@ object ConsoleAppender {
    *
    * @param name      An identifier for the `ConsoleAppender`.
    * @param terminal  The terminal to which this appender corresponds
+   * @return A new `ConsoleAppender` that writes to `out`.
+   */
+  def apply(name: String, terminal: Terminal): ConsoleAppender = {
+    val appender = new ConsoleAppender(name, Properties.from(terminal), noSuppressedMessage)
+    appender.start()
+    appender
+  }
+
+  /**
+   * A new `ConsoleAppender` identified by `name`, and that writes to `out`.
+   *
+   * @param name      An identifier for the `ConsoleAppender`.
+   * @param terminal  The terminal to which this appender corresponds
    * @param suppressedMessage How to handle stack traces.
    * @return A new `ConsoleAppender` that writes to `out`.
    */

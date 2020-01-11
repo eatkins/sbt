@@ -11,7 +11,6 @@ import java.io.{ InputStream, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.Locale
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
@@ -334,25 +333,13 @@ object Terminal {
   private[sbt] def withIn[T](in: InputStream)(f: => T): T = {
     val original = inputStream.get
     try {
-      val wrapped = new WrappedInputStream(in)
-      inputStream.set(wrapped)
-      System.setIn(wrapped)
+      inputStream.set(in)
+      System.setIn(in)
       scala.Console.withIn(in)(f)
     } finally {
       inputStream.set(original)
       System.setIn(original)
     }
-  }
-  private[this] class WrappedInputStream(val in: InputStream) extends InputStream {
-    override def read(): Int = in.read
-    override def read(b: Array[Byte]): Int = in.read(b)
-    override def read(b: Array[Byte], off: Int, len: Int): Int = in.read(b, off, len)
-    override def skip(n: Long): Long = in.skip(n)
-    override def available(): Int = in.available()
-    override def close(): Unit = in.close()
-    override def mark(readlimit: Int): Unit = in.mark(readlimit)
-    override def reset(): Unit = in.reset()
-    override def markSupported(): Boolean = in.markSupported()
   }
 
   private[sbt] def withOut[T](out: PrintStream)(f: => T): T = {
@@ -402,7 +389,7 @@ object Terminal {
       try {
         val lock = new AnyRef
         waitingLocks.synchronized(waitingLocks.add(lock))
-        submitRead()
+        if (buffer.isEmpty) submitRead()
         while (buffer.isEmpty) lock.synchronized(lock.wait())
         buffer.take match {
           case -1 => throw new ClosedChannelException
@@ -411,7 +398,10 @@ object Terminal {
       } finally Util.ignoreResult(waitingLocks.synchronized(waitingLocks.remove(t)))
     }
 
-    override def available(): Int = buffer.size
+    override def available(): Int = {
+      if (buffer.isEmpty) submitRead()
+      buffer.size
+    }
     override def close(): Unit = {
       executor.shutdownNow()
       ()
@@ -436,7 +426,6 @@ object Terminal {
     } finally System.setIn(nonBlockingIn)
 
   private[sbt] def withPrintStream[T](f: PrintStream => T): T = console.withPrintStream(f)
-  private[this] val terminalLock = new ReentrantLock()
   private[this] val attached = new AtomicBoolean(true)
   private[this] val terminalHolder = new AtomicReference(wrap(jline.TerminalFactory.get))
   private[this] val currentTerminal = new AtomicReference[Terminal](terminalHolder.get)
@@ -591,8 +580,11 @@ object Terminal {
       case _      => false
     }
   }
-  private[sbt] abstract class TerminalImpl(val in: InputStream, val out: OutputStream, name: String)
-      extends Terminal {
+  private[sbt] abstract class TerminalImpl private[sbt] (
+      val in: InputStream,
+      val out: OutputStream,
+      name: String
+  ) extends Terminal {
     private[this] val currentLine = new AtomicReference(new ArrayBuffer[Byte])
     private[this] val lineBuffer = new LinkedBlockingQueue[Byte]
     private[this] val flushQueue = new LinkedBlockingQueue[Seq[Byte]]
