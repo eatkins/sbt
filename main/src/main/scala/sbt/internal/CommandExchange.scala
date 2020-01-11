@@ -319,6 +319,9 @@ private[sbt] final class CommandExchange {
     removeChannels(toDel.toList)
   }
 
+  private[sbt] def channelForName(channelName: String): Option[CommandChannel] =
+    channels.find(_.name == channelName)
+
   private def tryTo(x: => Unit, c: CommandChannel, toDel: ListBuffer[CommandChannel]): Unit =
     try x
     catch { case _: IOException => toDel += c }

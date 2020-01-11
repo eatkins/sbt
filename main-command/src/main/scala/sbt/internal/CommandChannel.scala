@@ -55,7 +55,7 @@ abstract class CommandChannel extends HasUserThread {
     maintenance.forEach(q => q.synchronized { q.add(new MaintenanceTask(this, task)); () })
   }
   private[sbt] def mkUIThread: (State, CommandChannel) => UIThread
-  private[sbt] def terminal: Terminal
+  private[sbt] def terminal: Terminal = Terminal.get
   def append(exec: Exec): Boolean = registered.synchronized {
     exec.commandLine.nonEmpty && {
       if (registered.isEmpty) commandQueue.add(exec)

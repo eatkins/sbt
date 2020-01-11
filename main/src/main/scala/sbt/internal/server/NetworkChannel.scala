@@ -94,7 +94,7 @@ final class NetworkChannel(
     override def success(message: => String): Unit = {}
     override def log(level: Level.Value, message: => String): Unit = {}
   }
-  override val terminal: Terminal = new NetworkTerminal
+  override private[sbt] val terminal: Terminal = new NetworkTerminal
 
   def setContentType(ct: String): Unit = synchronized { _contentType = ct }
   def contentType: String = _contentType
