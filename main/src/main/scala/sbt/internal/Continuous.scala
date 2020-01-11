@@ -18,7 +18,7 @@ import java.util.concurrent.{
   Future,
   LinkedBlockingQueue
 }
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger, AtomicReference }
 
 import sbt.BasicCommandStrings._
 import sbt.Def._
@@ -422,7 +422,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         aggregate(
           configs,
           logger,
-          terminal.inputStream,
+          terminal,
           s,
           currentCount,
           isCommand = true,
@@ -458,7 +458,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   private def aggregate(
       configs: Seq[Config],
       logger: Logger,
-      inputStream: InputStream,
+      terminal: Terminal,
       state: State,
       count: AtomicInteger,
       isCommand: Boolean,
@@ -470,11 +470,11 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     val project = extracted.currentRef
     val beforeCommand = () => configs.foreach(_.watchSettings.beforeCommand())
     val onStart: () => Watch.Action =
-      getOnStart(project, commands, configs, rawLogger, count, extracted)
+      getOnStart(project, commands, configs, logger, count, extracted)
     val (message, parser, altParser) = getWatchInputOptions(configs, extracted)
     val nextInputEvent: ExecutorService => Option[Watch.Action] = {
       val poll = !Util.isNonCygwinWindows && configs.exists(_.watchSettings.pollSystemIn)
-      parseInputEvents(parser, altParser, state, logger, poll)
+      parseInputEvents(parser, altParser, state, terminal, logger, poll)
     }
     val (nextFileEvent, cleanupFileMonitor): (() => Option[(Watch.Event, Watch.Action)], () => Unit) =
       getFileEvents(configs, logger, state, count, commands, fileStampCache)
@@ -784,6 +784,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       parser: Parser[Watch.Action],
       alternative: Option[(TaskKey[InputStream], InputStream => Watch.Action)],
       state: State,
+      terminal: Terminal,
       logger: Logger,
       poll: Boolean,
   )(implicit extracted: Extracted): ExecutorService => Option[Watch.Action] = {
@@ -829,15 +830,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         def getNextByte: Callable[Option[Byte]] =
           () =>
             try {
-              if (poll || alternative.isDefined) {
-                if (!Terminal.systemInIsAttached) None
-                else {
-                  while (Terminal.wrappedSystemIn.available == 0) {
-                    Thread.sleep(10)
-                  }
-                  Some(Terminal.wrappedSystemIn.read.toByte)
-                }
-              } else Some(Terminal.wrappedSystemIn.read.toByte)
+              Some(terminal.inputStream.read.toByte)
             } finally readFuture.synchronized(readFuture.set(null))
         val action =
           try {
@@ -872,7 +865,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         }
       }
 
-      Terminal.withRawSystemIn(impl())
+      terminal.withRawSystemIn(impl())
     }
   }
 
