@@ -376,20 +376,14 @@ object Terminal {
           case null =>
           case lock => lock.synchronized(lock.notify())
         }
-        if (!waitingLocks.isEmpty) submitRead()
       }
     }
-    private[this] def submitRead(): Unit =
-      readFuture.synchronized(readFuture.get match {
-        case null => readFuture.set(executor.submit(runnable))
-        case _    =>
-      })
+    executor.submit(runnable)
     override def read(): Int = {
       val t = Thread.currentThread
       try {
         val lock = new AnyRef
         waitingLocks.synchronized(waitingLocks.add(lock))
-        if (buffer.isEmpty) submitRead()
         while (buffer.isEmpty) lock.synchronized(lock.wait())
         buffer.take match {
           case -1 => throw new ClosedChannelException
@@ -398,10 +392,7 @@ object Terminal {
       } finally Util.ignoreResult(waitingLocks.synchronized(waitingLocks.remove(t)))
     }
 
-    override def available(): Int = {
-      if (buffer.isEmpty) submitRead()
-      buffer.size
-    }
+    override def available(): Int = buffer.size
     override def close(): Unit = {
       executor.shutdownNow()
       ()
