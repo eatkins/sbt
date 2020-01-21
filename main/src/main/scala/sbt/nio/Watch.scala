@@ -406,9 +406,7 @@ object Watch {
    *         are non empty.
    */
   @inline
-  private[sbt] def aggregate(
-      events: Seq[(Action, Event)]
-  ): Option[(Action, Event)] =
+  private[sbt] def aggregate(events: Seq[(Action, Event)]): Option[(Action, Event)] =
     if (events.isEmpty) None else Some(events.minBy(_._1))
 
   private implicit class StringToExec(val s: String) extends AnyVal {
