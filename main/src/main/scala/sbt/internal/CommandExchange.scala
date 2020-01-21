@@ -461,7 +461,8 @@ private[sbt] final class CommandExchange {
               case "shutdown" =>
                 Option(currentExec.get).foreach(cancel)
                 commandQueue.clear()
-                val exit = Exec("exit", Some(Exec.newExecId), Some(CommandSource(mt.channel.name)))
+                val exit =
+                  Exec("shutdown", Some(Exec.newExecId), Some(CommandSource(mt.channel.name)))
                 commandQueue.add(exit)
               case _ =>
             }
