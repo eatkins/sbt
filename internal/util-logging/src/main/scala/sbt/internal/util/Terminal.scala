@@ -11,7 +11,7 @@ import java.io.{ InputStream, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
 import java.util.Locale
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue }
+import java.util.concurrent.{ ArrayBlockingQueue, CountDownLatch, Executors, LinkedBlockingQueue }
 
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
@@ -364,35 +364,34 @@ object Terminal {
     private[this] val executor =
       Executors.newSingleThreadExecutor(r => new Thread(r, s"sbt-$name-input-reader"))
     private[this] val buffer = new LinkedBlockingQueue[Int]
-    private[this] val readFuture = new AtomicReference[java.util.concurrent.Future[_]]()
-    private[this] val waitingLocks = new LinkedBlockingQueue[AnyRef]()
+    private[this] val latch = new CountDownLatch(1)
+    private[this] val closed = new AtomicBoolean(false)
+    private[this] def takeOne: Int = if (closed.get) -1 else buffer.take
     private[this] val runnable: Runnable = () => {
-      val b =
-        try in.read
-        finally readFuture.set(null)
-      waitingLocks.synchronized {
+      @tailrec def impl(): Unit = {
+        val b = in.read
         buffer.put(b)
-        waitingLocks.poll match {
-          case null =>
-          case lock => lock.synchronized(lock.notify())
-        }
+        if (b != -1) impl()
+        else closed.set(true)
       }
+      try {
+        latch.await()
+        impl()
+      } catch { case _: InterruptedException => }
     }
     executor.submit(runnable)
     override def read(): Int = {
-      val t = Thread.currentThread
-      try {
-        val lock = new AnyRef
-        waitingLocks.synchronized(waitingLocks.add(lock))
-        while (buffer.isEmpty) lock.synchronized(lock.wait())
-        buffer.take match {
-          case -1 => throw new ClosedChannelException
-          case b  => b
-        }
-      } finally Util.ignoreResult(waitingLocks.synchronized(waitingLocks.remove(t)))
+      latch.countDown()
+      takeOne match {
+        case -1 => throw new ClosedChannelException
+        case b  => b
+      }
     }
 
-    override def available(): Int = buffer.size
+    override def available(): Int = {
+      latch.countDown()
+      buffer.size
+    }
     override def close(): Unit = {
       executor.shutdownNow()
       ()
