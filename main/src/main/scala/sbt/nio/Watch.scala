@@ -329,7 +329,7 @@ object Watch {
       new impl(input, display, description, action)
   }
 
-  private type NextAction = () => Watch.Action
+  private type NextAction = Int => Watch.Action
 
   /**
    * Runs a task and then blocks until the task is ready to run again or we no longer wish to
@@ -342,47 +342,48 @@ object Watch {
    *         the count of the number of iterations that were run. If
    */
   def apply(
-      task: () => Unit,
+      initialCount: Int,
+      task: Int => Unit,
       onStart: NextAction,
       nextAction: NextAction,
       recursive: Boolean
   ): Watch.Action = {
-    def safeNextAction(delegate: NextAction): Watch.Action =
-      try delegate()
+    def safeNextAction(count: Int, delegate: NextAction): Watch.Action =
+      try delegate(count)
       catch {
         case NonFatal(t) =>
           System.err.println(s"Watch caught unexpected error:")
           t.printStackTrace(System.err)
           new HandleError(t)
       }
-    @tailrec def next(): Watch.Action = safeNextAction(nextAction) match {
+    @tailrec def next(count: Int): Watch.Action = safeNextAction(count, nextAction) match {
       // This should never return Ignore due to this condition.
-      case Ignore => next()
+      case Ignore => next(count)
       case action => action
     }
-    @tailrec def impl(): Watch.Action = {
-      task()
-      safeNextAction(onStart) match {
+    @tailrec def impl(count: Int): Watch.Action = {
+      task(count)
+      safeNextAction(count, onStart) match {
         case Ignore =>
-          next() match {
+          next(count) match {
             case Trigger =>
-              if (recursive) impl()
+              if (recursive) impl(count + 1)
               else {
-                task()
+                task(count)
                 Watch.Trigger
               }
             case action => action
           }
         case Trigger =>
-          if (recursive) impl()
+          if (recursive) impl(count + 1)
           else {
-            task()
+            task(count)
             Watch.Trigger
           }
         case a => a
       }
     }
-    try impl()
+    try impl(initialCount)
     catch { case NonFatal(t) => new HandleError(t) }
   }
 

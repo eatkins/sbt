@@ -396,10 +396,10 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   }
 
   private[sbt] class Callbacks(
-      val nextEvent: () => Watch.Action,
+      val nextEvent: Int => Watch.Action,
       val beforeCommand: () => Unit,
       val onExit: () => Unit,
-      val onStart: () => Watch.Action,
+      val onStart: Int => Watch.Action,
       val onTermination: (Watch.Action, String, Int, State) => State
   )
 
@@ -414,7 +414,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     implicit val logger: Logger = LogExchange.logger(channelName + "-watch")
     setup(s, commands) { (_, valid, invalid) =>
       if (invalid.isEmpty) {
-        val currentCount = new AtomicInteger(0)
         val configs = getAllConfigs(valid.map(v => v._1 -> v._2))
         val appender = ConsoleAppender(channelName + "-watch", terminal)
         val level = configs.minBy(_.watchSettings.logLevel).watchSettings.logLevel
@@ -424,13 +423,14 @@ private[sbt] object Continuous extends DeprecatedContinuous {
           logger,
           terminal,
           s,
-          currentCount,
           isCommand = true,
           commands,
           fileStampCache
         )
-        // TODO -- fix exception message
-      } else throw new IllegalArgumentException
+      } else {
+        val msg = s"Invalid commands: ${invalid.mkString("'", "', '", ",")}"
+        throw new IllegalArgumentException(msg)
+      }
     }
   }
 
@@ -460,7 +460,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       logger: Logger,
       terminal: Terminal,
       state: State,
-      count: AtomicInteger,
       isCommand: Boolean,
       commands: Seq[String],
       fileStampCache: FileStamp.Cache
@@ -469,20 +468,22 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   ): Callbacks = {
     val project = extracted.currentRef
     val beforeCommand = () => configs.foreach(_.watchSettings.beforeCommand())
-    val onStart: () => Watch.Action =
-      getOnStart(project, commands, configs, logger, count, extracted)
+    val onStart: Int => Watch.Action =
+      getOnStart(project, commands, configs, logger, extracted)
     val (message, parser, altParser) = getWatchInputOptions(configs, extracted)
     val nextInputEvent: ExecutorService => Option[Watch.Action] = {
       val poll = !Util.isNonCygwinWindows && configs.exists(_.watchSettings.pollSystemIn)
       parseInputEvents(parser, altParser, state, terminal, logger, poll)
     }
-    val (nextFileEvent, cleanupFileMonitor): (() => Option[(Watch.Event, Watch.Action)], () => Unit) =
-      getFileEvents(configs, logger, state, count, commands, fileStampCache)
+    val (nextFileEvent, cleanupFileMonitor): (
+        Int => Option[(Watch.Event, Watch.Action)],
+        () => Unit
+    ) = getFileEvents(configs, logger, state, commands, fileStampCache)
     val executor = Executors.newFixedThreadPool(3, {
       val count = new AtomicInteger(0)
       r => new Thread(r, s"sbt-watch-event-thread-${count.incrementAndGet}")
     })
-    val nextEvent: () => Watch.Action =
+    val nextEvent: Int => Watch.Action =
       combineInputAndFileEvents(nextInputEvent, nextFileEvent, message, logger, logger, executor)
     val onExit = () => {
       cleanupFileMonitor()
@@ -545,32 +546,31 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       commands: Seq[String],
       configs: Seq[Config],
       logger: Logger,
-      count: AtomicInteger,
       extracted: Extracted,
-  ): () => Watch.Action = {
-    val f: () => Seq[Watch.Action] = () => {
+  ): Int => Watch.Action = {
+    val f: Int => Seq[Watch.Action] = count => {
       configs.map { params =>
         val ws = params.watchSettings
-        ws.onIteration.map(_(count.get, project, commands)).getOrElse {
+        ws.onIteration.map(_(count, project, commands)).getOrElse {
           if (configs.size == 1) { // Only allow custom start messages for single tasks
             ws.startMessage match {
-              case Some(Left(sm))  => logger.info(sm(params.watchState(count.get())))
-              case Some(Right(sm)) => sm(count.get(), project, commands).foreach(logger.info(_))
+              case Some(Left(sm))  => logger.info(sm(params.watchState(count)))
+              case Some(Right(sm)) => sm(count, project, commands).foreach(logger.info(_))
               case None =>
-                Watch.defaultStartWatch(count.get(), project, commands).foreach(logger.info(_))
+                Watch.defaultStartWatch(count, project, commands).foreach(logger.info(_))
             }
           }
           Watch.Ignore
         }
       }
     }
-    () => {
-      val res = f().min
+    count => {
+      val res = f(count).min
       // Print the default watch message if there are multiple tasks
       if (configs.size > 1) {
         val onStartWatch =
           extracted.getOpt(watchStartMessage in project).getOrElse(Watch.defaultStartWatch)
-        onStartWatch(count.get(), project, commands).foreach(logger.info(_))
+        onStartWatch(count, project, commands).foreach(logger.info(_))
       }
       res
     }
@@ -580,10 +580,9 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       configs: Seq[Config],
       logger: Logger,
       state: State,
-      count: AtomicInteger,
       commands: Seq[String],
       fileStampCache: FileStamp.Cache
-  )(implicit extracted: Extracted): (() => Option[(Watch.Event, Watch.Action)], () => Unit) = {
+  )(implicit extracted: Extracted): (Int => Option[(Watch.Event, Watch.Action)], () => Unit) = {
     val trackMetaBuild = configs.forall(_.watchSettings.trackMetaBuild)
     val buildGlobs =
       if (trackMetaBuild) extracted.getOpt(fileInputs in checkBuildSources).getOrElse(Nil)
@@ -647,7 +646,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       retentionPeriod
     )
 
-    val onEvent: Event => Seq[(Watch.Event, Watch.Action)] = event => {
+    val onEvent: (Int, Event) => Seq[(Watch.Event, Watch.Action)] = (count, event) => {
       val path = event.path
 
       def getWatchEvent(forceTrigger: Boolean): Option[Watch.Event] = {
@@ -706,7 +705,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
             }
           acceptedConfigParameters.flatMap {
             case (_, _, callback) =>
-              watchEvent.map(e => e -> callback(count.get(), e))
+              watchEvent.map(e => e -> callback(count, e))
           }
         } else Nil
       }
@@ -716,25 +715,25 @@ private[sbt] object Continuous extends DeprecatedContinuous {
      * motivation is to allow the user to specify this callback via setting so that, for example,
      * they can clear the screen when the build triggers.
      */
-    val onTrigger: Watch.Event => Unit = { event: Watch.Event =>
+    val onTrigger: (Int, Watch.Event) => Unit = { (count: Int, event: Watch.Event) =>
       if (configs.size == 1) {
         val config = configs.head
         config.watchSettings.triggerMessage match {
-          case Left(tm)  => logger.info(tm(config.watchState(count.get())))
-          case Right(tm) => tm(count.get(), event.path, commands).foreach(logger.info(_))
+          case Left(tm)  => logger.info(tm(config.watchState(count)))
+          case Right(tm) => tm(count, event.path, commands).foreach(logger.info(_))
         }
       } else {
-        Watch.defaultOnTriggerMessage(count.get(), event.path, commands).foreach(logger.info(_))
+        Watch.defaultOnTriggerMessage(count, event.path, commands).foreach(logger.info(_))
       }
     }
 
-    (() => {
+    ((count: Int) => {
       val interrupted = new AtomicBoolean(false)
       def getEvent: Option[(Watch.Event, Watch.Action)] = {
         val events =
           try antiEntropyMonitor.poll(Duration.Inf)
           catch { case _: InterruptedException => interrupted.set(true); Nil }
-        val actions = events.flatMap(onEvent)
+        val actions = events.flatMap(onEvent(count, _))
         if (actions.exists(_._2 != Watch.Ignore)) {
           val builder = new StringBuilder
           val min = actions.minBy {
@@ -747,7 +746,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
               a
           }
           logger.debug(s"Received file event actions: $builder. Returning: $min")
-          if (min._2 == Watch.Trigger) onTrigger(min._1)
+          if (min._2 == Watch.Trigger) onTrigger(count, min._1)
           if (min._2 == Watch.ShowOptions) None else Some(min)
         } else None
       }
@@ -871,17 +870,17 @@ private[sbt] object Continuous extends DeprecatedContinuous {
 
   private def combineInputAndFileEvents(
       nextInputAction: ExecutorService => Option[Watch.Action],
-      nextFileEvent: () => Option[(Watch.Event, Watch.Action)],
+      nextFileEvent: Int => Option[(Watch.Event, Watch.Action)],
       options: String,
       logger: Logger,
       rawLogger: Logger,
       executor: ExecutorService
-  ): () => Watch.Action = () => {
+  ): Int => Watch.Action = count => {
     val events = new LinkedBlockingQueue[Either[Watch.Action, (Watch.Event, Watch.Action)]]
 
     def submit(f: => Unit): Future[_] = executor.submit((() => f): Runnable)
     val inputJob = submit(nextInputAction(executor).foreach(a => events.put(Left(a))))
-    val fileJob = submit(nextFileEvent().foreach(e => events.put(Right(e))))
+    val fileJob = submit(nextFileEvent(count).foreach(e => events.put(Right(e))))
     try {
       val (inputAction: Watch.Action, fileEvent: Option[(Watch.Event, Watch.Action)]) =
         events.take() match {
@@ -1170,7 +1169,8 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         afterWatch: () => Unit,
         callbacks: Callbacks
     ) = this(count, commands, beforeCommand, afterCommand, afterWatch, callbacks, mutable.Set.empty)
-    def withCount(c: Int): ContinuousState =
+    def incremented: ContinuousState = withCount(count + 1)
+    private def withCount(c: Int): ContinuousState =
       new ContinuousState(
         c,
         commands,
@@ -1253,7 +1253,7 @@ private[sbt] object ContinuousCommands {
             state => {
               watchStates.get(channelName) match {
                 case null =>
-                case ws   => watchStates.put(channelName, ws.withCount(ws.count + 1))
+                case ws   => watchStates.put(channelName, ws.incremented)
               }
               val restoredState = state.get(stashedRepo) match {
                 case None    => throw new IllegalStateException(s"No stashed repository for $state")
@@ -1303,12 +1303,20 @@ private[sbt] object ContinuousCommands {
       with UIThread {
     override private[sbt] def reader: UIThread.Reader = () => {
       def stop = Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
-      Watch.apply(() => (), cs.callbacks.onStart, cs.callbacks.nextEvent, recursive = false) match {
+      val exitAction: Watch.Action =
+        Watch.apply(
+          cs.count,
+          _ => (),
+          cs.callbacks.onStart,
+          cs.callbacks.nextEvent,
+          recursive = false
+        )
+      exitAction match {
         case Watch.Trigger       => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
         case Watch.Reload        => Right("reload")
         case Watch.Run(commands) => stop.map(_ +: commands.map(_.commandLine) mkString ";")
         case Watch.CancelWatch   => stop
-        case _                   => System.err.println("whoops"); stop
+        case _                   => stop
       }
     }
     override private[sbt] def onProgressEvent(
