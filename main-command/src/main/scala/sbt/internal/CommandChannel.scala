@@ -57,7 +57,6 @@ abstract class CommandChannel extends HasUserThread {
   private[sbt] def mkUIThread: (State, CommandChannel) => UIThread
   private[sbt] def terminal: Terminal = Terminal.get
   final def append(exec: Exec): Boolean = registered.synchronized {
-    new Exception(s"exec: $exec").printStackTrace(System.err)
     exec.commandLine.nonEmpty && {
       if (registered.isEmpty) commandQueue.add(exec)
       else registered.asScala.forall(_.add(exec))
