@@ -430,7 +430,7 @@ final class NetworkChannel(
       case x: ExecCommand             => onExecCommand(x)
       case x: SettingQuery            => onSettingQuery(None, x)
       case _: Attach                  => attached.set(true)
-      case x: TerminalPropertiesQuery =>
+      case _: TerminalPropertiesQuery =>
     }
   }
 
