@@ -164,6 +164,7 @@ private[sbt] final class CommandExchange {
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
+      // TODO: Don't use state global log. It can cause logging to mix with console output.
       s.log.info(s"new client connected: $name")
       val channel =
         new NetworkChannel(
@@ -440,9 +441,9 @@ private[sbt] final class CommandExchange {
     private[this] val isStopped = new AtomicBoolean(false)
     private[this] def cancel(e: Exec): Unit = {
       if (e.commandLine.startsWith("console")) {
-        val kill = s" // console session killed by remote client"
-        Terminal.get.write(kill.getBytes.map(_ & 0xFF): _*)
-        Terminal.get.write(13, 4)
+        val terminal = Terminal.get
+        terminal.write(13, 4)
+        terminal.printStream.println("\nconsole session killed by remote sbt client")
       } else {
         Util.ignoreResult(NetworkChannel.cancel(e.execId, e.execId.getOrElse("0")))
       }
