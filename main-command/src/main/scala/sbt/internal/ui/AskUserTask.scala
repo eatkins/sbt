@@ -11,14 +11,14 @@ import sbt.State
 import sbt.internal.CommandChannel
 import sbt.internal.util.{ ProgressEvent, ProgressState, Terminal }
 
-private[sbt] class AskUserThread(
+private[sbt] class AskUserTask(
     state: State,
     override val channel: CommandChannel,
-) extends Thread(s"ask-user-thread-${channel.name}")
-    with UIThread {
+) extends UITask {
   private[this] val terminal = channel.terminal
-  override private[sbt] def reader: UIThread.Reader =
-    UIThread.Reader.terminalReader(terminal.prompt, state.combinedParser)(terminal, state)
+  override private[sbt] def reader: UITask.Reader = {
+    UITask.Reader.terminalReader(terminal.prompt, state.combinedParser)(terminal, state)
+  }
 
   override private[sbt] def onProgressEvent(pe: ProgressEvent, terminal: Terminal): Unit = {
     ProgressState.updateProgressState(pe, terminal)

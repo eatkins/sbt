@@ -11,7 +11,7 @@ package internal
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
-import sbt.internal.ui.{ HasUserThread, UIThread, UserThread }
+import sbt.internal.ui.{ HasUserThread, UITask, UserThread }
 import sbt.internal.util.Prompt.AskUser
 import sbt.internal.util.Terminal
 import sbt.protocol.EventMessage
@@ -54,7 +54,7 @@ abstract class CommandChannel extends HasUserThread {
   private[sbt] final def initiateMaintenance(task: String): Unit = {
     maintenance.forEach(q => q.synchronized { q.add(new MaintenanceTask(this, task)); () })
   }
-  private[sbt] def mkUIThread: (State, CommandChannel) => UIThread
+  private[sbt] def mkUIThread: (State, CommandChannel) => UITask
   private[sbt] def terminal: Terminal = Terminal.get
   final def append(exec: Exec): Boolean = registered.synchronized {
     exec.commandLine.nonEmpty && {
@@ -104,7 +104,7 @@ abstract class CommandChannel extends HasUserThread {
     val state = consolePromptEvent.state
     terminal.prompt match {
       case _: AskUser =>
-      case _          => terminal.setPrompt(AskUser(() => UIThread.shellPrompt(terminal, state)))
+      case _          => terminal.setPrompt(AskUser(() => UITask.shellPrompt(terminal, state)))
     }
     reset(state, UserThread.Ready)
   }

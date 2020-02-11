@@ -8,13 +8,13 @@
 package sbt
 package internal
 
-import sbt.internal.ui.UIThread
+import sbt.internal.ui.UITask
 import sbt.internal.util._
 import sjsonnew.JsonFormat
 
 private[sbt] final class ConsoleChannel(
     val name: String,
-    override private[sbt] val mkUIThread: (State, CommandChannel) => UIThread
+    override private[sbt] val mkUIThread: (State, CommandChannel) => UITask
 ) extends CommandChannel {
   override private[sbt] def terminal = Terminal.console
 

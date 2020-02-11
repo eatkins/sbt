@@ -8,10 +8,11 @@
 package sbt.internal.ui
 
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{ Executors, Future }
 
 import sbt.State
-import sbt.internal.{ ConsolePromptEvent, ConsoleUnpromptEvent }
 import sbt.internal.util.{ ProgressEvent, Terminal }
+import sbt.internal.{ ConsolePromptEvent, ConsoleUnpromptEvent }
 
 private[sbt] object UserThread {
   sealed trait UIState
@@ -20,25 +21,29 @@ private[sbt] object UserThread {
 }
 
 private[sbt] trait HasUserThread {
-  private[this] val askUserThread = new AtomicReference[UIThread]
+  private[this] val askUserThread = new AtomicReference[(UITask, Future[_])]
   def name: String
   private[sbt] def terminal: Terminal
   private[sbt] def onCommand: String => Boolean
   private[sbt] def onMaintenance: String => Boolean
   private[sbt] final def onProgressEvent(pe: ProgressEvent): Unit = askUserThread.get match {
-    case null => terminal.progressState.reset()
-    case t    => t.onProgressEvent(pe, terminal)
+    case null   => terminal.progressState.reset()
+    case (t, _) => t.onProgressEvent(pe, terminal)
   }
-  private[sbt] def makeUIThread(s: State): UIThread
+  private[sbt] def makeUIThread(s: State): UITask
   private[sbt] def onConsolePromptEvent(consolePromptEvent: ConsolePromptEvent): Unit
   private[sbt] def onConsoleUnpromptEvent(consoleunPromptEvent: ConsoleUnpromptEvent): Unit
+  private[this] val executor =
+    Executors.newSingleThreadExecutor(r => new Thread(r, s"sbt-$name-ui-thread"))
   private[sbt] def reset(state: State, uiState: UserThread.UIState): Unit = {
     askUserThread.synchronized {
-      val newThread = makeUIThread(state)
-      askUserThread.getAndSet(newThread) match {
-        case null                                  => newThread.start()
-        case t if t.getClass == newThread.getClass => askUserThread.set(t)
-        case _                                     => newThread.start()
+      val task = makeUIThread(state)
+      askUserThread.get match {
+        case null                                  => askUserThread.set((task, executor.submit(task)))
+        case (t, _) if t.getClass == task.getClass =>
+        case (_, f) =>
+          f.cancel(true)
+          askUserThread.set((task, executor.submit(task)))
       }
     }
   }
@@ -46,7 +51,10 @@ private[sbt] trait HasUserThread {
   private[sbt] def stopThread(): Unit = askUserThread.synchronized {
     askUserThread.getAndSet(null) match {
       case null =>
-      case t    => t.close()
+      case (t, f) =>
+        t.close()
+        f.cancel(true)
+        executor.shutdown()
     }
   }
 }
