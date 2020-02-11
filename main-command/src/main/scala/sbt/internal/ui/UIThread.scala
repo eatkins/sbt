@@ -72,8 +72,8 @@ object UIThread {
                 case _ =>
               }
               s match {
-                case c if c.startsWith("kill ") => Left(c)
-                case "shutdown"                 => Left("shutdown")
+                case cmd if cmd.startsWith("kill ") => Left(cmd)
+                case cmd @ ("shutdown" | "exit")    => Left(cmd)
                 case cmd =>
                   terminal.setPrompt(Prompt.Running)
                   terminal.printStream.write(Int.MinValue)

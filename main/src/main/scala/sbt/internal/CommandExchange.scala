@@ -458,6 +458,7 @@ private[sbt] final class CommandExchange {
               case k if k.startsWith("kill") =>
                 val name = k.split("kill[ ]+").lastOption
                 Option(currentExec.get).filter(e => name.contains(e.commandLine)).foreach(cancel)
+              case "exit" => mt.channel.shutdown(false)
               case "shutdown" =>
                 Option(currentExec.get).foreach(cancel)
                 commandQueue.clear()
