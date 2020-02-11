@@ -72,7 +72,10 @@ abstract class CommandChannel extends HasUserThread {
     case _                         =>
   }
   def publishBytes(bytes: Array[Byte]): Unit
-  def shutdown(logShutdown: Boolean): Unit = stopThread()
+  def shutdown(logShutdown: Boolean): Unit = {
+    stopThread()
+    close()
+  }
   @deprecated("Use the variant that takes the logShutdown parameter", "1.4.0")
   def shutdown(): Unit = shutdown(true)
   def name: String
