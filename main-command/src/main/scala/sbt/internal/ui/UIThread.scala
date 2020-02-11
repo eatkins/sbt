@@ -14,10 +14,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import jline.console.history.PersistentHistory
 import sbt.BasicKeys.{ historyPath, newShellPrompt }
 import sbt.State
-import sbt.internal.util.complete.{ JLineCompletion, Parser }
-import sbt.internal.util.{ ConsoleAppender, LineReader, ProgressEvent, Prompt, Terminal }
-import ConsoleAppender.{ ClearScreenFromCursorToBottom, DeleteLine }
 import sbt.internal.CommandChannel
+import sbt.internal.util.ConsoleAppender.{ ClearScreenFromCursorToBottom, DeleteLine }
+import sbt.internal.util._
+import sbt.internal.util.complete.{ JLineCompletion, Parser }
 
 import scala.annotation.tailrec
 

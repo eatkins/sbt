@@ -19,8 +19,8 @@ import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
 import sbt.internal.ui.{ AskUserThread, UIThread }
-import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util._
+import sbt.internal.util.codec.JValueFormats
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
 import sbt.nio.Watch.NullLogger
@@ -55,6 +55,7 @@ private[sbt] final class CommandExchange {
   private lazy val jsonFormat = new sjsonnew.BasicJsonProtocol with JValueFormats {}
   private[this] val lastState = new AtomicReference[State]
   private[this] val currentExec = new AtomicReference[Exec]
+  private[this] val lastProgressEvent = new AtomicReference[ProgressEvent]
 
   def channels: List[CommandChannel] = channelBuffer.toList
   private[this] def removeChannels(toDel: List[CommandChannel]): Unit = {
@@ -431,6 +432,7 @@ private[sbt] final class CommandExchange {
     removeChannels(toDel.toList)
   }
   private[sbt] def updateProgress(pe: ProgressEvent): Unit = {
+    lastProgressEvent.set(pe)
     channels.foreach(c => ProgressState.updateProgressState(pe, c.terminal))
   }
   private[this] class MaintenanceThread
