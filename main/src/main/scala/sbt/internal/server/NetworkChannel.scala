@@ -25,7 +25,7 @@ import sbt.internal.protocol.{
   JsonRpcRequestMessage,
   JsonRpcNotificationMessage
 }
-import sbt.internal.ui.{ AskUserThread, UIThread }
+import sbt.internal.ui.{ AskUserTask, UITask }
 import sbt.internal.util.Terminal.TerminalImpl
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.util.complete.Parser
@@ -49,7 +49,7 @@ final class NetworkChannel(
     override private[sbt] val mkUIThread: (
         State,
         CommandChannel,
-    ) => UIThread
+    ) => UITask
 ) extends CommandChannel
     with LanguageServerProtocol {
   def this(
@@ -68,7 +68,7 @@ final class NetworkChannel(
       auth,
       instance,
       handlers,
-      (s, c) => new AskUserThread(s, c)
+      (s, c) => new AskUserTask(s, c)
     )
   import NetworkChannel._
 

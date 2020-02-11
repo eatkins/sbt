@@ -18,7 +18,7 @@ import sbt.nio.Watch.NullLogger
 import sbt.internal.protocol.JsonRpcResponseError
 import sbt.internal.langserver.{ LogMessageParams, MessageType }
 import sbt.internal.server._
-import sbt.internal.ui.{ AskUserThread, UIThread }
+import sbt.internal.ui.{ AskUserTask, UITask }
 import sbt.internal.util._
 import sbt.internal.util.codec.JValueFormats
 import sbt.io.syntax._
@@ -148,8 +148,8 @@ private[sbt] final class CommandExchange {
 
   private[this] def mkAskUser(
       name: String,
-  ): (State, CommandChannel) => UIThread = { (state, channel) =>
-    ContinuousCommands.watchUIThreadFor(channel).getOrElse(new AskUserThread(state, channel))
+  ): (State, CommandChannel) => UITask = { (state, channel) =>
+    ContinuousCommands.watchUIThreadFor(channel).getOrElse(new AskUserTask(state, channel))
   }
 
   /**

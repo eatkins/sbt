@@ -27,7 +27,7 @@ import sbt.internal.Continuous.{ ContinuousState, FileStampRepository }
 import sbt.internal.LabeledFunctions._
 import sbt.internal.io.WatchState
 import sbt.internal.nio._
-import sbt.internal.ui.UIThread
+import sbt.internal.ui.UITask
 import sbt.internal.util.complete.DefaultParsers.{ Space, matched }
 import sbt.internal.util.complete.Parser._
 import sbt.internal.util.complete.{ Parser, Parsers }
@@ -1291,17 +1291,17 @@ private[sbt] object ContinuousCommands {
         (pre ::: cs.commands.toList ::: post) ::: state
     }
   }
-  private[sbt] def watchUIThreadFor(channel: CommandChannel): Option[UIThread] =
+  private[sbt] def watchUIThreadFor(channel: CommandChannel): Option[UITask] =
     watchStates.get(channel.name) match {
       case null => None
-      case cs   => Some(new WatchUIThread(channel, cs))
+      case cs   => Some(new WatchUITask(channel, cs))
     }
-  private[this] class WatchUIThread(
+  private[this] class WatchUITask(
       override private[sbt] val channel: CommandChannel,
       cs: ContinuousState,
   ) extends Thread(s"sbt-${channel.name}-watch-ui-thread")
-      with UIThread {
-    override private[sbt] def reader: UIThread.Reader = () => {
+      with UITask {
+    override private[sbt] def reader: UITask.Reader = () => {
       def stop = Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
       val exitAction: Watch.Action =
         Watch.apply(

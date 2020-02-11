@@ -21,17 +21,16 @@ import sbt.internal.util.complete.{ JLineCompletion, Parser }
 
 import scala.annotation.tailrec
 
-trait UIThread extends Thread with AutoCloseable { self: Thread =>
+trait UITask extends Runnable with AutoCloseable {
   private[sbt] def channel: CommandChannel
-  private[sbt] def reader: UIThread.Reader
+  private[sbt] def reader: UITask.Reader
   private[this] final def handleInput(s: Either[String, String]): Boolean = s match {
     case Left(m)    => channel.onMaintenance(m)
     case Right(cmd) => channel.onCommand(cmd)
   }
   private[this] val isStopped = new AtomicBoolean(false)
   private[sbt] def onProgressEvent(pe: ProgressEvent, terminal: Terminal): Unit
-  self.setDaemon(true)
-  override abstract def run(): Unit = {
+  override def run(): Unit = {
     @tailrec def impl(): Unit = {
       val res = reader.readLine()
       if (!handleInput(res) && !isStopped.get) impl()
@@ -39,14 +38,10 @@ trait UIThread extends Thread with AutoCloseable { self: Thread =>
     try impl()
     catch { case _: InterruptedException | _: ClosedChannelException => isStopped.set(true) }
   }
-  override def close(): Unit = {
-    isStopped.set(true)
-    interrupt()
-    join(5000)
-  }
+  override def close(): Unit = isStopped.set(true)
 }
 
-object UIThread {
+object UITask {
   trait Reader { def readLine(): Either[String, String] }
   object Reader {
     def terminalReader(prompt: Prompt, parser: Parser[_])(
