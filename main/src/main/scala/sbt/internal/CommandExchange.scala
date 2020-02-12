@@ -165,8 +165,7 @@ private[sbt] final class CommandExchange {
 
     def onIncomingSocket(socket: Socket, instance: ServerInstance): Unit = {
       val name = newNetworkName
-      // TODO: Don't use state global log. It can cause logging to mix with console output.
-      s.log.info(s"new client connected: $name")
+      s.log.debug(s"new client connected: $name")
       val channel =
         new NetworkChannel(
           name,
