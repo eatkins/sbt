@@ -116,18 +116,12 @@ private[sbt] final class TaskProgress(exec: Option[Exec])
       Some(ltc),
       exec.flatMap(_.source.map(_.channelName)),
       exec.flatMap(_.execId),
-      exec.map(_.commandLine)
+      exec.map(_.commandLine),
+      Some(containsSkipTasks(active))
     )
     if (active.nonEmpty) maybeStartThread()
-    if (containsSkipTasks(active)) {
-      if (ltc > 0) {
-        lastTaskCount.set(0)
-        appendProgress(event(Vector.empty))
-      }
-    } else {
-      lastTaskCount.set(currentTasksCount)
-      appendProgress(event(currentTasks))
-    }
+    lastTaskCount.set(currentTasksCount)
+    appendProgress(event(currentTasks))
   }
 
   private[this] def containsSkipTasks(tasks: Vector[Task[_]]): Boolean =

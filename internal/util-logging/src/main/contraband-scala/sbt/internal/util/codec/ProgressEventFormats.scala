@@ -17,8 +17,9 @@ implicit lazy val ProgressEventFormat: JsonFormat[sbt.internal.util.ProgressEven
       val channelName = unbuilder.readField[Option[String]]("channelName")
       val execId = unbuilder.readField[Option[String]]("execId")
       val command = unbuilder.readField[Option[String]]("command")
+      val skipIfActive = unbuilder.readField[Option[Boolean]]("skipIfActive")
       unbuilder.endObject()
-      sbt.internal.util.ProgressEvent(level, items, lastTaskCount, channelName, execId, command)
+      sbt.internal.util.ProgressEvent(level, items, lastTaskCount, channelName, execId, command, skipIfActive)
       case None =>
       deserializationError("Expected JsObject but found None")
     }
@@ -31,6 +32,7 @@ implicit lazy val ProgressEventFormat: JsonFormat[sbt.internal.util.ProgressEven
     builder.addField("channelName", obj.channelName)
     builder.addField("execId", obj.execId)
     builder.addField("command", obj.command)
+    builder.addField("skipIfActive", obj.skipIfActive)
     builder.endObject()
   }
 }
