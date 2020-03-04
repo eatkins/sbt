@@ -666,19 +666,21 @@ private[sbt] object ProgressState {
 
           val currentLength = info.foldLeft(0)(_ + terminal.lineCount(_))
           val previousLines = state.progressLines.getAndSet(info)
-          val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
-          val (height, width) = terminal.prompt match {
-            case Prompt.Running =>
-              terminal.getLastLine.map(terminal.getLineHeightAndWidth).getOrElse((0, 0))
-            case a => terminal.getLineHeightAndWidth(a.render())
-          }
-          val prevSize = prevLength + state.padding.get
+          if (previousLines != info) {
+            val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
+            val (height, width) = terminal.prompt match {
+              case Prompt.Running =>
+                terminal.getLastLine.map(terminal.getLineHeightAndWidth).getOrElse((0, 0))
+              case a => terminal.getLineHeightAndWidth(a.render())
+            }
+            val prevSize = prevLength + state.padding.get
 
-          val newPadding = math.max(0, prevSize - currentLength)
-          state.padding.set(newPadding)
-          state.printPrompt(terminal, ps)
-          ps.print(state.printProgress(height, width))
-          ps.flush()
+            val newPadding = math.max(0, prevSize - currentLength)
+            state.padding.set(newPadding)
+            state.printPrompt(terminal, ps)
+            ps.print(state.printProgress(height, width))
+            ps.flush()
+          }
         }
       } else if (state.progressLines.get.nonEmpty) {
         state.progressLines.set(Nil)
