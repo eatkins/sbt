@@ -901,6 +901,8 @@ lazy val mainProj = (project in file("main"))
       exclude[DirectMissingMethodProblem]("sbt.Plugins.topologicalSort"),
       exclude[IncompatibleMethTypeProblem]("sbt.Defaults.allTestGroupsTask"),
       exclude[DirectMissingMethodProblem]("sbt.StandardMain.shutdownHook"),
+      exclude[DirectMissingMethodProblem]("sbt.nio.Keys.compileBinaryFileInputs"),
+      exclude[DirectMissingMethodProblem]("sbt.nio.Keys.compileSourceFileInputs"),
       exclude[MissingClassProblem]("sbt.internal.ResourceLoaderImpl"),
       exclude[IncompatibleSignatureProblem]("sbt.internal.ConfigIndex.*"),
       exclude[IncompatibleSignatureProblem]("sbt.internal.Inspect.*"),
@@ -921,6 +923,8 @@ lazy val mainProj = (project in file("main"))
         "sbt.internal.ReverseLookupClassLoaderHolder$ReverseLookupClassLoader"
       ),
       exclude[MissingClassProblem]("sbt.internal.LayeredClassLoaderImpl"),
+      exclude[MissingClassProblem]("sbt.internal.ExternalHooks"),
+      exclude[MissingClassProblem]("sbt.internal.ExternalHooks$"),
       // false positives
       exclude[DirectMissingMethodProblem]("sbt.plugins.IvyPlugin.requires"),
       exclude[DirectMissingMethodProblem]("sbt.plugins.JUnitXmlReportPlugin.requires"),
