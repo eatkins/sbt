@@ -56,25 +56,28 @@ object UITask {
         try {
           terminal.setPrompt(prompt)
           val p = prompt.mkPrompt()
-          val res = lineReader.readLine(clear + p)
-          res match {
-            case null => Left("kill channel")
-            case s: String =>
-              lineReader.getHistory match {
-                case p: PersistentHistory =>
-                  p.add(s)
-                  p.flush()
-                case _ =>
-              }
-              s match {
-                case cmd if cmd.startsWith("kill ") => Left(cmd)
-                case cmd @ ("shutdown" | "exit")    => Left(cmd)
-                case cmd =>
-                  terminal.setPrompt(Prompt.Running)
-                  terminal.printStream.write(Int.MinValue)
-                  Right(cmd)
-              }
+          @tailrec def impl(): Either[String, String] = {
+            lineReader.readLine(clear + p) match {
+              case null => Left("kill channel")
+              case s: String =>
+                lineReader.getHistory match {
+                  case p: PersistentHistory =>
+                    p.add(s)
+                    p.flush()
+                  case _ =>
+                }
+                s match {
+                  case cmd if cmd.startsWith("kill ") => Left(cmd)
+                  case ""                             => impl()
+                  case cmd @ ("shutdown" | "exit")    => Left(cmd)
+                  case cmd =>
+                    terminal.setPrompt(Prompt.Running)
+                    terminal.printStream.write(Int.MinValue)
+                    Right(cmd)
+                }
+            }
           }
+          impl()
         } catch {
           case _: InterruptedException => Right("")
         } finally lineReader.close()
