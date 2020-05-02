@@ -240,7 +240,7 @@ trait NetworkClientImpl { self =>
         case ("textDocument/publishDiagnostics", Some(json)) =>
           import sbt.internal.langserver.codec.JsonProtocol._
           Converter.fromJson[PublishDiagnosticsParams](json) match {
-            case Success(params) => splitDiagnostics(params)
+            case Success(params) => splitDiagnostics(params); Vector()
             case Failure(_)      => Vector()
           }
         case ("shutdown", Some(_)) => Vector.empty
