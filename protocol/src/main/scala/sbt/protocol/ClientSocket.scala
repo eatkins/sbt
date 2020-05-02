@@ -21,10 +21,7 @@ import org.scalasbt.ipcsocket._
 object ClientSocket {
   private lazy val fileFormats = new BasicJsonProtocol with PortFileFormats with TokenFileFormats {}
 
-  def socket(
-      portfile: File,
-      provider: UnixDomainSocketLibraryProvider
-  ): (Socket, Option[String]) = {
+  def socket(portfile: File): (Socket, Option[String]) = {
     import fileFormats._
     val json: JValue = Parser.parseFromFile(portfile).get
     val p = Converter.fromJson[PortFile](json).get
@@ -45,6 +42,4 @@ object ClientSocket {
     }
     (sk, token)
   }
-  def socket(portfile: File): (Socket, Option[String]) =
-    socket(portfile, UnixDomainSocketLibraryProvider.jna)
 }
