@@ -15,7 +15,7 @@ import jline.console.history.PersistentHistory
 import sbt.BasicKeys.{ historyPath, newShellPrompt }
 import sbt.State
 import sbt.internal.CommandChannel
-import sbt.internal.util.ConsoleAppender.{ ClearScreenFromCursorToBottom, DeleteLine }
+import sbt.internal.util.ConsoleAppender.{ ClearScreenAfterCursor, DeleteLine }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ JLineCompletion, Parser }
 
@@ -52,7 +52,7 @@ object UITask {
       JLineCompletion.installCustomCompletor(lineReader, parser)
       () => {
         import ConsoleAppender._
-        val clear = terminal.ansi(DeleteLine + ClearScreenFromCursorToBottom + CursorLeft1000, "")
+        val clear = terminal.ansi(DeleteLine + ClearScreenAfterCursor + CursorLeft1000, "")
         try {
           terminal.setPrompt(prompt)
           val p = prompt.mkPrompt()
@@ -88,6 +88,6 @@ object UITask {
       case Some(pf) => pf(terminal, s)
       case None =>
         def ansi(s: String): String = if (terminal.isAnsiSupported) s"$s" else ""
-        s"${ansi(DeleteLine)}> ${ansi(ClearScreenFromCursorToBottom)}"
+        s"${ansi(DeleteLine)}> ${ansi(ClearScreenAfterCursor)}"
     }
 }

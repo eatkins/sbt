@@ -685,7 +685,7 @@ private[sbt] object ProgressState {
       } else if (state.progressLines.get.nonEmpty) {
         state.progressLines.set(Nil)
         terminal.withPrintStream { ps =>
-          ps.print(ClearScreenFromCursorToBottom)
+          ps.print(ClearScreenAfterCursor)
           ps.flush()
         }
       }
