@@ -1033,15 +1033,21 @@ lazy val sbtClientProj = (project in file("client"))
     name := "sbt-client",
     crossPaths := false,
     exportJars := true,
+    libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
+    libraryDependencies += "net.java.dev.jna" % "jna-platform" % "5.5.0",
     graalVMNativeImageOptions += "-H:IncludeResourceBundles=jline.console.completer.CandidateListCompletionHandler",
     graalVMNativeImageOptions += {
       val classes = Seq(
         "org.scalasbt.ipcsocket",
+        "org.scalasbt.ipcsocket.Impl",
         "com.sun.jna",
+        "sbt.client",
       )
       s"--initialize-at-run-time=${classes.mkString(",")}"
     },
     graalVMNativeImageOptions += "--verbose",
+    graalVMNativeImageOptions += "--no-fallback",
+    graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",
     generateReflectionConfig := {
       val cp =
         ((Compile / run / fullClasspath).value
