@@ -1026,6 +1026,7 @@ lazy val serverTestProj = (project in file("server-test"))
     },
   )
 val generateReflectionConfig = taskKey[Unit]("generate the graalvm reflection config")
+val genExecutable = taskKey[java.nio.file.Path]("generate a java implementation of the thin client")
 lazy val sbtClientProj = (project in file("client"))
   .dependsOn(sbtProj)
   .enablePlugins(GraalVMNativeImagePlugin)
@@ -1048,6 +1049,18 @@ lazy val sbtClientProj = (project in file("client"))
     graalVMNativeImageOptions += "--verbose",
     graalVMNativeImageOptions += "--no-fallback",
     graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",
+    genExecutable := {
+      val output = target.value.toPath / "bin" / "client"
+      java.nio.file.Files.createDirectories(output.getParent)
+      val cp = (Compile / fullClasspathAsJars).value.map(_.data)
+      java.nio.file.Files.write(output, s"""
+        |#!/bin/sh
+        |
+        |java -cp ${cp.mkString(java.io.File.pathSeparator)} sbt.client.Client $$*
+        """.stripMargin.linesIterator.toSeq.tail.mkString("\n").getBytes)
+      output.toFile.setExecutable(true)
+      output
+    },
     generateReflectionConfig := {
       val cp =
         ((Compile / run / fullClasspath).value
