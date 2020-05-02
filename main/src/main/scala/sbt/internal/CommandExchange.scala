@@ -450,6 +450,14 @@ private[sbt] final class CommandExchange {
       }
     }
     override def run(): Unit = {
+      def shutdown(mt: MaintenanceTask): Unit = {
+        Option(currentExec.get).foreach(cancel)
+        commandQueue.clear()
+        val exit =
+          Exec("shutdown", Some(Exec.newExecId), Some(CommandSource(mt.channel.name)))
+        commandQueue.add(exit)
+        ()
+      }
       @tailrec def impl(): Unit = {
         maintenanceChannelQueue.take match {
           case null =>
@@ -460,14 +468,11 @@ private[sbt] final class CommandExchange {
               case k if k.startsWith("kill") =>
                 val name = k.split("kill[ ]+").lastOption
                 Option(currentExec.get).filter(e => name.contains(e.commandLine)).foreach(cancel)
-              case "exit" => mt.channel.shutdown(false)
-              case "shutdown" =>
-                Option(currentExec.get).foreach(cancel)
-                commandQueue.clear()
-                val exit =
-                  Exec("shutdown", Some(Exec.newExecId), Some(CommandSource(mt.channel.name)))
-                commandQueue.add(exit)
-              case _ =>
+              case "exit" =>
+                mt.channel.shutdown(false)
+                if (mt.channel.name.contains("console")) shutdown(mt)
+              case "shutdown" => shutdown(mt)
+              case _          =>
             }
         }
         if (!isStopped.get) impl()
