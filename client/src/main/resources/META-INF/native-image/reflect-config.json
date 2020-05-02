@@ -1,6 +1,6 @@
 [
   {
-    "name": "org.scalasbt.ipcsocket.Impl",
+    "name": "org.scalasbt.ipcsocket.JNAUnixDomainSocketLibrary",
     "allDeclaredConstructors" : true,
     "allPublicConstructors" : true,
     "allDeclaredMethods" : true,
