@@ -15,7 +15,6 @@ import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue, TimeUnit }
 
-import org.scalasbt.ipcsocket.UnixDomainSocketLibraryProvider
 import sbt.internal.client.NetworkClient.Arguments
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
 import sbt.internal.protocol._
@@ -44,7 +43,6 @@ trait NetworkClientImpl { self =>
   def baseDirectory: File
   def arguments: List[String] = (sbtArguments ++ commandArguments).toList
   def console: ConsoleInterface
-  def provider: UnixDomainSocketLibraryProvider
   def sbtArguments: Seq[String]
   def commandArguments: Seq[String]
   val sbtScript: String
@@ -80,7 +78,7 @@ trait NetworkClientImpl { self =>
       forkServer(portfile)
     }
     val (sk, tkn) =
-      try ClientSocket.socket(portfile, provider)
+      try ClientSocket.socket(portfile)
       catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
@@ -437,7 +435,6 @@ class NetworkClient(
     override val sbtArguments: Seq[String],
     override val commandArguments: Seq[String],
     override val sbtScript: String,
-    override val provider: UnixDomainSocketLibraryProvider
 ) extends {
   override val console: ConsoleInterface = {
     val appender = ConsoleAppender("thin")
@@ -454,7 +451,6 @@ class NetworkClient(
       arguments.sbtArguments,
       arguments.commandArguments,
       arguments.sbtScript,
-      arguments.provider
     )
   def this(configuration: xsbti.AppConfiguration, args: List[String]) =
     this(configuration, NetworkClient.parseArgs(args.toArray))
@@ -466,7 +462,6 @@ class SimpleClient(
     val sbtArguments: Seq[String],
     val commandArguments: Seq[String],
     override val sbtScript: String,
-    override val provider: UnixDomainSocketLibraryProvider
 ) extends {
   override val console: ConsoleInterface = new ConsoleInterface {
     import scala.Console.{ GREEN, RED, RESET, YELLOW }
@@ -494,7 +489,6 @@ object SimpleClient {
       arguments.sbtArguments,
       arguments.commandArguments,
       arguments.sbtScript,
-      arguments.provider
     )
   }
 }
@@ -505,11 +499,9 @@ object NetworkClient {
       val sbtArguments: Seq[String],
       val commandArguments: Seq[String],
       val sbtScript: String,
-      val provider: UnixDomainSocketLibraryProvider
   )
   private[client] def parseArgs(args: Array[String]): Arguments = {
     var i = 0
-    var jni = false
     var sbtScript = "sbt"
     val commandArgs = new mutable.ArrayBuffer[String]
     val sbtArguments = new mutable.ArrayBuffer[String]
@@ -517,7 +509,6 @@ object NetworkClient {
     val SysProp = "-D([^=]+)=(.*)".r
     while (i < args.length) {
       args(i) match {
-        case "--jni" => jni = true
         case a if a.startsWith("--pwd=") =>
           pwd = a.split("--pwd=").lastOption.map(new File(_).getCanonicalFile)
         case a if a.startsWith("--sbt-script=") =>
@@ -532,9 +523,7 @@ object NetworkClient {
       i += 1
     }
     val file = pwd.getOrElse(new File("").getCanonicalFile)
-    val provider =
-      if (jni) UnixDomainSocketLibraryProvider.jni else UnixDomainSocketLibraryProvider.jna
-    new Arguments(file, sbtArguments, commandArgs, sbtScript, provider)
+    new Arguments(file, sbtArguments, commandArgs, sbtScript)
   }
   def run(configuration: xsbti.AppConfiguration, arguments: List[String]): Unit =
     try {
@@ -544,7 +533,6 @@ object NetworkClient {
         args.sbtArguments,
         args.commandArguments,
         args.sbtScript,
-        args.provider
       )
       ()
     } catch {
