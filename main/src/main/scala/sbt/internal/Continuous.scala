@@ -178,6 +178,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       state: State,
       scopedKey: ScopedKey[_],
       compiledMap: CompiledMap,
+      dynamicInputs: mutable.Set[DynamicInput],
   )(implicit extracted: Extracted, logger: Logger): Config = {
 
     // Extract all of the globs that we will monitor during the continuous build.
@@ -189,19 +190,13 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     }
 
     val repository = getRepository(state)
-    val dynamicInputs = state
-      .get(DynamicInputs)
-      .getOrElse {
-        val msg = "Uninitialized dynamic inputs in continuous build (should be unreachable!)"
-        throw new IllegalStateException(msg)
-      }
     dynamicInputs ++= inputs
     logger.debug(s"[watch] [${scopedKey.show}] Found inputs: ${inputs.map(_.glob).mkString(",")}")
     inputs.foreach(i => repository.register(i.glob))
     val watchSettings = new WatchSettings(scopedKey)
     new Config(
       scopedKey.show,
-      () => dynamicInputs.toSeq.sorted,
+      dynamicInputs,
       watchSettings
     )
   }
@@ -312,12 +307,13 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   }
 
   private def getAllConfigs(
-      inputs: Seq[(String, State)]
+      inputs: Seq[(String, State)],
+      dynamicInputs: mutable.Set[DynamicInput],
   )(implicit extracted: Extracted, logger: Logger): Seq[Config] = {
     val commandKeys = inputs.map { case (c, s) => s -> parseCommand(c, s) }
     val compiledMap = SettingsGraph.compile(extracted.structure)
     commandKeys.flatMap {
-      case (s, scopedKeys) => scopedKeys.map(getConfig(s, _, compiledMap))
+      case (s, scopedKeys) => scopedKeys.map(getConfig(s, _, compiledMap, dynamicInputs))
     }
   }
 
@@ -334,13 +330,14 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       channelName: String,
       commands: Seq[String],
       terminal: Terminal,
-      fileStampCache: FileStamp.Cache
+      fileStampCache: FileStamp.Cache,
+      dynamicInputs: mutable.Set[DynamicInput],
   ): Callbacks = {
     implicit val extracted: Extracted = Project.extract(s)
     implicit val logger: Logger = LogExchange.logger(channelName + "-watch")
     setup(s, commands) { (_, valid, invalid) =>
       if (invalid.isEmpty) {
-        val configs = getAllConfigs(valid.map(v => v._1 -> v._2))
+        val configs = getAllConfigs(valid.map(v => v._1 -> v._2), dynamicInputs)
         val appender = ConsoleAppender(channelName + "-watch", terminal)
         val level = configs.minBy(_.watchSettings.logLevel).watchSettings.logLevel
         LogExchange.bindLoggerAppenders(channelName + "-watch", (appender -> level) :: Nil)
@@ -933,9 +930,10 @@ private[sbt] object Continuous extends DeprecatedContinuous {
    */
   private final class Config private[internal] (
       val command: String,
-      val inputs: () => Seq[DynamicInput],
+      val dynamicInputs: mutable.Set[DynamicInput],
       val watchSettings: WatchSettings
   ) {
+    def inputs() = dynamicInputs.toSeq.sorted
     private[sbt] def watchState(count: Int): DeprecatedWatchState =
       WatchState.empty(inputs().map(_.glob)).withCount(count)
 
@@ -1087,14 +1085,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       val dynamicInputs: mutable.Set[DynamicInput]
   ) {
     def beforeCommand(state: State): State = beforeCommandImpl(state, dynamicInputs)
-    def this(
-        count: Int,
-        commands: Seq[String],
-        beforeCommand: (State, mutable.Set[DynamicInput]) => State,
-        afterCommand: State => State,
-        afterWatch: () => Unit,
-        callbacks: Callbacks
-    ) = this(count, commands, beforeCommand, afterCommand, afterWatch, callbacks, mutable.Set.empty)
     def incremented: ContinuousState = withCount(count + 1)
     private def withCount(c: Int): ContinuousState =
       new ContinuousState(
@@ -1156,8 +1146,9 @@ private[sbt] object ContinuousCommands {
             .channelForName(channelName)
             .map(_.terminal)
             .getOrElse(Terminal.get)
+          val dynamicInputs = mutable.Set.empty[DynamicInput]
           def cb: Continuous.Callbacks =
-            Continuous.getCallbacks(state, channelName, commands, terminal, cache)
+            Continuous.getCallbacks(state, channelName, commands, terminal, cache, dynamicInputs)
           val s = new ContinuousState(
             count,
             commands,
@@ -1192,7 +1183,8 @@ private[sbt] object ContinuousCommands {
               LogExchange.unbindLoggerAppenders(channelName + "-watch")
               repo.close()
             },
-            cb
+            cb,
+            dynamicInputs
           )
           Util.ignoreResult(watchStates.put(channelName, s))
         case cs =>
