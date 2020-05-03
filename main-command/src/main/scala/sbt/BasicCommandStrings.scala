@@ -16,6 +16,7 @@ object BasicCommandStrings {
   val Exit: String = "exit"
   val Quit: String = "quit"
   val TemplateCommand: String = "new"
+  private[sbt] val DisconnectNetworkChannel = "__disconnectNetworkChannel"
 
   /** The command name to terminate the program.*/
   val TerminateAction: String = Exit

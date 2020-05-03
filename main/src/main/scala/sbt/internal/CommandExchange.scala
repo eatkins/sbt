@@ -430,6 +430,9 @@ private[sbt] final class CommandExchange {
 
     removeChannels(toDel.toList)
   }
+  private[sbt] def killChannel(channel: String): Unit = {
+    channels.find(_.name == channel).foreach(_.shutdown(false))
+  }
   private[sbt] def updateProgress(pe: ProgressEvent): Unit = {
     lastProgressEvent.set(pe)
     channels.foreach(c => ProgressState.updateProgressState(pe, c.terminal))
