@@ -11,7 +11,8 @@ createSymlinks := {
   Files.createSymbolicLink(foo, base / "file-source" / "Foo.scala")
 }
 
-ThisBuild / watchLogLevel := Level.Debug
+import scala.concurrent.duration._
+ThisBuild / watchDeletionQuarantinePeriod := 50.millis
 
 ThisBuild / watchOnFileInputEvent := {
   val srcDir = baseDirectory.value.toPath / "src" / "main" / "scala"
