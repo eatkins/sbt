@@ -912,32 +912,16 @@ object BuiltinCommands {
     Command.command(ClearCaches, help)(f)
   }
 
-  def waitCmd: Command = Command.command("startExchange") { s0 =>
-    val s1 = StandardMain.exchange.run(s0, false)
-    StandardMain.exchange publishEventMessage ConsolePromptEvent(s1)
-    s1
-  //import sbt.internal.ConsolePromptEvent
-  //val exchange = StandardMain.exchange
-  //println("FUCK RUN")
-  //val s1 = exchange.run(s0, false)
-  //println("publish!")
-  //exchange publishEventMessage ConsolePromptEvent(s1)
-  //println("FUCK")
-  //import scala.concurrent.duration._
-  //val exec: Exec = exchange.blockUntilNextExec(Duration.Inf, Some(s1), s1.globalLogging.full)
-  //if (exec.source.fold(true)(_.channelName != "console0") && !exec.commandLine.startsWith("__")) {
-  //s1.log.info(s"received remote command: ${exec.commandLine}")
-  //}
-  //val newState = s1
-  //.copy(
-  //onFailure = Some(Exec(Shell, None)),
-  //remainingCommands = exec +: Exec(Shell, None) +: s1.remainingCommands
-  //)
-  //.setInteractive(true)
-  //val res =
-  //if (exec.commandLine.trim.isEmpty) newState
-  //else newState.clearGlobalLog
-  //res
+  def waitCmd: Command = Command.command("wait") { s0 =>
+    val exchange = StandardMain.exchange
+    exchange publishEventMessage ConsolePromptEvent(s0)
+    import scala.concurrent.duration.Duration
+    val exec: Exec = exchange.blockUntilNextExec(Duration.Inf, Some(s0), s0.globalLogging.full)
+    val newState = s0.copy(remainingCommands = exec +: s0.remainingCommands)
+    val res =
+      if (exec.commandLine.trim.isEmpty) newState
+      else newState.clearGlobalLog
+    res
   }
 
   def shell: Command = Command.command(Shell, Help.more(Shell, ShellDetailed)) { s0 =>
@@ -945,7 +929,7 @@ object BuiltinCommands {
     println(s"WTF!")
     val exchange = StandardMain.exchange
     val welcomeState = displayWelcomeBanner(s0)
-    val s1 = exchange run (welcomeState, true)
+    val s1 = exchange run (welcomeState, false)
     exchange publishEventMessage ConsolePromptEvent(s0)
     val minGCInterval = Project
       .extract(s1)

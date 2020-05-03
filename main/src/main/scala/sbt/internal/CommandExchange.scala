@@ -126,15 +126,11 @@ private[sbt] final class CommandExchange {
 
   def run(s: State): State = run(s, s.get(autoStartServer).getOrElse(true))
   def run(s: State, autoStart: Boolean): State = {
-    println(s"OH FFS")
     if (consoleChannel.isEmpty) {
       val name = "console0"
-      println(s"FUCK MAKE CONSOLE")
       val console0 = new ConsoleChannel(name, mkAskUser(name))
       consoleChannel = Some(console0)
       subscribe(console0)
-    } else {
-      println("WHAT THE MOTHER FUCK")
     }
     if (autoStartServerSysProp && autoStart) runServer(s)
     else s
@@ -147,12 +143,15 @@ private[sbt] final class CommandExchange {
     Util.ignoreResult(channelBuffer -= c)
   }
 
+  private[sbt] def addScriptedChannel(): Unit = {
+    if (!channels.exists(_.name == "anonymous"))
+      subscribe(new ScriptedCommandChannel(mkAskUser("anonymous")))
+  }
+
   private[this] def mkAskUser(
       name: String,
   ): (State, CommandChannel) => UITask = { (state, channel) =>
-    val blah = ContinuousCommands.watchUIThreadFor(channel)
-    println(blah)
-    blah.getOrElse(new AskUserTask(state, channel))
+    ContinuousCommands.watchUIThreadFor(channel).getOrElse(new AskUserTask(state, channel))
   }
 
   /**
@@ -298,19 +297,11 @@ private[sbt] final class CommandExchange {
     removeChannels(toDel.toList)
   }
 
-  private[sbt] def getLoggerFor(exec: Exec): Option[ManagedLogger] =
-    channels.find(c => exec.source.map(_.channelName).contains(c.name)) match {
-      case Some(c) =>
-        println(s"fuck found $c"); /*Some(c.logger) */
-        None
-      case None => println(s"no channel for $exec"); None
-    }
-
   // This is an interface to directly notify events.
   private[sbt] def notifyEvent[A: JsonFormat](method: String, params: A): Unit = {
     val toDel: ListBuffer[CommandChannel] = ListBuffer.empty
     channels.foreach {
-      case _: ConsoleChannel =>
+      case _: ConsoleChannel | _: ScriptedCommandChannel =>
       // c.publishEvent(event)
       case c: NetworkChannel =>
         try {
@@ -414,9 +405,9 @@ private[sbt] final class CommandExchange {
     event match {
       // Special treatment for ConsolePromptEvent since it's hand coded without codec.
       case entry: ConsolePromptEvent =>
-        println(channels)
         channels collect {
-          case c @ (_: ConsoleChannel | _: NetworkChannel) => c.publishEventMessage(entry)
+          case c @ (_: ConsoleChannel | _: NetworkChannel | _: ScriptedCommandChannel) =>
+            c.publishEventMessage(entry)
         }
       case entry: ExecStatusEvent =>
         channels collect {

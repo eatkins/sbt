@@ -187,6 +187,7 @@ final class ScriptedTests(
    */
   private def createAutoPlugin(testName: String) =
     s"""
+      |package sbt
       |import sbt._, Keys._
       |object InstrumentScripted extends AutoPlugin {
       |  override def trigger = allRequirements
@@ -197,6 +198,7 @@ final class ScriptedTests(
       |    val nameScriptedSetting = name.in(LocalRootProject).:=(
       |        if (name.value.startsWith("sbt_")) "$testName" else name.value)
       |    val state1 = Project.extract(state0).appendWithoutSession(nameScriptedSetting, state0)
+      |    StandardMain.exchange.addScriptedChannel()
       |    "initialize" :: state1
       |  }
       |}

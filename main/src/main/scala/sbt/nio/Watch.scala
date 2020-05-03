@@ -348,7 +348,6 @@ object Watch {
       nextAction: NextAction,
       recursive: Boolean
   ): Watch.Action = {
-    System.err.println("excuse me")
     def safeNextAction(count: Int, delegate: NextAction): Watch.Action =
       try delegate(count)
       catch {
@@ -363,9 +362,7 @@ object Watch {
       case action => action
     }
     @tailrec def impl(count: Int): Watch.Action = {
-      println("HUH")
       task(count)
-      println("\n\n\nFUCK\n\n\n\n")
       safeNextAction(count, onStart) match {
         case Ignore =>
           next(count) match {
