@@ -1286,15 +1286,17 @@ private[sbt] object ContinuousCommands {
     watchStates.get(channel) match {
       case null => state
       case cs =>
-        val pre = StashOnFailure :: s"$preWatch $channel" :: Nil
-        val post = FailureWall :: PopOnFailure :: s"$postWatch $channel" :: Nil
+        val pre = StashOnFailure :: "startExchange" :: s"$preWatch $channel" :: Nil
+        val post = FailureWall :: PopOnFailure :: s"$postWatch $channel" :: "shell" :: Nil
         (pre ::: cs.commands.toList ::: post) ::: state
     }
   }
   private[sbt] def watchUIThreadFor(channel: CommandChannel): Option[UITask] =
-    watchStates.get(channel.name) match {
-      case null => None
-      case cs   => Some(new WatchUITask(channel, cs))
+    watchUIThreadFor(channel, channel.name)
+  private[this] def watchUIThreadFor(channel: CommandChannel, name: String): Option[UITask] =
+    watchStates.get(name) match {
+      case null if name == "anonymous" => watchUIThreadFor(channel, "console0")
+      case cs                          => Some(new WatchUITask(channel, cs))
     }
   private[this] class WatchUITask(
       override private[sbt] val channel: CommandChannel,
@@ -1303,14 +1305,17 @@ private[sbt] object ContinuousCommands {
       with UITask {
     override private[sbt] def reader: UITask.Reader = () => {
       def stop = Right(s"${ContinuousCommands.stopWatch} ${channel.name}")
-      val exitAction: Watch.Action =
+      println(s"DIE BASTARD")
+      val exitAction: Watch.Action = {
+        println(s"What the mother fuck")
         Watch.apply(
           cs.count,
-          _ => (),
+          _ => { println(s"FUCK\n\n\n\n\n\n\nSHOW ME!!!!"); () },
           cs.callbacks.onStart,
           cs.callbacks.nextEvent,
           recursive = false
         )
+      }
       exitAction match {
         case Watch.Trigger       => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
         case Watch.Reload        => Right("reload")

@@ -11,6 +11,8 @@ createSymlinks := {
   Files.createSymbolicLink(foo, base / "file-source" / "Foo.scala")
 }
 
+ThisBuild / watchLogLevel := Level.Debug
+
 ThisBuild / watchOnFileInputEvent := {
   val srcDir = baseDirectory.value.toPath / "src" / "main" / "scala"
   (_: Int, event: Watch.Event) =>
@@ -29,6 +31,7 @@ copySource := {
   }
   val base = baseDirectory.value.toPath
   Files.copy((base / "changes").resolve(relative), base.resolve(relative), REPLACE_EXISTING)
+  println(s"should have copied ${base.resolve(relative)}")
 }
 
 val removeLink = inputKey[Unit]("remove a symlink")

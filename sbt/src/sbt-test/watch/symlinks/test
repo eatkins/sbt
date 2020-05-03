@@ -1,3 +1,5 @@
+> startExchange
+
 > createSymlinks
 
 > skipWindows ~compile; copySource file-source/Foo.scala
