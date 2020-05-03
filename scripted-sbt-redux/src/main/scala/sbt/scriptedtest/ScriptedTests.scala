@@ -198,7 +198,7 @@ final class ScriptedTests(
       |    val nameScriptedSetting = name.in(LocalRootProject).:=(
       |        if (name.value.startsWith("sbt_")) "$testName" else name.value)
       |    val state1 = Project.extract(state0).appendWithoutSession(nameScriptedSetting, state0)
-      |    StandardMain.exchange.addScriptedChannel()
+      |    StandardMain.exchange.addBatchChannel(useSuperShell = false)
       |    "initialize" :: state1
       |  }
       |}
