@@ -1,3 +1,1 @@
 * Add ctrl+z support for thin client
-* 'q' in client watch shutsdown the server
-* watch session gets prompt about killing task that won't work
