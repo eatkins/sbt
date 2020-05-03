@@ -334,6 +334,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       dynamicInputs: mutable.Set[DynamicInput],
   ): Callbacks = {
     implicit val extracted: Extracted = Project.extract(s)
+    StandardMain.exchange.addBatchChannel(extracted.getOpt(Keys.useSuperShell).getOrElse(false))
     implicit val logger: Logger = LogExchange.logger(channelName + "-watch")
     setup(s, commands) { (_, valid, invalid) =>
       if (invalid.isEmpty) {

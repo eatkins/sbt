@@ -26,8 +26,9 @@ private[sbt] final class ConsoleChannel(
 
 }
 
-private[sbt] final class ScriptedCommandChannel(
-    override private[sbt] val mkUIThread: (State, CommandChannel) => UITask
+private[sbt] sealed class BatchCommandChannel(
+    override private[sbt] val mkUIThread: (State, CommandChannel) => UITask,
+    useSuperShell: Boolean
 ) extends CommandChannel {
   override val name: String = "anonymous"
 
@@ -51,7 +52,7 @@ private[sbt] final class ScriptedCommandChannel(
     def isAnsiSupported: Boolean = delegate.isAnsiSupported
     def isColorEnabled: Boolean = delegate.isColorEnabled
     def isEchoEnabled: Boolean = delegate.isEchoEnabled
-    def isSupershellEnabled: Boolean = false
+    def isSupershellEnabled: Boolean = useSuperShell
     def outputStream: java.io.OutputStream = System.out
     private[sbt] def printStream: java.io.PrintStream = System.out
     private[sbt] def withPrintStream[T](f: java.io.PrintStream => T): T = f(System.out)

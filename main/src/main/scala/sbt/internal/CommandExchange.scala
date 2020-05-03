@@ -143,9 +143,9 @@ private[sbt] final class CommandExchange {
     Util.ignoreResult(channelBuffer -= c)
   }
 
-  private[sbt] def addScriptedChannel(): Unit = {
+  private[sbt] def addBatchChannel(useSuperShell: Boolean): Unit = {
     if (!channels.exists(_.name == "anonymous"))
-      subscribe(new ScriptedCommandChannel(mkAskUser("anonymous")))
+      subscribe(new BatchCommandChannel(mkAskUser("anonymous"), useSuperShell))
   }
 
   private[this] def mkAskUser(
@@ -301,7 +301,7 @@ private[sbt] final class CommandExchange {
   private[sbt] def notifyEvent[A: JsonFormat](method: String, params: A): Unit = {
     val toDel: ListBuffer[CommandChannel] = ListBuffer.empty
     channels.foreach {
-      case _: ConsoleChannel | _: ScriptedCommandChannel =>
+      case _: ConsoleChannel | _: BatchCommandChannel =>
       // c.publishEvent(event)
       case c: NetworkChannel =>
         try {
@@ -406,7 +406,7 @@ private[sbt] final class CommandExchange {
       // Special treatment for ConsolePromptEvent since it's hand coded without codec.
       case entry: ConsolePromptEvent =>
         channels collect {
-          case c @ (_: ConsoleChannel | _: NetworkChannel | _: ScriptedCommandChannel) =>
+          case c @ (_: ConsoleChannel | _: NetworkChannel | _: BatchCommandChannel) =>
             c.publishEventMessage(entry)
         }
       case entry: ExecStatusEvent =>
