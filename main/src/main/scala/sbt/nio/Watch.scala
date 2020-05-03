@@ -228,6 +228,9 @@ object Watch {
     override def hashCode: Int = throwable.hashCode
     override def toString: String = s"HandleError($throwable)"
   }
+  object HandleError {
+    def unapply(h: HandleError): Option[Throwable] = Some(h.throwable)
+  }
 
   /**
    * Action that indicates that an error has occurred. The watch will be terminated when this action
@@ -236,6 +239,9 @@ object Watch {
   private[sbt] final class HandleUnexpectedError(override val throwable: Throwable)
       extends HandleError(throwable) {
     override def toString: String = s"HandleUnexpectedError($throwable)"
+  }
+  object HandleUnexpectedError {
+    def unapply(h: HandleUnexpectedError): Option[Throwable] = Some(h.throwable)
   }
 
   /**

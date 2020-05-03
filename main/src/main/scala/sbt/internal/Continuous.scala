@@ -1100,8 +1100,13 @@ private[sbt] object Continuous extends DeprecatedContinuous {
 }
 
 private[sbt] object ContinuousCommands {
-  private[sbt] def value: Seq[Command] =
-    runWatchCommand :: preWatchCommand :: postWatchCommand :: stopWatchCommand :: Nil
+  private[sbt] def value: Seq[Command] = Vector(
+    failWatchCommand,
+    preWatchCommand,
+    postWatchCommand,
+    runWatchCommand,
+    stopWatchCommand,
+  )
   private[sbt] val watchStateCallbacks =
     AttributeKey[java.util.Map[String, (State => State, State => State)]](
       "sbt-watch-state-callbacks",
@@ -1116,6 +1121,7 @@ private[sbt] object ContinuousCommands {
   private[sbt] val preWatch = "__preWatch"
   private[sbt] val postWatch = "__postWatch"
   private[sbt] val stopWatch = "__stopWatch"
+  private[sbt] val failWatch = "__failWatch"
   private[this] def noComplete[T](p: Parser[T]): Parser[T] = p.examples()
   private[this] val space = noComplete(Space)
   private[this] def cmdParser(s: String): Parser[String] = noComplete(matched(s)) <~ space
@@ -1149,10 +1155,11 @@ private[sbt] object ContinuousCommands {
           val dynamicInputs = mutable.Set.empty[DynamicInput]
           def cb: Continuous.Callbacks =
             Continuous.getCallbacks(state, channelName, commands, terminal, cache, dynamicInputs)
+
           val s = new ContinuousState(
-            count,
-            commands,
-            (state, dynamicInputs) => {
+            count = count,
+            commands = commands,
+            beforeCommandImpl = (state, dynamicInputs) => {
               val original = state
                 .get(globalFileTreeRepository)
                 .getOrElse(
@@ -1167,7 +1174,7 @@ private[sbt] object ContinuousCommands {
                 else stateWithRepo
               stateWithCache.put(Continuous.DynamicInputs, dynamicInputs)
             },
-            state => {
+            afterCommand = state => {
               watchStates.get(channelName) match {
                 case null =>
                 case ws   => watchStates.put(channelName, ws.incremented)
@@ -1178,13 +1185,13 @@ private[sbt] object ContinuousCommands {
               }
               restoredState.remove(persistentFileStampCache).remove(Continuous.DynamicInputs)
             },
-            () => {
+            afterWatch = () => {
               watchStates.remove(channelName)
               LogExchange.unbindLoggerAppenders(channelName + "-watch")
               repo.close()
             },
-            cb,
-            dynamicInputs
+            callbacks = cb,
+            dynamicInputs = dynamicInputs
           )
           Util.ignoreResult(watchStates.put(channelName, s))
         case cs =>
@@ -1233,11 +1240,12 @@ private[sbt] object ContinuousCommands {
         )
       }
       exitAction match {
-        case Watch.Trigger       => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
-        case Watch.Reload        => Right("reload")
-        case Watch.Run(commands) => stop.map(_ +: commands.map(_.commandLine) mkString ";")
-        case Watch.CancelWatch   => stop
-        case _                   => stop
+        case Watch.Trigger        => Right(s"${ContinuousCommands.runWatch} ${channel.name}")
+        case Watch.Reload         => stop.map(_ :: "reload" :: Nil mkString "; ")
+        case Watch.Run(commands)  => stop.map(_ +: commands.map(_.commandLine) mkString "; ")
+        case Watch.CancelWatch    => stop
+        case Watch.HandleError(_) => stop.map(_ :: failWatch :: Nil mkString "; ")
+        case _                    => stop
       }
     }
     override private[sbt] def onProgressEvent(
@@ -1256,6 +1264,9 @@ private[sbt] object ContinuousCommands {
   private[this] val stopWatchCommand = watchCommand(stopWatch) { (channel, state) =>
     watchState(channel).afterWatch()
     state
+  }
+  private[this] val failWatchCommand = watchCommand(failWatch) { (channel, state) =>
+    state.fail
   }
   /*
    * Creates a FileTreeRepository where it is safe to call close without inadvertently cancelling
