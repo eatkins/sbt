@@ -124,18 +124,19 @@ private[sbt] final class CommandExchange {
     res
   }
 
-  def run(s: State): State = {
+  def run(s: State): State = run(s, s.get(autoStartServer).getOrElse(true))
+  def run(s: State, autoStart: Boolean): State = {
+    println(s"OH FFS")
     if (consoleChannel.isEmpty) {
       val name = "console0"
+      println(s"FUCK MAKE CONSOLE")
       val console0 = new ConsoleChannel(name, mkAskUser(name))
       consoleChannel = Some(console0)
       subscribe(console0)
+    } else {
+      println("WHAT THE MOTHER FUCK")
     }
-    val autoStartServerAttr = s get autoStartServer match {
-      case Some(bool) => bool
-      case None       => true
-    }
-    if (autoStartServerSysProp && autoStartServerAttr) runServer(s)
+    if (autoStartServerSysProp && autoStart) runServer(s)
     else s
   }
   private[sbt] def setState(s: State): Unit = lastState.set(s)
@@ -149,7 +150,9 @@ private[sbt] final class CommandExchange {
   private[this] def mkAskUser(
       name: String,
   ): (State, CommandChannel) => UITask = { (state, channel) =>
-    ContinuousCommands.watchUIThreadFor(channel).getOrElse(new AskUserTask(state, channel))
+    val blah = ContinuousCommands.watchUIThreadFor(channel)
+    println(blah)
+    blah.getOrElse(new AskUserTask(state, channel))
   }
 
   /**
@@ -411,6 +414,7 @@ private[sbt] final class CommandExchange {
     event match {
       // Special treatment for ConsolePromptEvent since it's hand coded without codec.
       case entry: ConsolePromptEvent =>
+        println(channels)
         channels collect {
           case c @ (_: ConsoleChannel | _: NetworkChannel) => c.publishEventMessage(entry)
         }
