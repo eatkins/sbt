@@ -1212,13 +1212,7 @@ private[sbt] object ContinuousCommands {
   private[sbt] def watchUIThreadFor(channel: CommandChannel): Option[UITask] = {
     val res = watchStates.get(channel.name) match {
       case null => None
-      //if (channel.name == "console0") {
-      //watchStates.get("anonymous") match {
-      //case null => None
-      //case cs   => Some(new WatchUITask(channel, cs))
-      //}
-      //} else None
-      case cs => Some(new WatchUITask(channel, cs))
+      case cs   => Some(new WatchUITask(channel, cs))
     }
     res
   }
