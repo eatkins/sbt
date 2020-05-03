@@ -23,6 +23,7 @@ import sbt.internal.CommandStrings.BootCommand
 import sbt.internal._
 import sbt.internal.inc.ScalaInstance
 import sbt.internal.nio.{ FileTreeRepository, PollingWatchService }
+import sbt.internal.server.NetworkChannel
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ Parser, SizeParser }
@@ -251,6 +252,7 @@ object BuiltinCommands {
       act,
       continuous,
       clearCaches,
+      NetworkChannel.disconnect,
     ) ++ allBasicCommands ++ ContinuousCommands.value
 
   def DefaultBootCommands: Seq[String] =
@@ -920,7 +922,7 @@ object BuiltinCommands {
       .getOpt(Keys.minForcegcInterval)
       .getOrElse(GCUtil.defaultMinForcegcInterval)
     val exec: Exec = exchange.blockUntilNextExec(minGCInterval, Some(s1), s1.globalLogging.full)
-    if (exec.source.fold(true)(_.channelName != "console0")) {
+    if (exec.source.fold(true)(_.channelName != "console0") && !exec.commandLine.startsWith("__")) {
       s1.log.info(s"received remote command: ${exec.commandLine}")
     }
     val newState = s1

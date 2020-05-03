@@ -18,7 +18,7 @@ import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlock
 
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
 import sbt.internal.util.{ ObjectEvent, StringEvent, Terminal }
-import sbt.internal.util.complete.Parser
+import sbt.internal.util.complete.{ Parser, Parsers }
 import sbt.internal.util.codec.JValueFormats
 import sbt.internal.protocol.{
   JsonRpcResponseError,
@@ -703,4 +703,13 @@ object NetworkChannel {
         Left("No tasks under execution")
     }
   }
+
+  private[sbt] val disconnect: Command =
+    Command.arb { s =>
+      val dncParser: Parser[String] = BasicCommandStrings.DisconnectNetworkChannel
+      dncParser.examples() ~> Parsers.Space.examples() ~> Parsers.any.*.examples()
+    } { (st, channel) =>
+      StandardMain.exchange.killChannel(channel.mkString)
+      st
+    }
 }
