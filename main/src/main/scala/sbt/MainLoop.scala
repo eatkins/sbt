@@ -19,6 +19,7 @@ import sbt.io.{ IO, Using }
 import sbt.nio.Keys._
 import sbt.protocol._
 import sbt.util.Logger
+import sbt.internal.inc.{ Benchmark => bm }
 
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
@@ -178,88 +179,92 @@ object MainLoop {
 
   /** This is the main function State transfer function of the sbt command processing. */
   def processCommand(exec: Exec, state: State): State = {
-    val channelName = exec.source map (_.channelName)
-    StandardMain.exchange publishEventMessage
-      ExecStatusEvent("Processing", channelName, exec.execId, Vector())
-    try {
-      def process(): State = {
-        val originalLogger = state.globalLogging
-        val progressState = state.get(sbt.Keys.currentTaskProgress) match {
-          case Some(_) => state
-          case _ =>
-            if (state.get(Keys.stateBuildStructure).isDefined) {
-              val extracted = Project.extract(state)
-              val progress = EvaluateTask.executeProgress(extracted, extracted.structure, state)
-              state.put(sbt.Keys.currentTaskProgress, new Keys.TaskProgress(progress))
-            } else state
-        }
-        StandardMain.exchange.publishEventMessage(ConsoleUnpromptEvent(exec.source, progressState))
-        val execSource = exec.source.map(_.channelName)
-        val newState = (StandardMain.exchange.channels.collectFirst {
-          case c: CommandChannel if execSource.contains(c.name) => c
-        } match {
-          case Some(channel) =>
-            Terminal.withTerminal(channel.terminal) {
-              Command.process(exec.commandLine, progressState)
-            }
-          case _ =>
-            Command.process(exec.commandLine, progressState)
-        }).copy(globalLogging = originalLogger)
-        if (exec.commandLine.contains("session"))
-          newState.get(hasCheckedMetaBuild).foreach(_.set(false))
-        val doneEvent = ExecStatusEvent(
-          "Done",
-          channelName,
-          exec.execId,
-          newState.remainingCommands.toVector map (_.commandLine),
-          exitCode(newState, state),
-        )
-        if (doneEvent.execId.isDefined) { // send back a response or error
-          import sbt.protocol.codec.JsonProtocol._
-          StandardMain.exchange publishEvent doneEvent
-        } else { // send back a notification
-          StandardMain.exchange publishEventMessage doneEvent
-        }
-        newState.get(sbt.Keys.currentTaskProgress).foreach(_.progress.stop())
-        newState.remove(sbt.Keys.currentTaskProgress)
-      }
-      // The split on space is to handle 'reboot full' and 'reboot'.
-      val res = state.currentCommand.flatMap(_.commandLine.trim.split(" ").headOption) match {
-        case Some("reload") =>
-          // Reset the hasCheckedMetaBuild parameter so that the next call to checkBuildSources
-          // updates the previous cache for checkBuildSources / fileInputStamps but doesn't log.
-          state.get(hasCheckedMetaBuild).foreach(_.set(false))
-          process()
-        case Some("exit") | Some("reboot") => process()
-        case _ =>
-          val emptyState = state.copy(remainingCommands = Nil).put(Aggregation.suppressShow, true)
-          Parser.parse("checkBuildSources", emptyState.combinedParser) match {
-            case Right(cmd) =>
-              cmd() match {
-                case s if s.remainingCommands.headOption.map(_.commandLine).contains("reload") =>
-                  Exec("reload", None, None) +: exec +: state
-                case _ => process()
-              }
-            case _ => process()
+    bm(exec.commandLine) {
+      val channelName = exec.source map (_.channelName)
+      StandardMain.exchange publishEventMessage
+        ExecStatusEvent("Processing", channelName, exec.execId, Vector())
+      try {
+        def process(): State = {
+          val originalLogger = state.globalLogging
+          val progressState = state.get(sbt.Keys.currentTaskProgress) match {
+            case Some(_) => state
+            case _ =>
+              if (state.get(Keys.stateBuildStructure).isDefined) {
+                val extracted = Project.extract(state)
+                val progress = EvaluateTask.executeProgress(extracted, extracted.structure, state)
+                state.put(sbt.Keys.currentTaskProgress, new Keys.TaskProgress(progress))
+              } else state
           }
+          StandardMain.exchange.publishEventMessage(
+            ConsoleUnpromptEvent(exec.source, progressState)
+          )
+          val execSource = exec.source.map(_.channelName)
+          val newState = (StandardMain.exchange.channels.collectFirst {
+            case c: CommandChannel if execSource.contains(c.name) => c
+          } match {
+            case Some(channel) =>
+              Terminal.withTerminal(channel.terminal) {
+                Command.process(exec.commandLine, progressState)
+              }
+            case _ =>
+              Command.process(exec.commandLine, progressState)
+          }).copy(globalLogging = originalLogger)
+          if (exec.commandLine.contains("session"))
+            newState.get(hasCheckedMetaBuild).foreach(_.set(false))
+          val doneEvent = ExecStatusEvent(
+            "Done",
+            channelName,
+            exec.execId,
+            newState.remainingCommands.toVector map (_.commandLine),
+            exitCode(newState, state),
+          )
+          if (doneEvent.execId.isDefined) { // send back a response or error
+            import sbt.protocol.codec.JsonProtocol._
+            StandardMain.exchange publishEvent doneEvent
+          } else { // send back a notification
+            StandardMain.exchange publishEventMessage doneEvent
+          }
+          newState.get(sbt.Keys.currentTaskProgress).foreach(_.progress.stop())
+          newState.remove(sbt.Keys.currentTaskProgress)
+        }
+        // The split on space is to handle 'reboot full' and 'reboot'.
+        val res = state.currentCommand.flatMap(_.commandLine.trim.split(" ").headOption) match {
+          case Some("reload") =>
+            // Reset the hasCheckedMetaBuild parameter so that the next call to checkBuildSources
+            // updates the previous cache for checkBuildSources / fileInputStamps but doesn't log.
+            state.get(hasCheckedMetaBuild).foreach(_.set(false))
+            process()
+          case Some("exit") | Some("reboot") => process()
+          case _ =>
+            val emptyState = state.copy(remainingCommands = Nil).put(Aggregation.suppressShow, true)
+            bm("parse")(Parser.parse("checkBuildSources", emptyState.nonMultiParser)) match {
+              case Right(cmd) =>
+                bm("checkbuild")(cmd()) match {
+                  case s if s.remainingCommands.headOption.map(_.commandLine).contains("reload") =>
+                    Exec("reload", None, None) +: exec +: state
+                  case _ => process()
+                }
+              case _ => process()
+            }
+        }
+        res
+      } catch {
+        case err: JsonRpcResponseError =>
+          StandardMain.exchange.respondError(err, exec.execId, channelName.map(CommandSource(_)))
+          throw err
+        case err: Throwable =>
+          val errorEvent = ExecStatusEvent(
+            "Error",
+            channelName,
+            exec.execId,
+            Vector(),
+            ExitCode(ErrorCodes.UnknownError),
+            Option(err.getMessage),
+          )
+          import sbt.protocol.codec.JsonProtocol._
+          StandardMain.exchange.publishEvent(errorEvent)
+          throw err
       }
-      res
-    } catch {
-      case err: JsonRpcResponseError =>
-        StandardMain.exchange.respondError(err, exec.execId, channelName.map(CommandSource(_)))
-        throw err
-      case err: Throwable =>
-        val errorEvent = ExecStatusEvent(
-          "Error",
-          channelName,
-          exec.execId,
-          Vector(),
-          ExitCode(ErrorCodes.UnknownError),
-          Option(err.getMessage),
-        )
-        import sbt.protocol.codec.JsonProtocol._
-        StandardMain.exchange.publishEvent(errorEvent)
-        throw err
     }
   }
 
