@@ -15,7 +15,7 @@ import jline.console.history.PersistentHistory
 import sbt.BasicKeys.{ historyPath, newShellPrompt }
 import sbt.State
 import sbt.internal.CommandChannel
-import sbt.internal.util.ConsoleAppender.{ ClearScreenAfterCursor, DeleteLine }
+import sbt.internal.util.ConsoleAppender.{ ClearScreenAfterCursor, CursorLeft1000, DeleteLine }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ JLineCompletion, Parser }
 
@@ -51,8 +51,7 @@ object UITask {
       val lineReader = LineReader.createReader(history(state), terminal, prompt)
       JLineCompletion.installCustomCompletor(lineReader, parser)
       () => {
-        import ConsoleAppender._
-        val clear = terminal.ansi(DeleteLine + ClearScreenAfterCursor + CursorLeft1000, "")
+        val clear = terminal.ansi(CursorLeft1000 + ClearScreenAfterCursor, "")
         try {
           terminal.setPrompt(prompt)
           val p = prompt.mkPrompt()
