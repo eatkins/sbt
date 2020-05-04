@@ -132,8 +132,10 @@ private[sbt] final class CommandExchange {
       consoleChannel = Some(console0)
       subscribe(console0)
     }
-    if (autoStartServerSysProp && autoStart) runServer(s)
-    else s
+    if (autoStartServerSysProp) println("ok")
+    runServer(s)
+    //if (autoStartServerSysProp && autoStart) runServer(s)
+    //else s
   }
   private[sbt] def setState(s: State): Unit = lastState.set(s)
 

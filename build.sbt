@@ -1028,7 +1028,7 @@ lazy val serverTestProj = (project in file("server-test"))
 val generateReflectionConfig = taskKey[Unit]("generate the graalvm reflection config")
 val genExecutable = taskKey[java.nio.file.Path]("generate a java implementation of the thin client")
 lazy val sbtClientProj = (project in file("client"))
-  .dependsOn(sbtProj)
+  .dependsOn(commandProj)
   .enablePlugins(GraalVMNativeImagePlugin)
   .settings(
     name := "sbt-client",
