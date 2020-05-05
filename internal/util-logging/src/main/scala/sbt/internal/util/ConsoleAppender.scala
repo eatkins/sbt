@@ -601,7 +601,6 @@ private[sbt] final class ProgressState(
 
   private[util] def printPrompt(terminal: Terminal, printStream: PrintStream): Unit =
     if (terminal.prompt != Prompt.Running) {
-      System.err.println(s"$terminal ${terminal.isAnsiSupported}")
       val prefix = if (terminal.isAnsiSupported) s"$DeleteLine$CursorLeft1000" else ""
       val pmpt = prefix.getBytes ++ terminal.prompt.render().getBytes
       pmpt.foreach(b => printStream.write(b & 0xFF))
