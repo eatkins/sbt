@@ -33,9 +33,7 @@ private[sbt] object Prompt {
       override def flush(): Unit = terminal.withPrintStream(_.flush())
     }
 
-    override def render(): String =
-      ConsoleAppender.DeleteLine + ConsoleAppender.CursorLeft1000 +
-        new String(bytes.asScala.toArray.map(_.toByte)) + ConsoleAppender.ClearScreenAfterCursor
+    override def render(): String = new String(bytes.asScala.toArray.map(_.toByte))
   }
   private[sbt] case object Running extends Prompt {
     override val mkPrompt: () => String = () => ""
