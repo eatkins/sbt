@@ -70,10 +70,6 @@ import sbt.librarymanagement.CrossVersion.{ binarySbtVersion, binaryScalaVersion
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy._
 import sbt.librarymanagement.syntax._
-<<<<<<< HEAD
-//import sbt.nio.FileStamp.Formats.seqPathFileStampJsonFormatter
-=======
->>>>>>> Remove custom ExternalHooks
 import sbt.nio.Keys._
 import sbt.nio.file.syntax._
 import sbt.nio.file.{ FileTreeView, Glob, RecursiveGlob }
@@ -197,9 +193,7 @@ object Defaults extends BuildCommon {
         val ih = app.provider.scalaProvider.launcher.ivyHome
         val coursierCache = csrCacheDirectory.value
         val javaHome = Paths.get(sys.props("java.home"))
-        Vector(base.toPath, boot.toPath, coursierCache.toPath, ih.toPath, javaHome).map { p =>
-          scala.util.Try(p.toRealPath()).getOrElse(p.toAbsolutePath)
-        }
+        Vector(base.toPath, boot.toPath, coursierCache.toPath, ih.toPath, javaHome)
       },
       fileConverter := MappedFileConverter(rootPaths.value, allowMachinePath.value),
       fullServerHandlers := {
@@ -208,40 +202,7 @@ object Defaults extends BuildCommon {
           ++ Vector(ServerHandler.fallback))
       },
       uncachedStamper := Stamps.uncachedStamps(fileConverter.value),
-      reusableStamper := {
-        val converter = fileConverter.value
-        val unmanagedCache = unmanagedFileStampCache.value
-        val managedCache = managedFileStampCache.value
-        val backing =
-          Stamps.timeWrapLibraryStamps(uncachedStamper.value, fileConverter.value)
-        new xsbti.compile.analysis.ReadStamps {
-          def getAllLibraryStamps()
-              : java.util.Map[xsbti.VirtualFileRef, xsbti.compile.analysis.Stamp] =
-            backing.getAllLibraryStamps()
-          def getAllProductStamps()
-              : java.util.Map[xsbti.VirtualFileRef, xsbti.compile.analysis.Stamp] =
-            backing.getAllProductStamps()
-          def getAllSourceStamps()
-              : java.util.Map[xsbti.VirtualFileRef, xsbti.compile.analysis.Stamp] =
-            new java.util.HashMap[xsbti.VirtualFileRef, xsbti.compile.analysis.Stamp]
-          def library(fr: xsbti.VirtualFileRef): xsbti.compile.analysis.Stamp = {
-            val path = converter.toPath(fr)
-            managedCache
-              .getOrElseUpdate(path, sbt.nio.FileStamper.Hash)
-              .map(_.stamp)
-              .getOrElse(backing.library(fr))
-          }
-          def product(fr: xsbti.VirtualFileRef): xsbti.compile.analysis.Stamp = backing.product(fr)
-          def source(fr: xsbti.VirtualFile): xsbti.compile.analysis.Stamp = {
-            val path = converter.toPath(fr)
-            unmanagedCache
-              .get(path)
-              .orElse(managedCache.getOrElseUpdate(path, sbt.nio.FileStamper.Hash))
-              .map(_.stamp)
-              .getOrElse(backing.source(fr))
-          }
-        }
-      },
+      reusableStamper := Stamps.timeWrapLibraryStamps(uncachedStamper.value, fileConverter.value),
       traceLevel in run :== 0,
       traceLevel in runMain :== 0,
       traceLevel in bgRun :== 0,
@@ -684,7 +645,49 @@ object Defaults extends BuildCommon {
         else ""
       s"inc_compile$extra.zip"
     },
+    /*
+    // Comment this out because Zinc now uses farm hash to invalidate the virtual paths.
+    // To use watch to detect initial changes, we need to revalidate using content hash.
+    externalHooks := {
+      import sbt.nio.FileChanges
+      import sjsonnew.BasicJsonProtocol.mapFormat
+      val currentInputs =
+        (unmanagedSources / inputFileStamps).value ++ (managedSourcePaths / outputFileStamps).value
+      val sv = scalaVersion.value
+      val previousInputs = compileSourceFileInputs.previous.flatMap(_.get(sv))
+      val inputChanges = previousInputs
+        .map(sbt.nio.Settings.changedFiles(_, currentInputs))
+        .getOrElse(FileChanges.noPrevious(currentInputs.map(_._1)))
+      val currentOutputs = (dependencyClasspathFiles / outputFileStamps).value
+      val previousOutputs = compileBinaryFileInputs.previous.flatMap(_.get(sv))
+      val outputChanges = previousOutputs
+        .map(sbt.nio.Settings.changedFiles(_, currentOutputs))
+        .getOrElse(FileChanges.noPrevious(currentOutputs.map(_._1)))
+      ExternalHooks.default.value(inputChanges, outputChanges, fileTreeView.value)
+    },
+     */
     externalHooks := IncOptions.defaultExternal,
+    //compileSourceFileInputs := {
+    //import sjsonnew.BasicJsonProtocol.mapFormat
+    //compile.value // ensures the inputFileStamps previous value is only set if compile succeeds.
+    //val version = scalaVersion.value
+    //val versions = crossScalaVersions.value.toSet + version
+    //val prev: Map[String, Seq[(java.nio.file.Path, sbt.nio.FileStamp)]] =
+    //compileSourceFileInputs.previous.map(_.filterKeys(versions)).getOrElse(Map.empty)
+    //prev + (version ->
+    //((unmanagedSources / inputFileStamps).value ++ (managedSourcePaths / outputFileStamps).value))
+    //},
+    //compileSourceFileInputs := compileSourceFileInputs.triggeredBy(compile).value,
+    //compileBinaryFileInputs := {
+    //import sjsonnew.BasicJsonProtocol.mapFormat
+    //compile.value // ensures the inputFileStamps previous value is only set if compile succeeds.
+    //val version = scalaVersion.value
+    //val versions = crossScalaVersions.value.toSet + version
+    //val prev: Map[String, Seq[(java.nio.file.Path, sbt.nio.FileStamp)]] =
+    //compileBinaryFileInputs.previous.map(_.filterKeys(versions)).getOrElse(Map.empty)
+    //prev + (version -> (dependencyClasspathFiles / outputFileStamps).value)
+    //},
+    //compileBinaryFileInputs := compileBinaryFileInputs.triggeredBy(compile).value,
     incOptions := {
       val old = incOptions.value
       old
