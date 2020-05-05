@@ -662,7 +662,7 @@ object Terminal {
       case width if width > 0 =>
         val position = EscHelpers.cursorPosition(line)
         val count = (position + width - 1) / width
-        (count, position - ((count - 1) * width))
+        (count, position - (math.max((count - 1), 0) * width))
       case _ => (0, 0)
     }
 

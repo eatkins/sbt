@@ -91,7 +91,6 @@ object EscHelpers {
   private[this] val csi = 2
   def cursorPosition(s: String): Int = {
     val bytes = s.getBytes
-    val res = Array.fill[Byte](bytes.length)(0)
     var i = 0
     var index = 0
     var state = 0
@@ -106,16 +105,15 @@ object EscHelpers {
         case '[' if state == esc => state = csi
         case 8 =>
           state = 0
-          index = math.max(index - 1, 0)
+          index = index - 1
         case b if state == csi =>
           leftDigit = Try(new String(digit.toArray).toInt).getOrElse(0)
           state = 0
           b.toChar match {
             case 'D' => index = math.max(index - leftDigit, 0)
-            case 'C' => index = math.min(index + leftDigit, res.length - 1)
-            case 'K' | 'J' =>
-              if (leftDigit > 0) (0 until index).foreach(res(_) = 32)
-              else res(index) = 32
+            case 'C' => index += leftDigit
+            case 'K' =>
+            case 'J' => if (leftDigit == 2) index = 0
             case 'm' =>
             case ';' => state = csi
             case _   =>
