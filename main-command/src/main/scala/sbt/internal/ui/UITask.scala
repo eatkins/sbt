@@ -48,10 +48,12 @@ object UITask {
         terminal: Terminal,
         state: State
     ): Reader = {
+      val clearLeft = terminal.ansi(CursorLeft1000, "")
+      val clearScreen = terminal.ansi(ClearScreenAfterCursor, "")
       val lineReader = LineReader.createReader(history(state), terminal, prompt)
       JLineCompletion.installCustomCompletor(lineReader, parser)
       () => {
-        val clear = terminal.ansi(CursorLeft1000 + ClearScreenAfterCursor, "")
+        val clear = clearLeft + clearScreen
         try {
           terminal.setPrompt(prompt)
           val p = prompt.mkPrompt()

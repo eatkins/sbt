@@ -3800,7 +3800,11 @@ object Classpaths {
     val extracted = Project.extract(s)
     (name in extracted.currentRef).get(extracted.structure.data) match {
       case Some(name) =>
-        s"sbt:$name" + Def.withColor(s"> ", Option(scala.Console.CYAN), terminal.isColorEnabled)
+        val clearLine =
+          terminal.ansi(ConsoleAppender.DeleteLine + ConsoleAppender.CursorLeft1000, "")
+        val clear = terminal.ansi(ConsoleAppender.ClearScreenAfterCursor, "")
+        val arrow = Def.withColor(s"> ", Option(scala.Console.CYAN), terminal.isColorEnabled)
+        clearLine + s"sbt:$name" + arrow + clear
       case _ => "> "
     }
   }
