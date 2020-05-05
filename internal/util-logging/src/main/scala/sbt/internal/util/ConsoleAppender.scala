@@ -471,14 +471,11 @@ class ConsoleAppender private[ConsoleAppender] (
   ): Unit =
     try {
       out.lockObject.synchronized {
-        val builder: StringBuilder =
-          new StringBuilder(
-            labelColor.length + label.length + messageColor.length + reset.length * 3
-          )
+        val len =
+          labelColor.length + label.length + messageColor.length + reset.length * 3 + ClearScreenAfterCursor.length
+        val builder: StringBuilder = new StringBuilder(len)
         message.linesIterator.foreach { line =>
-          builder.ensureCapacity(
-            labelColor.length + label.length + messageColor.length + line.length + 1 + reset.length * 3 + 3
-          )
+          builder.ensureCapacity(len + line.length + 4)
           builder.setLength(0)
 
           def fmted(a: String, b: String) = builder.append(reset).append(a).append(b).append(reset)
@@ -487,6 +484,7 @@ class ConsoleAppender private[ConsoleAppender] (
           fmted(labelColor, label)
           builder.append("] ")
           fmted(messageColor, line)
+          builder.append(ClearScreenAfterCursor)
           builder.append('\n')
           write(builder.toString)
         }
