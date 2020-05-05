@@ -4,3 +4,4 @@
 * ctrl+c in watch
 * isAnsiSupported
 * progress for remote watch
+* remote shutdown is broken
