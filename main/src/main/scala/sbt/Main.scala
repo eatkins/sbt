@@ -928,7 +928,7 @@ object BuiltinCommands {
     import sbt.internal.ConsolePromptEvent
     val exchange = StandardMain.exchange
     val welcomeState = displayWelcomeBanner(s0)
-    val s1 = exchange run (welcomeState, false)
+    val s1 = exchange run welcomeState
     exchange publishEventMessage ConsolePromptEvent(s0)
     val minGCInterval = Project
       .extract(s1)
