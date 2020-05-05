@@ -1,2 +1,4 @@
 * Add ctrl+z support for thin client
 * multi-commands don't work correctly in batch mode
+* ctrl+d to exit
+* ctrl+c in watch
