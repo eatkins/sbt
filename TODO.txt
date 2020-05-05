@@ -3,3 +3,4 @@
 * ctrl+d to exit
 * ctrl+c in watch
 * isAnsiSupported
+* progress for remote watch
