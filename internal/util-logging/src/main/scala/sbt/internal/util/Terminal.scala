@@ -51,15 +51,6 @@ trait Terminal extends AutoCloseable {
   def getLineHeightAndWidth(line: String): (Int, Int)
 
   /**
-   * Returns the number of lines that the input string will cover given the current width of the
-   * terminal.
-   *
-   * @param line the input line
-   * @return the number of lines that the line will cover on the terminal
-   */
-  def lineCount(line: String): Int = Terminal.lineCount(getWidth, line)
-
-  /**
    *
    */
   /**
@@ -124,6 +115,24 @@ trait Terminal extends AutoCloseable {
   private[this] val promptHolder: AtomicReference[Prompt] = new AtomicReference(Prompt.Running)
   private[sbt] final def prompt: Prompt = promptHolder.get
   private[sbt] final def setPrompt(prompt: Prompt): Unit = promptHolder.set(prompt)
+
+  /**
+   * Returns the number of lines that the input string will cover given the current width of the
+   * terminal.
+   *
+   * @param line the input line
+   * @return the number of lines that the line will cover on the terminal
+   */
+  private[sbt] def lineCount(line: String): Int = {
+    val lines = EscHelpers.stripColorsAndMoves(line).split('\n')
+    val width = getWidth
+    def count(l: String): Int = {
+      val len = l.length
+      if (width > 0 && len > 0) (len - 1 + width) / width else 0
+    }
+    lines.tail.foldLeft(lines.headOption.fold(0)(count))(_ + count(_))
+  }
+
 }
 
 object Terminal {
@@ -161,14 +170,6 @@ object Terminal {
         }
     }
   }
-  private[sbt] def lineCount(width: Int, line: String): Int = {
-    val lines = EscHelpers.stripColorsAndMoves(line).split('\n')
-    def count(l: String): Int = {
-      val len = l.length
-      if (width > 0 && len > 0) (len - 1 + width) / width else 0
-    }
-    lines.tail.foldLeft(lines.headOption.fold(0)(count))(_ + count(_))
-  }
 
   def close(): Unit = {
     if (System.console == null) {
@@ -177,68 +178,6 @@ object Terminal {
       System.err.close()
     }
   }
-
-  /**
-   * Gets the current width of the terminal. The implementation reads a property from the jline
-   * config which is updated if it has been more than a second since the last update. It is thus
-   * possible for this value to be stale.
-   *
-   * @return the terminal width.
-   */
-  def getWidth: Int = console.getWidth
-
-  /**
-   * Gets the current height of the terminal. The implementation reads a property from the jline
-   * config which is updated if it has been more than a second since the last update. It is thus
-   * possible for this value to be stale.
-   *
-   * @return the terminal height.
-   */
-  def getHeight: Int = console.getHeight
-
-  /**
-   * Returns the height and width of the current line that is displayed on the terminal. If the
-   * most recently flushed byte is a newline, this will be `(0, 0)`.
-   *
-   * @return the (height, width) pair
-   */
-  def getLineHeightAndWidth(line: String): (Int, Int) = console.getLineHeightAndWidth(line)
-  def getBooleanCapability(capability: String): Boolean = console.getBooleanCapability(capability)
-  def getNumericCapability(capability: String): Int = console.getNumericCapability(capability)
-  def getStringCapability(capability: String): String = console.getStringCapability(capability)
-
-  /**
-   * Returns the number of lines that the input string will cover given the current width of the
-   * terminal.
-   *
-   * @param line the input line
-   * @return the number of lines that the line will cover on the terminal
-   */
-  def lineCount(line: String): Int = {
-    val width = getWidth
-    val lines = EscHelpers.removeEscapeSequences(line).split('\n')
-    def count(l: String): Int = {
-      val len = l.length
-      if (width > 0 && len > 0) (len - 1 + width) / width else 0
-    }
-    lines.tail.foldLeft(lines.headOption.fold(0)(count))(_ + count(_))
-  }
-
-  /**
-   * Returns true if the current terminal supports ansi characters.
-   *
-   * @return true if the current terminal supports ansi escape codes.
-   */
-  def isAnsiSupported: Boolean =
-    try console.isAnsiSupported
-    catch { case NonFatal(_) => !isWindows }
-
-  /**
-   * Returns true if echo is enabled on the terminal.
-   *
-   * @return true if echo is enabled on the terminal.
-   */
-  def isEchoEnabled: Boolean = console.isEchoEnabled
 
   /**
    * Returns true if System.in is attached. When sbt is run as a subprocess, like in scripted or
@@ -432,6 +371,9 @@ object Terminal {
       } else -1
     }
   }
+  private[util] def isAnsiSupported =
+    try console.isAnsiSupported
+    catch { case NonFatal(_) => !isWindows }
 
   private[this] def wrap(terminal: jline.Terminal): Terminal = {
     val term: jline.Terminal with jline.Terminal2 = new jline.Terminal with jline.Terminal2 {
@@ -627,7 +569,7 @@ object Terminal {
         writeLock.synchronized {
           val remaining = bytes.foldLeft(new ArrayBuffer[Byte]) { (buf, i) =>
             if (i == 10) {
-              progressState.addBytes(buf)
+              progressState.addBytes(TerminalImpl.this, buf)
               progressState.clearBytes()
               val cl = currentLine.get
               if (buf.nonEmpty && isAnsiSupported && cl.isEmpty) clear.getBytes.foreach(write)

@@ -221,9 +221,9 @@ trait NetworkClientImpl { self =>
             case Success(terminalCapabilitiesQuery) =>
               val response = TerminalCapabilitiesResponse.apply(
                 terminalCapabilitiesQuery.id,
-                terminalCapabilitiesQuery.boolean.map(Terminal.getBooleanCapability),
-                terminalCapabilitiesQuery.numeric.map(Terminal.getNumericCapability),
-                terminalCapabilitiesQuery.string.map(Terminal.getStringCapability),
+                terminalCapabilitiesQuery.boolean.map(Terminal.console.getBooleanCapability),
+                terminalCapabilitiesQuery.numeric.map(Terminal.console.getNumericCapability),
+                terminalCapabilitiesQuery.string.map(Terminal.console.getStringCapability),
               )
               sendCommandResponse("sbt/terminalcapresponse", response, terminalCapabilitiesQuery.id)
             case Failure(_) =>

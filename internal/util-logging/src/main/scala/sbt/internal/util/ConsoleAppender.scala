@@ -585,13 +585,13 @@ private[sbt] final class ProgressState(
     currentLineBytes.set(new ArrayBuffer[Byte])
   }
 
-  private[util] def addBytes(bytes: ArrayBuffer[Byte]): Unit = {
+  private[util] def addBytes(terminal: Terminal, bytes: ArrayBuffer[Byte]): Unit = {
     val previous = currentLineBytes.get
     val padding = this.padding.get
-    val prevLineCount = if (padding > 0) Terminal.lineCount(new String(previous.toArray)) else 0
+    val prevLineCount = if (padding > 0) terminal.lineCount(new String(previous.toArray)) else 0
     previous ++= bytes
     if (padding > 0) {
-      val newLineCount = Terminal.lineCount(new String(previous.toArray))
+      val newLineCount = terminal.lineCount(new String(previous.toArray))
       val diff = newLineCount - prevLineCount
       this.padding.set(math.max(padding - diff, 0))
     }
@@ -606,15 +606,15 @@ private[sbt] final class ProgressState(
   private[util] def reprint(terminal: Terminal, printStream: PrintStream): Unit = {
     printPrompt(terminal, printStream)
     if (progressLines.get.nonEmpty) {
-      val lines = printProgress(0, 0)
+      val lines = printProgress(0, 0, terminal)
       printStream.print(ClearScreenAfterCursor + lines)
     }
   }
 
-  private[util] def printProgress(height: Int, width: Int): String = {
+  private[util] def printProgress(height: Int, width: Int, terminal: Terminal): String = {
     val previousLines = progressLines.get
     if (previousLines.nonEmpty) {
-      val currentLength = previousLines.foldLeft(0)(_ + Terminal.lineCount(_))
+      val currentLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
       val left = cursorLeft(1000) // resets the position to the left
       val offset = width > 0
       val pad = math.max(padding.get - height, 0)
@@ -668,7 +668,8 @@ private[sbt] object ProgressState {
             val prevLength = previousLines.foldLeft(0)(_ + terminal.lineCount(_))
             val (height, width) = terminal.prompt match {
               case Prompt.Running =>
-                terminal.getLastLine.map(terminal.getLineHeightAndWidth).getOrElse((0, 0))
+                val line = terminal.getLastLine
+                line.map(terminal.getLineHeightAndWidth).getOrElse((0, 0))
               case a => terminal.getLineHeightAndWidth(a.render())
             }
             val prevSize = prevLength + state.padding.get
@@ -676,7 +677,7 @@ private[sbt] object ProgressState {
             val newPadding = math.max(0, prevSize - currentLength)
             state.padding.set(newPadding)
             state.printPrompt(terminal, ps)
-            ps.print(state.printProgress(height, width))
+            ps.print(state.printProgress(height, width, terminal))
             ps.flush()
           }
         }

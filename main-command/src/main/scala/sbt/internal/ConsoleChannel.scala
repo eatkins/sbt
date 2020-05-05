@@ -42,7 +42,7 @@ private[sbt] sealed class BatchCommandChannel(
     def getLineHeightAndWidth(line: String): (Int, Int) = delegate.getLineHeightAndWidth(line)
     def getNumericCapability(capability: String): Int = delegate.getNumericCapability(capability)
     def getStringCapability(capability: String): String = delegate.getStringCapability(capability)
-    def getWidth: Int = Terminal.console.getWidth
+    def getWidth: Int = delegate.getWidth
     def inputStream: java.io.InputStream = new java.io.InputStream {
       override def read = {
         this.synchronized(this.wait())
