@@ -75,7 +75,6 @@ trait NetworkClientImpl { self =>
   // Open server connection based on the portfile
   def init(): ServerConnection = {
     if (!portfile.exists) {
-      println(s"FUCK Me no portfile")
       forkServer(portfile)
     }
     val (sk, tkn) =
@@ -477,9 +476,7 @@ class SimpleClient(
 
     override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
   }
-} with NetworkClientImpl {
-  println(s"fuck $baseDirectory")
-}
+} with NetworkClientImpl
 
 object SimpleClient {
   def main(args: Array[String]): Unit = {
