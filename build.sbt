@@ -1059,12 +1059,12 @@ lazy val sbtClientProj = (project in file("client"))
       println(full.mkString("\"", "\" \"", "\""))
       pb.directory(target.value / "graalcp")
       val proc = pb.start()
-      new Thread {
+      val thread = new Thread {
 	setDaemon(true)
-	start()
 	val is = proc.getInputStream
 	val es = proc.getErrorStream
 	override def run(): Unit = {
+	  Thread.sleep(100)
 	  while (proc.isAlive) {
 	    if (is.available > 0 || es.available > 0) {
 	      while (is.available > 0) System.out.print(is.read.toChar) 
@@ -1074,11 +1074,11 @@ lazy val sbtClientProj = (project in file("client"))
 	  }
 	}
       }
+      thread.start()
       proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES) 
       file("").toPath
     },
     graalVMNativeImageOptions += "-H:IncludeResourceBundles=jline.console.completer.CandidateListCompletionHandler",
-    graalVMNativeImageOptions += s"-H:DynamicProxyConfigurationFiles=${(Compile / resourceDirectory).value / "proxies.json"}",
     graalVMNativeImageOptions += {
       val classes = Seq(
         "org.scalasbt.ipcsocket",
@@ -1091,6 +1091,7 @@ lazy val sbtClientProj = (project in file("client"))
     graalVMNativeImageOptions += "--verbose",
     graalVMNativeImageOptions += "--no-fallback",
     graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",  
+    graalVMNativeImageOptions += "-H:+TraceClassInitialization",  
    // graalVMNativeImageCommand := "C:\\Users\\micro\\graalvm\\bin\\native-image.cmd",
     graalVMNativeImageCommand := "/Users/ethanatkins/.sdkman/candidates/java/20.0.0.r11-grl/bin/native-image",
     genExecutable := {
