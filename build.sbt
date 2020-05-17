@@ -1091,8 +1091,8 @@ lazy val sbtClientProj = (project in file("client"))
     graalVMNativeImageOptions += "--verbose",
     graalVMNativeImageOptions += "--no-fallback",
     graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",  
-    graalVMNativeImageCommand := "C:\\Users\\micro\\graalvm\\bin\\native-image.cmd",
-    //graalVMNativeImageCommand := "/Users/ethanatkins/.sdkman/candidates/java/20.0.0.r11-grl/bin/native-image",
+   // graalVMNativeImageCommand := "C:\\Users\\micro\\graalvm\\bin\\native-image.cmd",
+    graalVMNativeImageCommand := "/Users/ethanatkins/.sdkman/candidates/java/20.0.0.r11-grl/bin/native-image",
     genExecutable := {
       val output = target.value.toPath / "bin" / "client"
       java.nio.file.Files.createDirectories(output.getParent)
