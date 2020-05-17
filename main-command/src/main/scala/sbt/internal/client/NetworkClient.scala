@@ -32,7 +32,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-import scala.util.{ Failure, Success }
+import scala.util.{ Failure, Properties, Success }
 
 trait ConsoleInterface {
   def appendLog(level: Level.Value, message: => String): Unit
@@ -75,11 +75,10 @@ trait NetworkClientImpl { self =>
   // Open server connection based on the portfile
   def init(): ServerConnection = {
     if (!portfile.exists) {
-      println(s"FUCK Me no portfile")
       forkServer(portfile)
     }
     val (sk, tkn) =
-      try ClientSocket.socket(portfile)
+      try ClientSocket.socket(portfile, true)
       catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
@@ -477,9 +476,7 @@ class SimpleClient(
 
     override def success(msg: String): Unit = println(s"[${GREEN}success$RESET] $msg")
   }
-} with NetworkClientImpl {
-  println(s"fuck $baseDirectory")
-}
+} with NetworkClientImpl
 
 object SimpleClient {
   def main(args: Array[String]): Unit = {
@@ -506,7 +503,7 @@ object NetworkClient {
   )
   private[client] def parseArgs(args: Array[String]): Arguments = {
     var i = 0
-    var sbtScript = "sbt"
+    var sbtScript = if (Properties.isWin) "sbt.cmd" else "sbt"
     val commandArgs = new mutable.ArrayBuffer[String]
     val sbtArguments = new mutable.ArrayBuffer[String]
     var pwd: Option[File] = None

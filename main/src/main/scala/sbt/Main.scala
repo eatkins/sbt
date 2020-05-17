@@ -21,7 +21,7 @@ import sbt.internal.Aggregation.AnyKeys
 import sbt.internal.CommandStrings.BootCommand
 import sbt.internal._
 import sbt.internal.inc.ScalaInstance
-import sbt.internal.nio.CheckBuildSources
+import sbt.internal.nio.{ CheckBuildSources, FileTreeRepository }
 import sbt.internal.server.NetworkChannel
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util._
@@ -865,10 +865,14 @@ object BuiltinCommands {
     val session = Load.initialSession(structure, eval, s0)
     SessionSettings.checkSession(session, s2)
     val s3 = addCacheStoreFactoryFactory(Project.setProject(session, structure, s2))
-    val s4 = LintUnused.lintUnusedFunc(s3)
-    CheckBuildSources.init(s4)
+    val s4 = setupGlobalFileTreeRepository(s3)
+    CheckBuildSources.init(LintUnused.lintUnusedFunc(s4))
   }
 
+  private val setupGlobalFileTreeRepository: State => State = { state =>
+    state.get(sbt.nio.Keys.globalFileTreeRepository).foreach(_.close())
+    state.put(sbt.nio.Keys.globalFileTreeRepository, FileTreeRepository.default)
+  }
   private val addCacheStoreFactoryFactory: State => State = (s: State) => {
     val size = Project
       .extract(s)

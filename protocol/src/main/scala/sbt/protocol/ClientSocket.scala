@@ -9,6 +9,7 @@ package sbt
 package protocol
 
 import java.io.File
+import java.nio.file.Files
 import java.net.{ Socket, URI, InetAddress }
 import sjsonnew.BasicJsonProtocol
 import sjsonnew.support.scalajson.unsafe.{ Parser, Converter }
@@ -21,9 +22,10 @@ import org.scalasbt.ipcsocket._
 object ClientSocket {
   private lazy val fileFormats = new BasicJsonProtocol with PortFileFormats with TokenFileFormats {}
 
-  def socket(portfile: File): (Socket, Option[String]) = {
+  def socket(portfile: File): (Socket, Option[String]) = socket(portfile, false)
+  def socket(portfile: File, useJNI: Boolean): (Socket, Option[String]) = {
     import fileFormats._
-    val json: JValue = Parser.parseFromFile(portfile).get
+    val json: JValue = Parser.parseFromString(new String(Files.readAllBytes(portfile.toPath))).get
     val p = Converter.fromJson[PortFile](json).get
     val uri = new URI(p.uri)
     // println(uri)
@@ -35,10 +37,11 @@ object ClientSocket {
     }
     val sk = uri.getScheme match {
       case "local" if isWindows =>
-        (new Win32NamedPipeSocket("""\\.\pipe\""" + uri.getSchemeSpecificPart): Socket)
-      case "local" => (new UnixDomainSocket(uri.getSchemeSpecificPart): Socket)
-      case "tcp"   => new Socket(InetAddress.getByName(uri.getHost), uri.getPort)
-      case _       => sys.error(s"Unsupported uri: $uri")
+        (new Win32NamedPipeSocket("""\\.\pipe\""" + uri.getSchemeSpecificPart, useJNI): Socket)
+      case "local" =>
+        (new UnixDomainSocket(uri.getSchemeSpecificPart, useJNI): Socket)
+      case "tcp" => new Socket(InetAddress.getByName(uri.getHost), uri.getPort)
+      case _     => sys.error(s"Unsupported uri: $uri")
     }
     (sk, token)
   }

@@ -1,4 +1,5 @@
 * Add ctrl+z support for thin client
+* ctrl+c in thin client should cancel running task
 * multi-commands don't work correctly in batch mode
 * ctrl+d to exit
 * ctrl+c in watch

@@ -210,6 +210,9 @@ final class NetworkChannel(
             }
             process()
           } catch {
+            case _: IOException =>
+              running.set(false)
+              alive.set(false)
             case _: SocketTimeoutException => // its ok
           }
         } // while
@@ -234,83 +237,90 @@ final class NetworkChannel(
         case (f, i) => f orElse i.onNotification
       }
 
-    def handleBody(chunk: Vector[Byte]): Unit = {
-      if (isLanguageServerProtocol) {
-        Serialization.deserializeJsonMessage(chunk) match {
-          case Right(req: JsonRpcRequestMessage) =>
-            try {
-              registerRequest(req)
-              req.method match {
-                case "inputStream" =>
-                  import sjsonnew.BasicJsonProtocol._
-                  val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
-                  byte.foreach(inputBuffer.put)
-                case "sbt/terminalpropsresponse" =>
-                  import sbt.protocol.codec.JsonProtocol._
-                  val response =
-                    req.params.flatMap(Converter.fromJson[TerminalPropertiesResponse](_).toOption)
-                  pendingTerminalProperties.remove(req.id) match {
-                    case null   =>
-                    case buffer => response.foreach(buffer.put)
-                  }
-                case "sbt/terminalcapresponse" =>
-                  import sbt.protocol.codec.JsonProtocol._
-                  val response =
-                    req.params.flatMap(Converter.fromJson[TerminalCapabilitiesResponse](_).toOption)
-                  pendingTerminalCapability.remove(req.id) match {
-                    case null =>
-                    case buffer =>
-                      buffer.put(
-                        response.getOrElse(TerminalCapabilitiesResponse("", None, None, None))
+    def handleBody(chunk: Vector[Byte]): Unit =
+      try {
+        if (isLanguageServerProtocol) {
+          Serialization.deserializeJsonMessage(chunk) match {
+            case Right(req: JsonRpcRequestMessage) =>
+              try {
+                registerRequest(req)
+                req.method match {
+                  case "inputStream" =>
+                    import sjsonnew.BasicJsonProtocol._
+                    val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
+                    byte.foreach(inputBuffer.put)
+                  case "sbt/terminalpropsresponse" =>
+                    import sbt.protocol.codec.JsonProtocol._
+                    val response =
+                      req.params.flatMap(Converter.fromJson[TerminalPropertiesResponse](_).toOption)
+                    pendingTerminalProperties.remove(req.id) match {
+                      case null   =>
+                      case buffer => response.foreach(buffer.put)
+                    }
+                  case "sbt/terminalcapresponse" =>
+                    import sbt.protocol.codec.JsonProtocol._
+                    val response =
+                      req.params.flatMap(
+                        Converter.fromJson[TerminalCapabilitiesResponse](_).toOption
                       )
-                  }
-                case "attach" =>
-                  attached.set(true)
-                  initiateMaintenance("attach")
-                case _ =>
-                  onRequestMessage(req)
+                    pendingTerminalCapability.remove(req.id) match {
+                      case null =>
+                      case buffer =>
+                        buffer.put(
+                          response.getOrElse(TerminalCapabilitiesResponse("", None, None, None))
+                        )
+                    }
+                  case "attach" =>
+                    attached.set(true)
+                    initiateMaintenance("attach")
+                  case _ =>
+                    onRequestMessage(req)
+                }
+              } catch {
+                case LangServerError(code, message) =>
+                  log.debug(s"sending error: $code: $message")
+                  respondError(code, message, Some(req.id))
               }
-            } catch {
-              case LangServerError(code, message) =>
-                log.debug(s"sending error: $code: $message")
-                respondError(code, message, Some(req.id))
-            }
-          case Right(ntf: JsonRpcNotificationMessage) =>
-            try {
-              onNotification(ntf)
-            } catch {
-              case LangServerError(code, message) =>
-                logMessage("error", s"Error $code while handling notification: $message")
-            }
-          case Right(msg) =>
-            log.debug(s"Unhandled message: $msg")
-          case Left(errorDesc) =>
-            logMessage(
-              "error",
-              s"Got invalid chunk from client (${new String(chunk.toArray, "UTF-8")}): $errorDesc"
-            )
-        }
-      } else {
-        contentType match {
-          case SbtX1Protocol =>
-            Serialization
-              .deserializeCommand(chunk)
-              .fold(
-                errorDesc =>
-                  logMessage(
-                    "error",
-                    s"Got invalid chunk from client (${new String(chunk.toArray, "UTF-8")}): " + errorDesc
-                  ),
-                onCommand
+            case Right(ntf: JsonRpcNotificationMessage) =>
+              try {
+                onNotification(ntf)
+              } catch {
+                case LangServerError(code, message) =>
+                  logMessage("error", s"Error $code while handling notification: $message")
+              }
+            case Right(msg) =>
+              log.debug(s"Unhandled message: $msg")
+            case Left(errorDesc) =>
+              logMessage(
+                "error",
+                s"Got invalid chunk from client (${new String(chunk.toArray, "UTF-8")}): $errorDesc"
               )
-          case _ =>
-            logMessage(
-              "error",
-              s"Unknown Content-Type: $contentType"
-            )
-        }
-      } // if-else
-    }
+          }
+        } else {
+          contentType match {
+            case SbtX1Protocol =>
+              Serialization
+                .deserializeCommand(chunk)
+                .fold(
+                  errorDesc =>
+                    logMessage(
+                      "error",
+                      s"Got invalid chunk from client (${new String(chunk.toArray, "UTF-8")}): " + errorDesc
+                    ),
+                  onCommand
+                )
+            case _ =>
+              logMessage(
+                "error",
+                s"Unknown Content-Type: $contentType"
+              )
+          }
+        } // if-else
+      } catch {
+        case _: IOException =>
+          alive.set(false)
+          shutdown(true)
+      }
 
     def handleHeader(str: String): Option[Unit] = {
       str match {
