@@ -21,7 +21,8 @@ import org.scalasbt.ipcsocket._
 object ClientSocket {
   private lazy val fileFormats = new BasicJsonProtocol with PortFileFormats with TokenFileFormats {}
 
-  def socket(portfile: File): (Socket, Option[String]) = {
+  def socket(portfile: File): (Socket, Option[String]) = socket(portfile, false)
+  def socket(portfile: File, useJNI: Boolean): (Socket, Option[String]) = {
     import fileFormats._
     val json: JValue = Parser.parseFromFile(portfile).get
     val p = Converter.fromJson[PortFile](json).get
@@ -35,9 +36,9 @@ object ClientSocket {
     }
     val sk = uri.getScheme match {
       case "local" if isWindows =>
-        (new Win32NamedPipeSocket("""\\.\pipe\""" + uri.getSchemeSpecificPart): Socket)
+        (new Win32NamedPipeSocket("""\\.\pipe\""" + uri.getSchemeSpecificPart, useJNI): Socket)
       case "local" =>
-        (new UnixDomainSocket(uri.getSchemeSpecificPart): Socket)
+        (new UnixDomainSocket(uri.getSchemeSpecificPart, useJNI): Socket)
       case "tcp" => new Socket(InetAddress.getByName(uri.getHost), uri.getPort)
       case _     => sys.error(s"Unsupported uri: $uri")
     }

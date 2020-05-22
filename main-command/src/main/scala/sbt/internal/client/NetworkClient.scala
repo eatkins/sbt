@@ -78,7 +78,7 @@ trait NetworkClientImpl { self =>
       forkServer(portfile)
     }
     val (sk, tkn) =
-      try ClientSocket.socket(portfile)
+      try ClientSocket.socket(portfile, true)
       catch { case e: IOException => throw new ConnectionRefusedException(e) }
     val conn = new ServerConnection(sk) {
       override def onNotification(msg: JsonRpcNotificationMessage): Unit = {
