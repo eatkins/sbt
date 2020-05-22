@@ -4,6 +4,8 @@
         {"pattern":"library.properties"},
         {"pattern":"native/x86_64/libswoval-files0.dylib"},
         {"pattern":"darwin_x86_64/libsbtipcsocket.dylib"},
+        {"pattern":"linux_x86_64/libsbtipcsocket.so"},
+        {"pattern":"windows_x86_64/sbtipcsocket.dll"},
         {"pattern":"com/sun/jna/darwin/libjnidispatch.jnilib"},
         {"pattern":"com/sun/jna/linux/libjnidispatch.so"},
         {"pattern":"com/sun/jna/win32-x86-64/jnidispatch.dll"}
