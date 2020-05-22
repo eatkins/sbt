@@ -210,6 +210,9 @@ final class NetworkChannel(
             }
             process()
           } catch {
+            case _: IOException =>
+              running.set(false)
+              alive.set(false)
             case _: SocketTimeoutException => // its ok
           }
         } // while
