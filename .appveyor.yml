@@ -12,23 +12,25 @@ for:
   matrix:
     only:
       - image: Ubuntu
+
   branches:
     only:
       - build-graal
   artifacts:
-  - path: src/main/resources/linux/x86_64/libsbtipcsocket.so
-    name: libsbtipcsocket.so
-  - path: src/main/resources/win32/x86_64/sbtipcsocket.dll
-    name: sbtipcsocket.dll
+  - path: client/target/graalcp/sbt.client.client
+    name: linux-sbt-client
 
   install:
-  - sudo apt-get -y install mingw-w64
   - curl -sL https://github.com/sbt/sbt/releases/download/v1.3.10/sbt-1.3.10.tgz > ~/sbt-bin.tgz
   - mkdir ~/sbt
   - tar -xf ~/sbt-bin.tgz --directory ~/sbt
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
   - jabba install adopt@1.8.0-222
   - jabba use adopt@1.8.0-222
+  - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-linux-amd64-20.2.0-dev.tar.gz > ~/graalvm.tar.gz 
+  - tar -xf ~/graalvm.tar.gz --directory ~/.
+  - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/bin"
+  - gu install native-image
   - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
   - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
   - export PATH="~/sbt/sbt/bin:$PATH"
@@ -47,6 +49,9 @@ for:
   matrix:
     only:
       - image: Visual Studio 2019
+  branches:
+    except:
+      - build-graal
   install:
     - cinst jdk8 -params 'installdir=C:\\jdk8'
     - SET JAVA_HOME=C:\jdk8
@@ -64,6 +69,7 @@ for:
         }
     - SET PATH=C:\sbt\sbt\bin;%PATH%
     - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+
   cache:
     - '%USERPROFILE%/.sbt'
 
