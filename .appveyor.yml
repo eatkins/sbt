@@ -49,14 +49,14 @@ for:
     - cd $DIR/launcher
     - sbt --java-home ~/.jabba/jdk/zulu@1.7.262 publishLocal
     - cd $DIR/jline2
-    - sbt publishLocal
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222 publishLocal
     - cd $DIR/ipcsocket
-    - sbt publishLocal
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222 publishLocal
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - export PATH="$PATH:$DIR/graalvm-ce-java8-20.2.0-dev/bin"
     - gu install native-image
     - cd $DIR
-    - sbt -Dsbt.native-image=$DIR/graalvm-ce-java8-20.2.0-dev/bin/native-image "sbtClientProj/genNativeExecutable"
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222 -Dsbt.native-image=$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image "sbtClientProj/genNativeExecutable"
 
 -
   matrix:
@@ -97,14 +97,14 @@ for:
     - cd $DIR/launcher
     - sbt --java-home ~/.jabba/jdk/zulu@1.7.262/Contents/Home publishLocal
     - cd $DIR/jline2
-    - sbt publishLocal
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222/Contents/Home publishLocal
     - cd $DIR/ipcsocket
-    - sbt publishLocal
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222/Contents/Home publishLocal
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/Contents/Home/bin"
     - export PATH="$PATH:$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
     - gu install native-image
     - cd $DIR
-    - sbt -Dsbt.native-image=$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image "sbtClientProj/genNativeExecutable"
+    - sbt --java-home ~/.jabba/jdk/adopt@1.8.0-222/Contents/Home -Dsbt.native-image=$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image "sbtClientProj/genNativeExecutable"
 
 -
   matrix:
