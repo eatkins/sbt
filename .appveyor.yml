@@ -42,7 +42,7 @@ for:
     - /home/appveyor/.sbt
 
   test_script:
-    - sbt "jline2/publishLocal; ipcsocket / publishLocal"
+    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
 -
@@ -77,7 +77,7 @@ for:
     - /Users/appveyor/.jabba/jdk
 
   test_script:
-    - sbt "jline2/publishLocal; ipcsocket / publishLocal"
+    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
 -
@@ -118,7 +118,7 @@ for:
     - '%USERPROFILE%/.sbt'
 
   test_script:
-    - sbt "jline2/publishLocal; ipcsocket / publishLocal"
+    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 -
   matrix:
@@ -149,6 +149,6 @@ for:
     - '%USERPROFILE%/.sbt'
 
   test_script:
-    - sbt "jline2/publishLocal; ipcsocket / publishLocal"
+    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
     - sbt "scripted actions/* classloader-cache/* nio/* watch/*" "testOnly sbt.ServerSpec"
 
