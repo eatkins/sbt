@@ -1509,5 +1509,5 @@ ThisBuild / whitesourceIgnoredScopes ++= Seq("plugin", "scalafmt", "sxr")
 ThisBuild / whitesourceFailOnError := sys.env.contains("WHITESOURCE_PASSWORD") // fail if pwd is present
 ThisBuild / whitesourceForceCheckAllDependencies := true
 
-val jline2 = project
+val jline = project
 val ipcsocket = project
