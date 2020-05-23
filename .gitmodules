@@ -1,0 +1,6 @@
+[submodule "jline2"]
+	path = jline2
+	url = https://github.com/eatkins/jline2
+[submodule "ipcsocket"]
+	path = ipcsocket
+	url = https://github.com/eatkins/ipcsocket
