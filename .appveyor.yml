@@ -41,22 +41,21 @@ for:
     - /Users/appveyor/.ivy2
 
   test_script:
+    - DIR="$(pwd)"
     - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher ~/launcher
     - cd ~/launcher
     - export JAVA_HOME="~/.jabba/jdk/zulu@1.7.262"
     - sbt publishLocal
-    - cd -
     - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
     - jabba use adopt@1.8.0-222
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 ~/jline2
     - cd ~/jline2
     - sbt publishLocal
-    - cd -
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ~/ipcsocket
     - cd ~/ipcsocket
     - sbt publishLocal
-    - cd -
+    - cd $DIR
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/bin"
     - gu install native-image
     - sbt "sbtClientProj/eenNativeExecutable"
@@ -92,26 +91,24 @@ for:
     - /Users/appveyor/.ivy2
 
   test_script:
+    - DIR="$(pwd)"
     - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher ~/launcher
     - cd ~/launcher
     - export JAVA_HOME="~/.jabba/jdk/zulu@1.7.262"
     - sbt publishLocal
-    - cd -
     - jabba use adopt@1.8.0-222
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 ~/jline2
     - cd ~/jline2
-    - cd -
     - sbt publishLocal
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ~/ipcsocket
     - cd ~/ipcsocket
     - sbt publishLocal
-    - cd -
     - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
     - gu install native-image
-    - jabba use adopt@1.8.0-222
+    - cd $DIR
     - sbt "sbtClientProj/genNativeExecutable"
 
 -
