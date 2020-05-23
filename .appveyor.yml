@@ -1,5 +1,6 @@
-image: Ubuntu
-image: Visual Studio 2017
+image:
+  - Ubuntu
+  - Visual Studio 2017
 build: off
 
 init:
