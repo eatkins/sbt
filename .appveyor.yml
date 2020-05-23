@@ -92,6 +92,7 @@ for:
     - SET JAVA_HOME=C:\jdk8
     - SET PATH=C:\jdk8\bin;%PATH%
     - SET CI=true
+    - choco install windows-sdk-7.1 kb2519277
 
     - ps: |
         Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -111,12 +112,14 @@ for:
         }
     - SET PATH=C:\graalvm-ce-java8-20.2.0-dev\bin;%PATH%
     - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+    - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
 
   cache:
     - '%USERPROFILE%/.sbt'
 
   test_script:
     - sbt "jline2/publishLocal; ipcsocket / publishLocal"
+    - sbt "sbtClientProj/genNativeExecutable"
 -
   matrix:
     only:
