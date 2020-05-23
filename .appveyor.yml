@@ -38,6 +38,7 @@ for:
   cache:
     - /home/appveyor/.jabba/jdk
     - /home/appveyor/.sbt
+    - /Users/appveyor/.ivy2
 
   test_script:
     - git clone https://github.com/eatkins/launcher ~/launcher
@@ -81,12 +82,12 @@ for:
 
   cache:
     - /Users/appveyor/.jabba/jdk
+    - /Users/appveyor/.ivy2
 
   test_script:
     - git clone https://github.com/eatkins/launcher ~/launcher
     - cd ~/launcher
     - export JAVA_HOME="~/.jabba/jdk/zulu@1.7.262"
-    - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - sbt publishLocal
     - cd -
     - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
