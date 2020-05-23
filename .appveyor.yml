@@ -16,7 +16,7 @@ for:
 
   branches:
     only:
-      - build-graal
+      - build-graal1
   artifacts:
   - path: client/target/graalcp/sbt.client.client
     name: linux-sbt-client
@@ -68,7 +68,7 @@ for:
 
   branches:
     only:
-      - build-graal
+      - build-graal1
   artifacts:
   - path: client/target/graalcp/sbt.client.client
     name: mac-sbt-client
@@ -122,8 +122,6 @@ for:
       - build-graal1
   install:
     - cinst jdk8 -params 'installdir=C:\\jdk8'
-    - SET JAVA_HOME=C:\jdk8
-    - SET PATH=C:\jdk8\bin;%PATH%
     - SET CI=true
     - choco install windows-sdk-7.1 kb2519277
 
@@ -143,9 +141,32 @@ for:
           )
           [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\sbt-bin.zip", "C:\")
         }
-    - SET PATH=C:\graalvm-ce-java8-20.2.0-dev\bin;%PATH%
-    - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+        if (!(Test-Path -Path "C:\zulu-jdk7" )) {
+          (new-object System.Net.WebClient).DownloadFile(
+            'https://cdn.azul.com/zulu/bin/zulu7.38.0.11-ca-jdk7.0.262-win_x64.zip',
+            'C:\zulu-jdk7.zip'
+          )
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\zulu-jdk7.zip", "C:\")
+        }
     - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
+    - SET PATH=C:\graalvm-ce-java8-20.2.0-dev\bin;%PATH%
+    - SET PATH=C:\sbt\sbt\bin;%PATH%
+    - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
+    - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher C:\launcher
+    - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 C:\jline2
+    - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket C:\ipcsocket
+    - cd C:\launcher
+    - SET JAVA_HOME='C:\zulu7.38.0.11-ca-jdk7.0.262-win_x64'
+    - sbt publishLocal
+    - SET JAVA_HOME=C:\jdk8
+    - SET PATH=C:\jdk8\bin;%PATH%
+    - cd C:\jline2
+    - sbt publishLocal
+    - cd C:\ipcsocket
+    - sbt publishLocal
+    - gu install native-image
+    - mklink /D 'C:\%APPVEYOR_ACCOUNT_NAME%\native-image' 'C:\graalvm-ce-java8-20.2.0-dev\bin\native-image'
+    - cd '%APPVEYOR_BUILD_FOLDER%'
 
   cache:
     - '%USERPROFILE%/.sbt'
