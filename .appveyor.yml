@@ -112,7 +112,7 @@ for:
       - image: Visual Studio 2019
   branches:
     only:
-      - build-graal1
+      - build-graal
   install:
     - cinst jdk8 -params 'installdir=C:\\jdk8'
     - SET CI=true
