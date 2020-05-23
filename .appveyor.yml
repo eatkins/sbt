@@ -42,7 +42,7 @@ for:
     - /home/appveyor/.sbt
 
   test_script:
-    - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; set ThisBuild / version := \"2.14.7-SNAPSHOT\"; set ThisBuild / organization := \"jline\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";set ThisBuild / organization := \"org.scala-sbt.ipcsocket\"; ipcsocket / publishLocal"
+    - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; set ThisBuild / version := \"2.14.7-SNAPSHOT\"; set ThisBuild / organization := \"jline\"; set jline2 / name := \"jline\"; jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";set ThisBuild / organization := \"org.scala-sbt.ipcsocket\"; set ThisBuild / name := \"ipcsocket\";ipcsocket / publishLocal"
     - sbt "sbtClientProj/eenNativeExecutable"
 
 -
