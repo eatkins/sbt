@@ -32,7 +32,6 @@ for:
   - jabba use zulu@1.7.262
   - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-linux-amd64-20.2.0-dev.tar.gz > ~/graalvm.tar.gz 
   - tar -xf ~/graalvm.tar.gz --directory ~/.
-  - gu install native-image
   - export PATH="~/sbt/sbt/bin:$PATH"
   - export SBT_OPTS="-XX:MaxPermSize=1g -Xmx1g -Dfile.encoding=UTF8"
 
@@ -49,6 +48,7 @@ for:
     - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/bin"
+    - gu install native-image
     - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; set ThisBuild / version := \"2.14.7-SNAPSHOT\"; set ThisBuild / organization := \"jline\"; jline/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";set ThisBuild / organization := \"org.scala-sbt.ipcsocket\"; ipcsocket / publishLocal"
     - sbt "sbtClientProj/eenNativeExecutable"
 
@@ -71,9 +71,10 @@ for:
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
   - jabba install adopt@1.8.0-222
   - jabba use adopt@1.8.0-222
+  - jabba install zulu@1.7.262
+  - jabba use zulu@1.7.262
   - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-darwin-amd64-20.2.0-dev.tar.gz > ~/graalvm.tar.gz 
   - tar -xf ~/graalvm.tar.gz --directory ~/.
-  - gu install native-image
   - export PATH="~/sbt/sbt/bin:$PATH"
   - export SBT_OPTS="-XX:MaxPermSize=1g -Xmx1g -Dfile.encoding=UTF8"
 
@@ -90,6 +91,7 @@ for:
     - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
+    - gu install native-image
     - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; set ThisBuild / version := \"2.14.7-SNAPSHOT\"; set ThisBuild / organization := \"jline\"; jline/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";set ThisBuild / organization := \"org.scala-sbt.ipcsocket\"; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
