@@ -29,10 +29,11 @@ for:
   - jabba install adopt@1.8.0-222
   - jabba use adopt@1.8.0-222
   - jabba install zulu@1.7.262
-  - jabba use zulu@1.7.262
-  - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-linux-amd64-20.2.0-dev.tar.gz > ~/graalvm.tar.gz 
-  - tar -xf ~/graalvm.tar.gz --directory ~/.
+  - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-darwin-amd64-20.2.0-dev.tar.gz > graalvm.tar.gz 
+  - tar -xf graalvm.tar.gz
   - export PATH="~/sbt/sbt/bin:$PATH"
+  - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
+  - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
   - export SBT_OPTS="-XX:MaxPermSize=1g -Xmx1g -Dfile.encoding=UTF8"
 
   cache:
@@ -42,24 +43,20 @@ for:
 
   test_script:
     - DIR="$(pwd)"
-    - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher ~/launcher
-    - cd ~/launcher
-    - export JAVA_HOME="~/.jabba/jdk/zulu@1.7.262"
+    - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher launcher
+    - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 jline2
+    - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ipcsocket
+    - cd $DIR/launcher
+    - sbt --java-home ~/.jabba/jdk/zulu@1.7.262 publishLocal
+    - cd $DIR/jline2
     - sbt publishLocal
-    - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
-    - jabba use adopt@1.8.0-222
+    - cd $DIR/ipcsocket
+    - sbt publishLocal
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
-    - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 ~/jline2
-    - cd ~/jline2
-    - sbt publishLocal
-    - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ~/ipcsocket
-    - cd ~/ipcsocket
-    - sbt publishLocal
-    - cd $DIR
-    - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/bin"
+    - export PATH="$PATH:$DIR/graalvm-ce-java8-20.2.0-dev/bin"
     - gu install native-image
-    - ln -sf ~/graalvm-ce-java8-20.2.0-dev/bin/native-image ~/native-image
-    - sbt "sbtClientProj/genNativeExecutable"
+    - cd $DIR
+    - sbt -Dsbt.native-image=$DIR/graalvm-ce-java8-20.2.0-dev/bin/native-image "sbtClientProj/genNativeExecutable"
 
 -
   matrix:
@@ -81,10 +78,11 @@ for:
   - jabba install adopt@1.8.0-222
   - jabba use adopt@1.8.0-222
   - jabba install zulu@1.7.262
-  - jabba use zulu@1.7.262
-  - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-darwin-amd64-20.2.0-dev.tar.gz > ~/graalvm.tar.gz 
-  - tar -xf ~/graalvm.tar.gz --directory ~/.
+  - curl -sL https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-darwin-amd64-20.2.0-dev.tar.gz > graalvm.tar.gz 
+  - tar -xf graalvm.tar.gz
   - export PATH="~/sbt/sbt/bin:$PATH"
+  - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
+  - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
   - export SBT_OPTS="-XX:MaxPermSize=1g -Xmx1g -Dfile.encoding=UTF8"
 
   cache:
@@ -93,25 +91,20 @@ for:
 
   test_script:
     - DIR="$(pwd)"
-    - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher ~/launcher
-    - cd ~/launcher
-    - export JAVA_HOME="~/.jabba/jdk/zulu@1.7.262"
+    - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher launcher
+    - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 jline2
+    - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ipcsocket
+    - cd $DIR/launcher
+    - sbt --java-home ~/.jabba/jdk/zulu@1.7.262 publishLocal
+    - cd $DIR/jline2
     - sbt publishLocal
-    - jabba use adopt@1.8.0-222
+    - cd $DIR/ipcsocket
+    - sbt publishLocal
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
-    - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 ~/jline2
-    - cd ~/jline2
-    - sbt publishLocal
-    - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ~/ipcsocket
-    - cd ~/ipcsocket
-    - sbt publishLocal
-    - export JAVA_HOME="~/.jabba/jdk/adopt@1.8.0-222"
-    - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
-    - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
+    - export PATH="$PATH:$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
     - gu install native-image
     - cd $DIR
-    - ln -sf ~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image ~/native-image
-    - sbt "sbtClientProj/genNativeExecutable"
+    - sbt -Dsbt.native-image=$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image "sbtClientProj/genNativeExecutable"
 
 -
   matrix:
@@ -151,28 +144,27 @@ for:
         }
     - SET PATH=C:\graalvm-ce-java8-20.2.0-dev\bin;%PATH%
     - SET PATH=C:\sbt\sbt\bin;%PATH%
+    - SET JAVA_HOME=C:\jdk8
     - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
     - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher C:\launcher
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 C:\jline2
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket C:\ipcsocket
     - cd C:\launcher
-    - SET JAVA_HOME=C:\zulu7.38.0.11-ca-jdk7.0.262-win_x64
-    - sbt --java-home %JAVA_HOME% publishLocal
-    - SET JAVA_HOME=C:\jdk8
+    - sbt --java-home C:\zulu7.38.0.11-ca-jdk7.0.262-win_x64 publishLocal
     - SET PATH=C:\jdk8\bin;%PATH%
     - cd C:\jline2
     - sbt --java-home %JAVA_HOME% publishLocal
     - cd C:\ipcsocket
     - sbt --java-home %JAVA_HOME% publishLocal
     - gu install native-image
-    - mklink /D 'C:\Users\%APPVEYOR_ACCOUNT_NAME%\native-image' 'C:\graalvm-ce-java8-20.2.0-dev\bin\native-image'
+    - mklink /D C:\Users\%APPVEYOR_ACCOUNT_NAME%\native-image C:\graalvm-ce-java8-20.2.0-dev\bin\native-image.cmd
     - cd %APPVEYOR_BUILD_FOLDER%
 
   cache:
     - '%USERPROFILE%/.sbt'
 
   test_script:
-    - sbt "sbtClientProj/genNativeExecutable"
+    - sbt -Dsbt.native-image=C:\graalvm-ce-java8-20.2.0-dev\bin\native-image.cmd "sbtClientProj/genNativeExecutable"
 -
   matrix:
     only:
@@ -180,6 +172,7 @@ for:
   branches:
     except:
       - build-graal
+      - build-graal1
   install:
     - cinst jdk8 -params 'installdir=C:\\jdk8'
     - SET JAVA_HOME=C:\jdk8
