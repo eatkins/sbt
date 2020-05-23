@@ -95,12 +95,12 @@ for:
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 jline2
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ipcsocket
     - cd $DIR/launcher
-    - sbt --java-home ~/.jabba/jdk/zulu@1.7.262 publishLocal
+    - sbt --java-home ~/.jabba/jdk/zulu@1.7.262/Contents/Home publishLocal
     - cd $DIR/jline2
     - sbt publishLocal
     - cd $DIR/ipcsocket
     - sbt publishLocal
-    - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
+    - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/Contents/Home/bin"
     - export PATH="$PATH:$DIR/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
     - gu install native-image
     - cd $DIR
