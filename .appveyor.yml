@@ -140,7 +140,7 @@ for:
             'https://github.com/graalvm/graalvm-ce-dev-builds/releases/download/20.2.0-dev-20200522_0210/graalvm-ce-java8-windows-amd64-20.2.0-dev.zip',
             'C:\graalvm-ce-java8-20.2.0-dev.zip'
           )
-          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\sbt-bin.zip", "C:\")
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\graalvm-ce-java8-20.2.0-dev.zip", "C:\")
         }
         if (!(Test-Path -Path "C:\zulu-jdk7" )) {
           (new-object System.Net.WebClient).DownloadFile(
@@ -156,17 +156,17 @@ for:
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 C:\jline2
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket C:\ipcsocket
     - cd C:\launcher
-    - SET JAVA_HOME='C:\zulu7.38.0.11-ca-jdk7.0.262-win_x64'
-    - sbt publishLocal
+    - SET JAVA_HOME=C:\zulu7.38.0.11-ca-jdk7.0.262-win_x64
+    - sbt --java-home %JAVA_HOME% publishLocal
     - SET JAVA_HOME=C:\jdk8
     - SET PATH=C:\jdk8\bin;%PATH%
     - cd C:\jline2
-    - sbt publishLocal
+    - sbt --java-home %JAVA_HOME% publishLocal
     - cd C:\ipcsocket
-    - sbt publishLocal
+    - sbt --java-home %JAVA_HOME% publishLocal
     - gu install native-image
     - mklink /D 'C:\Users\%APPVEYOR_ACCOUNT_NAME%\native-image' 'C:\graalvm-ce-java8-20.2.0-dev\bin\native-image'
-    - cd '%APPVEYOR_BUILD_FOLDER%'
+    - cd %APPVEYOR_BUILD_FOLDER%
 
   cache:
     - '%USERPROFILE%/.sbt'
