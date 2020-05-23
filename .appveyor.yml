@@ -82,6 +82,8 @@ for:
     - /Users/appveyor/.jabba/jdk
 
   test_script:
+    - git clone https://github.com/eatkins/launcher ~/launcher
+    - cd ~/launcher
     - export JAVA_HOME="~/.jabba/jdk/zulu@1.7.262"
     - sbt publishLocal
     - cd -
