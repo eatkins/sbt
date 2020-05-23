@@ -1047,35 +1047,38 @@ lazy val sbtClientProj = (project in file("client"))
       val outputDir = target.value / "graalcp"
       IO.delete(outputDir)
       IO.createDirectory(outputDir)
-      original.zipWithIndex.map { case (f, i) =>
-	Files.createSymbolicLink(outputDir.toPath / s"$i.jar", f.toPath)
-	s"$i.jar"
-      }.mkString(java.io.File.pathSeparator)
+      original.zipWithIndex
+        .map {
+          case (f, i) =>
+            Files.createSymbolicLink(outputDir.toPath / s"$i.jar", f.toPath)
+            s"$i.jar"
+        }
+        .mkString(java.io.File.pathSeparator)
     },
     genNativeExecutable := {
       val prefix = Seq(graalVMNativeImageCommand.value, "-cp", graalClasspath.value)
       val full = prefix ++ graalVMNativeImageOptions.value :+ "sbt.client.Client"
-      val pb = new java.lang.ProcessBuilder(full:_*)
+      val pb = new java.lang.ProcessBuilder(full: _*)
       println(full.mkString("\"", "\" \"", "\""))
       pb.directory(target.value / "graalcp")
       val proc = pb.start()
       val thread = new Thread {
-	setDaemon(true)
-	val is = proc.getInputStream
-	val es = proc.getErrorStream
-	override def run(): Unit = {
-	  Thread.sleep(100)
-	  while (proc.isAlive) {
-	    if (is.available > 0 || es.available > 0) {
-	      while (is.available > 0) System.out.print(is.read.toChar) 
-	      while (es.available > 0) System.err.print(es.read.toChar)
-	    }
-	    if (proc.isAlive) Thread.sleep(10)
-	  }
-	}
+        setDaemon(true)
+        val is = proc.getInputStream
+        val es = proc.getErrorStream
+        override def run(): Unit = {
+          Thread.sleep(100)
+          while (proc.isAlive) {
+            if (is.available > 0 || es.available > 0) {
+              while (is.available > 0) System.out.print(is.read.toChar)
+              while (es.available > 0) System.err.print(es.read.toChar)
+            }
+            if (proc.isAlive) Thread.sleep(10)
+          }
+        }
       }
       thread.start()
-      proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES) 
+      proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
       file("").toPath
     },
     graalVMNativeImageOptions += "-H:IncludeResourceBundles=jline.console.completer.CandidateListCompletionHandler",
@@ -1090,8 +1093,8 @@ lazy val sbtClientProj = (project in file("client"))
     },
     graalVMNativeImageOptions += "--verbose",
     graalVMNativeImageOptions += "--no-fallback",
-    graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",  
-   // graalVMNativeImageOptions += "-H:+TraceClassInitialization",  
+    graalVMNativeImageOptions += "-H:+ReportExceptionStackTraces",
+    // graalVMNativeImageOptions += "-H:+TraceClassInitialization",
     graalVMNativeImageCommand := "C:\\Users\\micro\\graalvm\\bin\\native-image.cmd",
     //graalVMNativeImageCommand := "/Users/ethanatkins/.sdkman/candidates/java/20.0.0.r11-grl/bin/native-image",
     //graalVMNativeImageCommand := "/Users/ethanatkins/Downloads/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image",
@@ -1099,11 +1102,14 @@ lazy val sbtClientProj = (project in file("client"))
       val output = target.value.toPath / "bin" / "client"
       java.nio.file.Files.createDirectories(output.getParent)
       val cp = (Compile / fullClasspathAsJars).value.map(_.data)
-      java.nio.file.Files.write(output, s"""
+      java.nio.file.Files.write(
+        output,
+        s"""
         |#!/bin/sh
         |
         |java -cp ${cp.mkString(java.io.File.pathSeparator)} sbt.client.Client $$*
-        """.stripMargin.linesIterator.toSeq.tail.mkString("\n").getBytes)
+        """.stripMargin.linesIterator.toSeq.tail.mkString("\n").getBytes
+      )
       output.toFile.setExecutable(true)
       output
     },
