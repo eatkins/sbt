@@ -1,7 +1,9 @@
+build: off
+
 image:
   - Ubuntu
-  - Visual Studio 2017
-build: off
+  - Visual Studio 2019
+  - macOS
 
 init:
   - git config --global core.autocrlf input
@@ -66,11 +68,7 @@ for:
   cache:
     - '%USERPROFILE%/.sbt'
 
-test_script:
-  - sbt "jline2/publishLocal; ipcsocket / publishLocal"
-  - sbt "scripted actions/* classloader-cache/* nio/* watch/*" "testOnly sbt.ServerSpec"
+  test_script:
+    - sbt "jline2/publishLocal; ipcsocket / publishLocal"
+    - sbt "scripted actions/* classloader-cache/* nio/* watch/*" "testOnly sbt.ServerSpec"
 
-cache:
-  - '%LOCALAPPDATA%\Coursier\Cache\v1'
-  - '%USERPROFILE%\.ivy2\cache'
-  - '%USERPROFILE%\.sbt'
