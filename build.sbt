@@ -277,7 +277,7 @@ val completeProj = (project in file("internal") / "util-complete")
   .settings(
     testedBaseSettings,
     name := "Completion",
-    libraryDependencies += jline,
+    libraryDependencies += jline2,
     mimaSettings,
     // Parser is used publicly, so we can't break bincompat.
     mimaBinaryIssueFilters := Seq(
@@ -337,7 +337,7 @@ lazy val utilLogging = (project in file("internal") / "util-logging")
     utilCommonSettings,
     name := "Util Logging",
     libraryDependencies ++=
-      Seq(jline, log4jApi, log4jCore, disruptor, sjsonNewScalaJson.value, scalaReflect.value),
+      Seq(jline2, log4jApi, log4jCore, disruptor, sjsonNewScalaJson.value, scalaReflect.value),
     libraryDependencies ++= Seq(scalacheck % "test", scalatest % "test"),
     libraryDependencies ++= (scalaVersion.value match {
       case v if v.startsWith("2.12.") => List(compilerPlugin(silencerPlugin))

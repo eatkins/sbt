@@ -82,7 +82,7 @@ object Dependencies {
   val sjsonNewScalaJson = sjsonNew("sjson-new-scalajson")
   val sjsonNewMurmurhash = sjsonNew("sjson-new-murmurhash")
 
-  val jline = "jline" % "jline" % "2.14.7-SNAPSHOT"
+  val jline2 = "jline" % "jline" % "2.14.7-SNAPSHOT"
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.8"
   val scalacheck = "org.scalacheck" %% "scalacheck" % "1.14.0"
   val specs2 = "org.specs2" %% "specs2-junit" % "4.0.1"
