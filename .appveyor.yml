@@ -52,6 +52,7 @@ for:
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 ~/jline2
     - cd ~/jline2
     - sbt publishLocal
+    - cd -
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ~/ipcsocket
     - cd ~/ipcsocket
     - sbt publishLocal
@@ -101,6 +102,7 @@ for:
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 ~/jline2
     - cd ~/jline2
+    - cd -
     - sbt publishLocal
     - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ~/ipcsocket
     - cd ~/ipcsocket
