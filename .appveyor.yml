@@ -1,8 +1,8 @@
 build: off
 
 image:
-  - Ubuntu
   - MacOS
+  - Ubuntu
   - Visual Studio 2019
 
 init:
@@ -42,7 +42,7 @@ for:
     - /home/appveyor/.sbt
 
   test_script:
-    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
+    - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; jline2/publishLocal; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
 -
@@ -77,7 +77,7 @@ for:
     - /Users/appveyor/.jabba/jdk
 
   test_script:
-    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
+    - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; jline2/publishLocal; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
 -
@@ -118,7 +118,7 @@ for:
     - '%USERPROFILE%/.sbt'
 
   test_script:
-    - sbt "set ThisBuild / version := \"2.14.7-SNAPSHOT\";jline2/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";ipcsocket / publishLocal"
+    - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; jline2/publishLocal; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 -
   matrix:
