@@ -58,7 +58,8 @@ for:
     - cd $DIR
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/bin"
     - gu install native-image
-    - sbt "sbtClientProj/eenNativeExecutable"
+    - ln -sf ~/graalvm-ce-java8-20.2.0-dev/bin/native-image ~/native-image
+    - sbt "sbtClientProj/genNativeExecutable"
 
 -
   matrix:
@@ -109,7 +110,8 @@ for:
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
     - gu install native-image
     - cd $DIR
-    - sbt "set ;sbtClientProj/genNativeExecutable"
+    - ln -sf ~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin/native-image ~/native-image
+    - sbt "sbtClientProj/genNativeExecutable"
 
 -
   matrix:
