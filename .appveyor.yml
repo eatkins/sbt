@@ -3,7 +3,6 @@ build: off
 image:
   - Ubuntu
   - Visual Studio 2019
-  - macOS
 
 init:
   - git config --global core.autocrlf input
