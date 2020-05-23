@@ -49,6 +49,7 @@ for:
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/bin"
     - gu install native-image
+    - jabba use adopt@1.8.0-222
     - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; set ThisBuild / version := \"2.14.7-SNAPSHOT\"; set ThisBuild / organization := \"jline\"; jline/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";set ThisBuild / organization := \"org.scala-sbt.ipcsocket\"; ipcsocket / publishLocal"
     - sbt "sbtClientProj/eenNativeExecutable"
 
@@ -92,6 +93,7 @@ for:
     - export PATH="$PATH:~/.jabba/jdk/adopt@1.8.0-222/bin"
     - export PATH="$PATH:~/graalvm-ce-java8-20.2.0-dev/Contents/Home/bin"
     - gu install native-image
+    - jabba use adopt@1.8.0-222
     - sbt "set ThisBuild / crossPaths := false; set crossPaths := false; set ThisBuild / version := \"2.14.7-SNAPSHOT\"; set ThisBuild / organization := \"jline\"; jline/publishLocal; set ThisBuild / version := \"1.0.1-SNAPSHOT\";set ThisBuild / organization := \"org.scala-sbt.ipcsocket\"; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
