@@ -37,6 +37,7 @@ for:
     - /home/appveyor/.sbt
 
   test_script:
+    - sbt "jline2/publishLocal; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
 
@@ -65,6 +66,7 @@ for:
     - '%USERPROFILE%/.sbt'
 
 test_script:
+  - sbt "jline2/publishLocal; ipcsocket / publishLocal"
   - sbt "scripted actions/* classloader-cache/* nio/* watch/*" "testOnly sbt.ServerSpec"
 
 cache:
