@@ -124,6 +124,7 @@ for:
     - cinst jdk8 -params 'installdir=C:\\jdk8'
     - SET CI=true
     - choco install windows-sdk-7.1 kb2519277
+    - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
 
     - ps: |
         Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -148,7 +149,6 @@ for:
           )
           [System.IO.Compression.ZipFile]::ExtractToDirectory("C:\zulu-jdk7.zip", "C:\")
         }
-    - call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd"
     - SET PATH=C:\graalvm-ce-java8-20.2.0-dev\bin;%PATH%
     - SET PATH=C:\sbt\sbt\bin;%PATH%
     - SET SBT_OPTS=-XX:MaxPermSize=2g -Xmx4g -Dsbt.supershell=never -Dfile.encoding=UTF8
@@ -165,7 +165,7 @@ for:
     - cd C:\ipcsocket
     - sbt publishLocal
     - gu install native-image
-    - mklink /D 'C:\%APPVEYOR_ACCOUNT_NAME%\native-image' 'C:\graalvm-ce-java8-20.2.0-dev\bin\native-image'
+    - mklink /D 'C:\Users\%APPVEYOR_ACCOUNT_NAME%\native-image' 'C:\graalvm-ce-java8-20.2.0-dev\bin\native-image'
     - cd '%APPVEYOR_BUILD_FOLDER%'
 
   cache:
