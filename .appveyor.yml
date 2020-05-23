@@ -45,6 +45,7 @@ for:
     - sbt "jline2/publishLocal; ipcsocket / publishLocal"
     - sbt "sbtClientProj/genNativeExecutable"
 
+-
   matrix:
     only:
       - image: MacOS
