@@ -31,7 +31,7 @@ before_install:
   - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ipcsocket
   - export DIR=$(pwd)
   - cd launcher
-  - sbt --java-home ~/.jabba/jdk/zulu@1.7.262 publishLocal
+  - JAVA_HOME=~/.jabba/jdk/zulu@1.7.262 sbt publishLocal
   - cd $DIR/jline2
   - sbt publishLocal
   - cd $DIR/ipcsocket
