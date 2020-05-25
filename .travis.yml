@@ -25,6 +25,18 @@ matrix:
 
 before_install:
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
+  - jabba install zulu@1.7.262
+  - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher launcher
+  - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 jline2
+  - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ipcsocket
+  - export DIR=$(pwd)
+  - cd launcher
+  - sbt --java-home ~/.jabba/jdk/zulu@1.7.262 publishLocal
+  - cd $DIR/jline2
+  - sbt publishLocal
+  - cd $DIR/ipcsocket
+  - sbt publishLocal
+  - cd $DIR
 
 install:
   - $JABBA_HOME/bin/jabba install $TRAVIS_JDK
