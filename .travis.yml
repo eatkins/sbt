@@ -26,16 +26,18 @@ matrix:
 before_install:
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
   - jabba install zulu@1.7.262
+  - jabba install adopt@1.8.0-222
   - git clone --single-branch --branch jline-v2 https://github.com/eatkins/launcher launcher
   - git clone --single-branch --branch sbt-fork https://github.com/eatkins/jline2 jline2
   - git clone --single-branch --branch full-jni https://github.com/eatkins/ipcsocket ipcsocket
   - export DIR=$(pwd)
+  - cd $DIR/jline2
+265publishLocal
+  - JAVA_HOME=~/.jabba/jdk/adopt@1.8.0-222 sbt publishLocal
+  - cd $DIR/ipcsocket
+  - JAVA_HOME=~/.jabba/jdk/adopt@1.8.0-222 sbt publishLocal
   - cd launcher
   - JAVA_HOME=~/.jabba/jdk/zulu@1.7.262 sbt publishLocal
-  - cd $DIR/jline2
-  - sbt publishLocal
-  - cd $DIR/ipcsocket
-  - sbt publishLocal
   - cd $DIR
 
 install:
@@ -46,7 +48,7 @@ install:
 
 script:
   # It doesn't need that much memory because compile and run are forked
-  - sbt -Dsbt.ci=true -J-XX:ReservedCodeCacheSize=128m -J-Xmx800M -J-Xms800M -J-server "jline2/publishLocal; ipcsocket/publishLocal; $SBT_CMD"
+  - sbt -Dsbt.ci=true -J-XX:ReservedCodeCacheSize=128m -J-Xmx800M -J-Xms800M -J-server "$SBT_CMD"
 
 before_cache:
   - find $HOME/.cache/coursier/v1 -name "ivydata-*.properties" -delete
