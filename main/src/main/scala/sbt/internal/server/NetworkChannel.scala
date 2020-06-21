@@ -824,7 +824,7 @@ final class NetworkChannel(
       withThread(
         {
           if (pending.get) pending.synchronized(pending.wait())
-          f(properties.get)
+          Option(properties.get).map(f).getOrElse(false)
         },
         false
       )
