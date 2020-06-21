@@ -11,7 +11,7 @@ package internal
 import java.io.{ ByteArrayInputStream, IOException, InputStream, File => _ }
 import java.nio.file.Path
 import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue }
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger, AtomicReference }
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
 
 import sbt.BasicCommandStrings._
 import sbt.Def._
@@ -619,7 +619,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
   }
 
   private[this] class WatchExecutor(name: String) extends AutoCloseable {
-    val readFuture = new AtomicReference[WatchExecutor.Future[Option[Byte]]]
     val id = new AtomicInteger(0)
     val threads = new java.util.Vector[Thread]
     def submit[R](tag: String, f: => R): WatchExecutor.Future[R] = {
@@ -718,33 +717,16 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     }
     executor => {
       val interrupted = new AtomicBoolean(false)
-      val readFuture = executor.readFuture
       @tailrec def impl(): Option[Watch.Action] = {
-        def getNextByte() =
-          try Option(terminal.inputStream.read.toByte)
-          finally readFuture.synchronized(readFuture.set(null))
         val action =
           try {
             interrupted.set(false)
-            val future = readFuture.synchronized {
-              val previous = readFuture.get
-              if (Terminal.systemInIsAttached && previous == null) {
-                val newFuture = executor.submit("read-input", getNextByte())
-                readFuture.set(newFuture)
-                Some(newFuture)
-              } else Option(previous)
-            }
-            val byte: Option[Byte] = future.flatMap(_.result.toOption.flatten)
-            val parse: ActionParser => Watch.Action = parser =>
-              parser(byte.fold("")(_.toChar.toString))
+            val byte = terminal.inputStream.read
+            val parse: ActionParser => Watch.Action = parser => parser(byte.toChar.toString)
             parse(inputHandler)
           } catch {
             case _: InterruptedException =>
               interrupted.set(true)
-              readFuture.synchronized(readFuture.get) match {
-                case null =>
-                case f    => f.cancel()
-              }
               Watch.Ignore
           }
         action match {
@@ -800,10 +782,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         case m => m
       }
     } finally {
-      executor.readFuture.getAndSet(null) match {
-        case null =>
-        case f    => f.cancel()
-      }
       inputJob.cancel()
       fileJob.cancel()
       ()
