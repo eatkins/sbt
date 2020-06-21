@@ -812,7 +812,7 @@ final class NetworkChannel(
       }
     }
     def getProperty[T](f: TerminalPropertiesResponse => T, default: T): Option[T] = {
-      if (closed.get) None
+      if (closed.get || !isAttached) None
       else
         withThread({
           getProperties(true);
@@ -820,7 +820,7 @@ final class NetworkChannel(
         }, None)
     }
     private[this] def waitForPending(f: TerminalPropertiesResponse => Boolean): Boolean = {
-      if (closed.get) false
+      if (closed.get || !isAttached) false
       withThread(
         {
           if (pending.get) pending.synchronized(pending.wait())

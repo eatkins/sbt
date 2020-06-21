@@ -417,6 +417,7 @@ trait NetworkClientImpl extends AutoCloseable { self =>
     try f
     finally registration.remove()
   }
+  private[this] val cancelled = new AtomicBoolean(false)
 
   def run(): Int =
     withSignalHandler(contHandler, Signals.CONT) {
@@ -427,14 +428,18 @@ trait NetworkClientImpl extends AutoCloseable { self =>
       val exit = cleaned.nonEmpty && userCommands.isEmpty
       attachUUID.set(sendJson(attach, s"""{"interactive": $interactive}"""))
       val handler: () => Unit = () => {
-        val cancelledTasks = {
-          val queue = sendCancelAllCommand()
-          Option(queue.poll(1, TimeUnit.SECONDS)).getOrElse(true)
-        }
-        if ((!interactive && pendingResults.isEmpty) || !cancelledTasks) {
+        def exitAbruptly() = {
           exitClean.set(false)
           close()
         }
+        if (cancelled.compareAndSet(false, true)) {
+          val cancelledTasks = {
+            val queue = sendCancelAllCommand()
+            Option(queue.poll(1, TimeUnit.SECONDS)).getOrElse(true)
+          }
+          if ((!interactive && pendingResults.isEmpty) || !cancelledTasks) exitAbruptly()
+          else cancelled.set(false)
+        } else exitAbruptly() // handles double ctrl+c to force a shutdown
       }
       withSignalHandler(handler, Signals.INT) {
         if (interactive) {
