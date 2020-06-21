@@ -12,9 +12,8 @@ package server
 import java.io.{ IOException, InputStream, OutputStream }
 import java.net.{ Socket, SocketTimeoutException }
 import java.nio.channels.ClosedChannelException
-import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap, LinkedBlockingQueue }
+import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue }
 
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes, LogMessageParams, MessageType }
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
@@ -47,14 +46,6 @@ import sjsonnew.support.scalajson.unsafe.Converter
 
 import scala.util.Try
 import scala.util.control.NonFatal
-import Serialization.{
-  attach,
-  systemIn,
-  terminalCapabilities,
-  terminalCapabilitiesResponse,
-  terminalPropertiesQuery,
-  terminalPropertiesResponse
-}
 
 final class NetworkChannel(
     val name: String,
@@ -101,6 +92,12 @@ final class NetworkChannel(
   private[this] val alive = new AtomicBoolean(true)
   private[sbt] def isInteractive = interactive.get
   private[this] val interactive = new AtomicBoolean(false)
+  private[sbt] def setInteractive(value: Boolean) = {
+    interactive.set(isInteractive)
+    if (!isInteractive) terminal.setPrompt(Prompt.Batch)
+    attached.set(true)
+  }
+  private[sbt] def write(byte: Byte) = inputBuffer.add(byte)
 
   override private[sbt] val terminal: Terminal = new NetworkTerminal
   override val userThread: UserThread = new UserThread(this)
@@ -239,6 +236,10 @@ final class NetworkChannel(
       intents.foldLeft(PartialFunction.empty[JsonRpcRequestMessage, Unit]) {
         case (f, i) => f orElse i.onRequest
       }
+    lazy val onResponseMessage: PartialFunction[JsonRpcResponseMessage, Unit] =
+      intents.foldLeft(PartialFunction.empty[JsonRpcResponseMessage, Unit]) {
+        case (f, i) => f orElse i.onResponse
+      }
 
     lazy val onNotification: PartialFunction[JsonRpcNotificationMessage, Unit] =
       intents.foldLeft(PartialFunction.empty[JsonRpcNotificationMessage, Unit]) {
@@ -249,54 +250,10 @@ final class NetworkChannel(
       Serialization.deserializeJsonMessage(chunk) match {
         case Right(req: JsonRpcRequestMessage) =>
           registerRequest(req)
-          /*
-           * The following pattern match is to handle thin client specific requests
-           */
-          req.method match {
-            case `systemIn` =>
-              import sjsonnew.BasicJsonProtocol._
-              pendingRequests.remove(req.id)
-              val byte = req.params.flatMap(Converter.fromJson[Byte](_).toOption)
-              byte.foreach(inputBuffer.put)
-            case `terminalPropertiesResponse` =>
-              import sbt.protocol.codec.JsonProtocol._
-              val response =
-                req.params.flatMap(Converter.fromJson[TerminalPropertiesResponse](_).toOption)
-              pendingRequests.remove(req.id)
-              pendingTerminalProperties.remove(req.id) match {
-                case null   =>
-                case buffer => response.foreach(buffer.put)
-              }
-            case `terminalCapabilitiesResponse` =>
-              import sbt.protocol.codec.JsonProtocol._
-              val response =
-                req.params.flatMap(
-                  Converter.fromJson[TerminalCapabilitiesResponse](_).toOption
-                )
-              pendingRequests.remove(req.id)
-              pendingTerminalCapability.remove(req.id) match {
-                case null =>
-                case buffer =>
-                  buffer.put(
-                    response.getOrElse(TerminalCapabilitiesResponse("", None, None, None))
-                  )
-              }
-            case `attach` =>
-              import sbt.protocol.codec.JsonProtocol.AttachFormat
-              val isInteractive = req.params
-                .flatMap(Converter.fromJson[Attach](_).toOption.map(_.interactive))
-                .exists(identity)
-              interactive.set(isInteractive)
-              if (!isInteractive) terminal.setPrompt(Prompt.Batch)
-              initiateMaintenance(attach)
-              import sjsonnew.BasicJsonProtocol._
-              pendingRequests -= req.id
-              jsonRpcRespond("", req.id)
-              attached.set(true)
-            case t =>
-              // handle default LSP requests
-              onRequestMessage(req)
-          }
+          // handle default LSP requests
+          onRequestMessage(req)
+        case Right(res: JsonRpcResponseMessage) =>
+          onResponseMessage(res)
         case Right(ntf: JsonRpcNotificationMessage) =>
           try {
             onNotification(ntf)
@@ -657,9 +614,7 @@ final class NetworkChannel(
     StandardMain.exchange.removeChannel(this)
     super.shutdown(logShutdown)
     Terminal.consoleLog(s"shutting down client connection $name")
-    pendingTerminalProperties.values.forEach { p =>
-      Util.ignoreResult(p.offer(TerminalPropertiesResponse(0, 0, false, false, false, false)))
-    }
+    VirtualTerminal.cancelRequests(name)
     try jsonRpcNotify("shutdown", logShutdown)
     catch { case _: IOException => }
     running.set(false)
@@ -734,10 +689,6 @@ final class NetworkChannel(
       LogMessageParams(MessageType.fromLevelString(level), message)
     )
   }
-  private[this] lazy val pendingTerminalProperties =
-    new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalPropertiesResponse]]()
-  private[this] lazy val pendingTerminalCapability =
-    new ConcurrentHashMap[String, ArrayBlockingQueue[TerminalCapabilitiesResponse]]
   private[this] lazy val inputStream: InputStream = new InputStream {
     override def read(): Int = {
       try {
@@ -778,11 +729,7 @@ final class NetworkChannel(
       if (alive.get) {
         if (!pending.get && Option(lastUpdate.get).fold(true)(d => (d + 1.second).isOverdue)) {
           pending.set(true)
-          val id = UUID.randomUUID.toString
-          val queue = new ArrayBlockingQueue[TerminalPropertiesResponse](1)
-          import sbt.protocol.codec.JsonProtocol._
-          pendingTerminalProperties.put(id, queue)
-          jsonRpcNotify(terminalPropertiesQuery, id)
+          val queue = VirtualTerminal.sendTerminalPropertiesQuery(name, jsonRpcNotify)
           val update: Runnable = () => {
             queue.poll(5, java.util.concurrent.TimeUnit.SECONDS) match {
               case null =>
@@ -846,11 +793,7 @@ final class NetworkChannel(
     ): Option[T] = {
       if (closed.get) None
       else {
-        val id = UUID.randomUUID.toString
-        val queue = new ArrayBlockingQueue[TerminalCapabilitiesResponse](1)
-        import sbt.protocol.codec.JsonProtocol._
-        pendingTerminalCapability.put(id, queue)
-        jsonRpcNotify(terminalCapabilities, query(id))
+        val queue = VirtualTerminal.sendTerminalCapabilitiesQuery(name, jsonRpcNotify)
         Some(result(queue.take))
       }
     }

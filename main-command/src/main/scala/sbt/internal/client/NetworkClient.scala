@@ -593,8 +593,7 @@ trait NetworkClientImpl extends AutoCloseable { self =>
   def sendCommandResponse(method: String, command: EventMessage, id: String): Unit = {
     try {
       val s = new String(Serialization.serializeEventMessage(command))
-      val msg =
-        s"""{ "jsonrpc": "2.0", "id": "$id", "method": "$method", "params": $s }"""
+      val msg = s"""{ "jsonrpc": "2.0", "id": "$id", "result": $s }"""
       connection.sendString(msg)
     } catch {
       case e: IOException =>
@@ -607,6 +606,10 @@ trait NetworkClientImpl extends AutoCloseable { self =>
     val msg = s"""{ "jsonrpc": "2.0", "id": "$uuid", "method": "$method", "params": $params }"""
     connection.sendString(msg)
     uuid
+  }
+
+  def sendNotification(method: String, params: String): Unit = {
+    connection.sendString(s"""{ "jsonrpc": "2.0", "method": "$method", "params": $params }""")
   }
 
   private[this] class RawInputThread extends Thread("sbt-read-input-thread") with AutoCloseable {
@@ -631,7 +634,7 @@ trait NetworkClientImpl extends AutoCloseable { self =>
     def drain(): Unit = lock.synchronized {
       while (!stdinBytes.isEmpty) {
         val byte = stdinBytes.poll()
-        sendJson(systemIn, byte.toString)
+        sendNotification(systemIn, byte.toString)
       }
     }
 

@@ -49,7 +49,8 @@ import sbt.internal.server.{
   BuildServerReporter,
   Definition,
   LanguageServerProtocol,
-  ServerHandler
+  ServerHandler,
+  VirtualTerminal,
 }
 import sbt.internal.testing.TestLogger
 import sbt.internal.util.Attributed.data
@@ -208,7 +209,9 @@ object Defaults extends BuildCommon {
       fullServerHandlers := {
         Seq(
           LanguageServerProtocol.handler(fileConverter.value),
-          BuildServerProtocol.handler(sbtVersion.value)
+          BuildServerProtocol.handler(sbtVersion.value),
+          VirtualTerminal.requestHandler,
+          VirtualTerminal.responseHandler,
         ) ++ serverHandlers.value :+ ServerHandler.fallback
       },
       uncachedStamper := Stamps.uncachedStamps(fileConverter.value),

@@ -115,7 +115,8 @@ private[sbt] object LanguageServerProtocol {
             val param = Converter.fromJson[CP](json(r)).get
             callback.onCompletionRequest(Option(r.id), param)
         }
-      }, {
+      },
+      PartialFunction.empty, {
         case n: JsonRpcNotificationMessage if n.method == "textDocument/didSave" =>
           val cmd = "Test/compile; collectAnalyses"
           callback.appendExec(Exec(cmd, None, Some(CommandSource(callback.name))))
