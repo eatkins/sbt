@@ -210,6 +210,7 @@ object Defaults extends BuildCommon {
         Seq(
           LanguageServerProtocol.handler(fileConverter.value),
           BuildServerProtocol.handler(sbtVersion.value),
+          VirtualTerminal.notificationHandler,
           VirtualTerminal.requestHandler,
           VirtualTerminal.responseHandler,
         ) ++ serverHandlers.value :+ ServerHandler.fallback

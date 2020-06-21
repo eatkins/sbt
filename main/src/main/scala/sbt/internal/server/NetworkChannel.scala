@@ -92,10 +92,13 @@ final class NetworkChannel(
   private[this] val alive = new AtomicBoolean(true)
   private[sbt] def isInteractive = interactive.get
   private[this] val interactive = new AtomicBoolean(false)
-  private[sbt] def setInteractive(value: Boolean) = {
+  private[sbt] def setInteractive(id: String, value: Boolean) = {
     interactive.set(isInteractive)
     if (!isInteractive) terminal.setPrompt(Prompt.Batch)
     attached.set(true)
+    pendingRequests.remove(id)
+    import sjsonnew.BasicJsonProtocol._
+    jsonRpcRespond("", id)
   }
   private[sbt] def write(byte: Byte) = inputBuffer.add(byte)
 

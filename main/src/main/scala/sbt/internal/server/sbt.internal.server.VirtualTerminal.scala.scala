@@ -16,14 +16,16 @@ import sbt.protocol.Serialization.{
   attach,
   systemIn,
   terminalCapabilities,
-  terminalCapabilitiesResponse,
   terminalPropertiesQuery,
-  terminalPropertiesResponse
 }
 import sjsonnew.support.scalajson.unsafe.Converter
 import sbt.protocol.{ Attach, TerminalCapabilitiesResponse, TerminalPropertiesResponse }
 
 object VirtualTerminal {
+  private[this] val pendingTerminalProperties =
+    new ConcurrentHashMap[(String, String), ArrayBlockingQueue[TerminalPropertiesResponse]]()
+  private[this] val pendingTerminalCapabilities =
+    new ConcurrentHashMap[(String, String), ArrayBlockingQueue[TerminalCapabilitiesResponse]]
   private[sbt] def sendTerminalPropertiesQuery(
       channelName: String,
       jsonRpcNotify: (String, String) => Unit
@@ -40,24 +42,24 @@ object VirtualTerminal {
   ): ArrayBlockingQueue[TerminalCapabilitiesResponse] = {
     val id = UUID.randomUUID.toString
     val queue = new ArrayBlockingQueue[TerminalCapabilitiesResponse](1)
-    pendingTerminalCapability.put((channelName, id), queue)
+    pendingTerminalCapabilities.put((channelName, id), queue)
     jsonRpcNotify(terminalCapabilities, id)
     queue
   }
   private[sbt] def cancelRequests(name: String): Unit = {
-    pendingTerminalCapability.forEach {
-      case ((`name`, _), q) => q.put(TerminalCapabilitiesResponse("", None, None, None))
-      case _                =>
+    pendingTerminalCapabilities.forEach {
+      case (k @ (`name`, _), q) =>
+        pendingTerminalCapabilities.remove(k)
+        q.put(TerminalCapabilitiesResponse("", None, None, None))
+      case _ =>
     }
     pendingTerminalProperties.forEach {
-      case ((`name`, _), q) => q.put(TerminalPropertiesResponse(0, 0, false, false, false, false))
-      case _                =>
+      case (k @ (`name`, _), q) =>
+        pendingTerminalProperties.remove(k)
+        q.put(TerminalPropertiesResponse(0, 0, false, false, false, false))
+      case _ =>
     }
   }
-  private[this] val pendingTerminalProperties =
-    new ConcurrentHashMap[(String, String), ArrayBlockingQueue[TerminalPropertiesResponse]]()
-  private[this] val pendingTerminalCapability =
-    new ConcurrentHashMap[(String, String), ArrayBlockingQueue[TerminalCapabilitiesResponse]]
   val requestHandler: ServerHandler = ServerHandler { callback =>
     ServerIntent.request {
       case r if r.method == attach =>
@@ -65,15 +67,16 @@ object VirtualTerminal {
         val isInteractive = r.params
           .flatMap(Converter.fromJson[Attach](_).toOption.map(_.interactive))
           .exists(identity)
+        System.err.println(s"attach!")
         StandardMain.exchange.channelForName(callback.name) match {
-          case Some(nc: NetworkChannel) => nc.setInteractive(isInteractive)
+          case Some(nc: NetworkChannel) => nc.setInteractive(r.id, isInteractive)
           case _                        =>
         }
     }
   }
   val responseHandler: ServerHandler = ServerHandler { callback =>
     ServerIntent.response {
-      case r if r.id == terminalPropertiesResponse =>
+      case r if pendingTerminalProperties.get((callback.name, r.id)) != null =>
         import sbt.protocol.codec.JsonProtocol._
         val response =
           r.result.flatMap(Converter.fromJson[TerminalPropertiesResponse](_).toOption)
@@ -81,13 +84,14 @@ object VirtualTerminal {
           case null   =>
           case buffer => response.foreach(buffer.put)
         }
-      case r if r.id == terminalCapabilitiesResponse =>
+      case r if pendingTerminalCapabilities.get((callback.name, r.id)) != null =>
+        System.err.println(r)
         import sbt.protocol.codec.JsonProtocol._
         val response =
           r.result.flatMap(
             Converter.fromJson[TerminalCapabilitiesResponse](_).toOption
           )
-        pendingTerminalCapability.remove((callback.name, r.id)) match {
+        pendingTerminalCapabilities.remove((callback.name, r.id)) match {
           case null =>
           case buffer =>
             buffer.put(
