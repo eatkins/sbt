@@ -636,7 +636,6 @@ private[sbt] object Continuous extends DeprecatedContinuous {
     }
     def removeThread(thread: Thread): Unit = Util.ignoreResult(threads.remove(thread))
     def close(): Unit = {
-      new Exception("").printStackTrace()
       threads.forEach(_.interrupt)
     }
   }
@@ -722,15 +721,8 @@ private[sbt] object Continuous extends DeprecatedContinuous {
       val readFuture = executor.readFuture
       @tailrec def impl(): Option[Watch.Action] = {
         def getNextByte() =
-          try {
-            val res = Option(terminal.inputStream.read.toByte)
-            System.err.println(res)
-            res
-          } catch {
-            case e: InterruptedException =>
-              System.err.println("should exit read thread")
-              throw e
-          } finally readFuture.synchronized(readFuture.set(null))
+          try Option(terminal.inputStream.read.toByte)
+          finally readFuture.synchronized(readFuture.set(null))
         val action =
           try {
             interrupted.set(false)
@@ -808,6 +800,10 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         case m => m
       }
     } finally {
+      executor.readFuture.getAndSet(null) match {
+        case null =>
+        case f    => f.cancel()
+      }
       inputJob.cancel()
       fileJob.cancel()
       ()
