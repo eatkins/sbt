@@ -11,6 +11,9 @@ createSymlinks := {
   Files.createSymbolicLink(foo, base / "file-source" / "Foo.scala")
 }
 
+import scala.concurrent.duration._
+ThisBuild / watchDeletionQuarantinePeriod := 50.millis
+
 ThisBuild / watchOnFileInputEvent := {
   val srcDir = baseDirectory.value.toPath / "src" / "main" / "scala"
   (_: Int, event: Watch.Event) =>
@@ -29,6 +32,7 @@ copySource := {
   }
   val base = baseDirectory.value.toPath
   Files.copy((base / "changes").resolve(relative), base.resolve(relative), REPLACE_EXISTING)
+  println(s"should have copied ${base.resolve(relative)}")
 }
 
 val removeLink = inputKey[Unit]("remove a symlink")

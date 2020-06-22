@@ -143,7 +143,7 @@ final class NetworkChannel(
   protected def authOptions: Set[ServerAuthentication] = auth
 
   override def mkUIThread: (State, CommandChannel) => UITask = (state, command) => {
-    if (interactive.get) mkUIThreadImpl(state, command)
+    if (interactive.get || ContinuousCommands.isInWatch(this)) mkUIThreadImpl(state, command)
     else
       new UITask {
         override private[sbt] def channel = NetworkChannel.this
@@ -784,7 +784,8 @@ final class NetworkChannel(
     override def getHeight: Int = getProperty(_.height, 0).getOrElse(0)
     override def isAnsiSupported: Boolean = getProperty(_.isAnsiSupported, false).getOrElse(false)
     override def isEchoEnabled: Boolean = waitForPending(_.isEchoEnabled)
-    override def isSuccessEnabled: Boolean = prompt != Prompt.Batch
+    override def isSuccessEnabled: Boolean =
+      prompt != Prompt.Batch || ContinuousCommands.isInWatch(NetworkChannel.this)
     override lazy val isColorEnabled: Boolean = waitForPending(_.isColorEnabled)
     override lazy val isSupershellEnabled: Boolean = waitForPending(_.isSupershellEnabled)
     getProperties(false)
