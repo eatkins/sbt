@@ -8,7 +8,7 @@
 package sbt
 
 import java.io.{ File, PrintWriter }
-import java.net.{ URI, URL, URLClassLoader }
+import java.net.{ URI, URL }
 import java.nio.file.{ Paths, Path => NioPath }
 import java.util.Optional
 import java.util.concurrent.TimeUnit
@@ -32,9 +32,9 @@ import sbt.Scope.{ GlobalScope, ThisScope, fillTaskAxis }
 import sbt.coursierint._
 import sbt.internal.CommandStrings.ExportStream
 import sbt.internal._
-import sbt.internal.classpath.AlternativeZincUtil
+import sbt.internal.classpath.{ AlternativeZincUtil, ClassLoaderCache }
 import sbt.internal.inc.JavaInterfaceUtil._
-import sbt.internal.inc.classpath.{ ClassLoaderCache, ClasspathFilter, ClasspathUtil }
+import sbt.internal.inc.classpath.{ ClasspathFilter, ClasspathUtil }
 import sbt.internal.inc.{ MappedFileConverter, PlainVirtualFile, Stamps, ZincLmUtil, ZincUtil }
 import sbt.internal.io.{ Source, WatchState }
 import sbt.internal.librarymanagement.mavenint.{
@@ -373,6 +373,11 @@ object Defaults extends BuildCommon {
         () => Clean.deleteContents(tempDirectory, _ => false)
       },
       turbo :== SysProp.turbo,
+      useScalaReplJLine :== false,
+      scalaInstanceTopLoader := {
+        if (!useScalaReplJLine.value) JLine3.loader
+        else appConfiguration.value.provider.scalaProvider.launcher.topLoader.getParent
+      },
       useSuperShell := { if (insideCI.value) false else Terminal.console.isSupershellEnabled },
       progressReports := {
         val rs = EvaluateTask.taskTimingProgress.toVector ++ EvaluateTask.taskTraceEvent.toVector
@@ -829,8 +834,15 @@ object Defaults extends BuildCommon {
             val libraryJars = allJars.filter(_.getName == "scala-library.jar")
             allJars.filter(_.getName == "scala-compiler.jar") match {
               case Array(compilerJar) if libraryJars.nonEmpty =>
-                val cache = state.value.classLoaderCache
-                mkScalaInstance(version, allJars, libraryJars, compilerJar, cache)
+                val cache = state.value.extendedClassLoaderCache
+                mkScalaInstance(
+                  version,
+                  allJars,
+                  libraryJars,
+                  compilerJar,
+                  cache,
+                  scalaInstanceTopLoader.value
+                )
               case _ => ScalaInstance(version, scalaProvider)
             }
           } else
@@ -872,7 +884,8 @@ object Defaults extends BuildCommon {
       allJars,
       Array(libraryJar),
       compilerJar,
-      state.value.classLoaderCache
+      state.value.extendedClassLoaderCache,
+      scalaInstanceTopLoader.value,
     )
   }
   private[this] def mkScalaInstance(
@@ -881,15 +894,11 @@ object Defaults extends BuildCommon {
       libraryJars: Array[File],
       compilerJar: File,
       classLoaderCache: ClassLoaderCache,
+      topLoader: ClassLoader,
   ): ScalaInstance = {
     val allJarsDistinct = allJars.distinct
-    val libraryLoader = classLoaderCache(libraryJars.toList)
-    class ScalaLoader
-        extends URLClassLoader(allJarsDistinct.map(_.toURI.toURL).toArray, libraryLoader)
-    val fullLoader = classLoaderCache.cachedCustomClassloader(
-      allJarsDistinct.toList,
-      () => new ScalaLoader
-    )
+    val libraryLoader = classLoaderCache(libraryJars.toList, topLoader)
+    val fullLoader = classLoaderCache(allJarsDistinct.toList, libraryLoader)
     new ScalaInstance(
       version,
       fullLoader,
@@ -911,7 +920,8 @@ object Defaults extends BuildCommon {
       dummy.allJars,
       dummy.libraryJars,
       dummy.compilerJar,
-      state.value.classLoaderCache
+      state.value.extendedClassLoaderCache,
+      scalaInstanceTopLoader.value,
     )
   }
 

@@ -16,6 +16,7 @@ import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -173,10 +174,7 @@ object Terminal {
   def consoleLog(string: String): Unit = {
     Terminal.console.printStream.println(s"[info] $string")
   }
-  private[sbt] def set(terminal: Terminal) = {
-    activeTerminal.set(terminal)
-    jline.TerminalFactory.set(terminal.toJLine)
-  }
+  private[sbt] def set(terminal: Terminal) = activeTerminal.set(terminal)
   implicit class TerminalOps(private val term: Terminal) extends AnyVal {
     def ansi(richString: => String, string: => String): String =
       if (term.isAnsiSupported) richString else string
@@ -519,7 +517,6 @@ object Terminal {
    * System.out through the terminal's input and output streams.
    */
   private[this] val activeTerminal = new AtomicReference[Terminal](consoleTerminalHolder.get)
-  jline.TerminalFactory.set(consoleTerminalHolder.get.toJLine)
 
   /**
    * The boot input stream allows a remote client to forward input to the sbt process while
@@ -693,13 +690,13 @@ object Terminal {
         if (alive)
           try terminal.init()
           catch {
-            case _: InterruptedException =>
+            case _: InterruptedException | _: java.io.IOError =>
           }
       override def restore(): Unit =
         if (alive)
           try terminal.restore()
           catch {
-            case _: InterruptedException =>
+            case _: InterruptedException | _: java.io.IOError =>
           }
       override def reset(): Unit =
         try terminal.reset()
@@ -782,9 +779,11 @@ object Terminal {
       out: OutputStream
   ) extends TerminalImpl(in, out, originalErr, "console0") {
     private[util] lazy val system = JLine3.system
+    override private[sbt] def getSizeImpl: (Int, Int) = {
+      val size = system.getSize
+      (size.getColumns, size.getRows)
+    }
     private[this] def isCI = sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")
-    override def getWidth: Int = system.getSize.getColumns
-    override def getHeight: Int = system.getSize.getRows
     override def isAnsiSupported: Boolean = term.isAnsiSupported && !isCI
     override def isEchoEnabled: Boolean = system.echo()
     override def isSuccessEnabled: Boolean = true
@@ -800,7 +799,7 @@ object Terminal {
     override private[sbt] def restore(): Unit = term.restore()
 
     override private[sbt] def getAttributes: Map[String, String] =
-      JLine3.toMap(system.getAttributes)
+      Try(JLine3.toMap(system.getAttributes)).getOrElse(Map.empty)
     override private[sbt] def setAttributes(attributes: Map[String, String]): Unit =
       system.setAttributes(JLine3.attributesFromMap(attributes))
     override private[sbt] def setSize(width: Int, height: Int): Unit =
@@ -840,6 +839,19 @@ object Terminal {
       override val errorStream: OutputStream,
       override private[sbt] val name: String
   ) extends Terminal {
+    private[sbt] def getSizeImpl: (Int, Int)
+    private[this] val sizeRefreshPeriod = 1.second
+    private[this] val size =
+      new AtomicReference[((Int, Int), Deadline)](((1, 1), Deadline.now - 1.day))
+    private[this] def setSize() = size.set((Try(getSizeImpl).getOrElse((1, 1)), Deadline.now))
+    private[this] def getSize = size.get match {
+      case (s, d) if (d + sizeRefreshPeriod).isOverdue =>
+        setSize()
+        size.get._1
+      case (s, _) => s
+    }
+    override def getWidth: Int = getSize._1
+    override def getHeight: Int = getSize._2
     private[this] val rawMode = new AtomicBoolean(false)
     private[this] val writeLock = new AnyRef
     private[this] val writeableInputStream = in match {
