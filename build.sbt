@@ -286,7 +286,7 @@ val completeProj = (project in file("internal") / "util-complete")
     testedBaseSettings,
     name := "Completion",
     libraryDependencies += jline,
-    libraryDependencies += jline3,
+    libraryDependencies += jline3Reader,
     mimaSettings,
     // Parser is used publicly, so we can't break bincompat.
     mimaBinaryIssueFilters := Seq(
@@ -348,7 +348,8 @@ lazy val utilLogging = (project in file("internal") / "util-logging")
     libraryDependencies ++=
       Seq(
         jline,
-        jline3,
+        jline3Terminal,
+        jline3Jansi,
         log4jApi,
         log4jCore,
         disruptor,
@@ -633,6 +634,7 @@ lazy val actionsProj = (project in file("main-actions"))
     testedBaseSettings,
     name := "Actions",
     libraryDependencies += sjsonNewScalaJson.value,
+    libraryDependencies += jline3Terminal,
     mimaSettings,
     mimaBinaryIssueFilters ++= Seq(
       // Removed unused private[sbt] nested class
@@ -1057,7 +1059,6 @@ lazy val sbtClientProj = (project in file("client"))
     crossPaths := false,
     exportJars := true,
     libraryDependencies += jansi,
-    libraryDependencies += jline3Jansi,
     libraryDependencies += scalatest % "test",
     /*
      * On windows, the raw classpath is too large to be a command argument to an
