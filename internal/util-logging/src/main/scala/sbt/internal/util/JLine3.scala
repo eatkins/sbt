@@ -7,12 +7,12 @@
 
 package sbt.internal.util
 
-import java.io.{ EOFException, InputStream, OutputStream, PrintWriter }
+import java.io.{ InputStream, OutputStream, PrintWriter }
 import java.nio.charset.Charset
 import java.util.{ Arrays, EnumSet }
 import java.util.concurrent.atomic.AtomicBoolean
 import org.jline.utils.InfoCmp.Capability
-import org.jline.utils.{ NonBlocking, OSUtils }
+import org.jline.utils.{ ClosedException, NonBlocking, OSUtils }
 import org.jline.terminal.{ Attributes, Size, Terminal => JTerminal }
 import org.jline.terminal.Terminal.SignalHandler
 import org.jline.terminal.impl.AbstractTerminal
@@ -21,7 +21,21 @@ import org.jline.terminal.impl.jansi.win.JansiWinSysTerminal
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-private[util] object JLine3 {
+private[sbt] object JLine3 {
+  def loader: ClassLoader = {
+    val jlineLoader = classOf[org.jline.terminal.Terminal].getClassLoader
+    val jline2Loader = classOf[jline.Terminal].getClassLoader
+    val jansiLoader = classOf[org.fusesource.jansi.Ansi].getClassLoader
+    new java.net.URLClassLoader(Array.empty, null) {
+      override def findClass(name: String): Class[_] = name match {
+        case c if c.startsWith("org.jline")       => jlineLoader.loadClass(name)
+        case c if c.startsWith("jline.")          => jline2Loader.loadClass(name)
+        case c if c.startsWith("org.fusesource.") => jansiLoader.loadClass(name)
+        case _                                    => throw new ClassNotFoundException(name)
+      }
+      override def toString: String = "JLine3Loader"
+    }
+  }
   private val capabilityMap = Capability
     .values()
     .map { c =>
@@ -94,7 +108,7 @@ private[util] object JLine3 {
           val res = try term.inputStream.read
           catch { case _: InterruptedException => -2 }
           if (res == 4 && term.prompt.render().endsWith(term.prompt.mkPrompt()))
-            throw new EOFException
+            throw new ClosedException
           res
         }
       }

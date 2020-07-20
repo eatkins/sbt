@@ -936,6 +936,7 @@ object BuiltinCommands {
     SessionSettings.checkSession(session, s2)
     val s3 = addCacheStoreFactoryFactory(Project.setProject(session, structure, s2))
     val s4 = setupGlobalFileTreeRepository(s3)
+    s4.extendedClassLoaderCache.setParent(Project.extract(s4).get(Keys.scalaInstanceTopLoader))
     CheckBuildSources.init(LintUnused.lintUnusedFunc(s4))
   }
 
