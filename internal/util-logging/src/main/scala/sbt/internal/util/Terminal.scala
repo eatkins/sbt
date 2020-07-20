@@ -518,8 +518,8 @@ object Terminal {
    * is used to change the terminal during task evaluation. This allows us to route System.in and
    * System.out through the terminal's input and output streams.
    */
-  private[this] val activeTerminal = new AtomicReference[Terminal](consoleTerminalHolder.get)
-  jline.TerminalFactory.set(consoleTerminalHolder.get.toJLine)
+  private[this] val activeTerminal = new AtomicReference[Terminal](null)
+  set(consoleTerminalHolder.get)
 
   /**
    * The boot input stream allows a remote client to forward input to the sbt process while
@@ -693,13 +693,13 @@ object Terminal {
         if (alive)
           try terminal.init()
           catch {
-            case _: InterruptedException =>
+            case _: InterruptedException | _: java.io.IOError =>
           }
       override def restore(): Unit =
         if (alive)
           try terminal.restore()
           catch {
-            case _: InterruptedException =>
+            case _: InterruptedException | _: java.io.IOError =>
           }
       override def reset(): Unit =
         try terminal.reset()
@@ -781,10 +781,17 @@ object Terminal {
       in: InputStream,
       out: OutputStream
   ) extends TerminalImpl(in, out, originalErr, "console0") {
-    private[util] lazy val system = JLine3.system
+    private[util] val system = JLine3.system
+    private[this] val size = new AtomicReference[(Int, Int)]((1, 1))
     private[this] def isCI = sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")
-    override def getWidth: Int = system.getSize.getColumns
-    override def getHeight: Int = system.getSize.getRows
+    private[this] def getSize =
+      try {
+        val jsize = system.getSize
+        size.set((jsize.getColumns, jsize.getRows))
+        size.get
+      } catch { case NonFatal(_) => size.get }
+    override def getWidth: Int = getSize._1
+    override def getHeight: Int = getSize._2
     override def isAnsiSupported: Boolean = term.isAnsiSupported && !isCI
     override def isEchoEnabled: Boolean = system.echo()
     override def isSuccessEnabled: Boolean = true
@@ -800,7 +807,7 @@ object Terminal {
     override private[sbt] def restore(): Unit = term.restore()
 
     override private[sbt] def getAttributes: Map[String, String] =
-      JLine3.toMap(system.getAttributes)
+      Try(JLine3.toMap(system.getAttributes)).getOrElse(Map.empty)
     override private[sbt] def setAttributes(attributes: Map[String, String]): Unit =
       system.setAttributes(JLine3.attributesFromMap(attributes))
     override private[sbt] def setSize(width: Int, height: Int): Unit =

@@ -51,8 +51,9 @@ private[sbt] class ClassLoaderCache(
       }
   }
   private class Key(val fileStamps: Seq[(File, Long)], val parent: ClassLoader) {
-    def this(files: List[File]) =
-      this(files.map(f => f -> IO.getModifiedTimeOrZero(f)), commonParent)
+    def this(files: List[File], parent: ClassLoader) =
+      this(files.map(f => f -> IO.getModifiedTimeOrZero(f)), parent)
+    def this(files: List[File]) = this(files, commonParent)
     lazy val files: Seq[File] = fileStamps.map(_._1)
     lazy val maxStamp: Long = fileStamps.maxBy(_._2)._2
     class CachedClassLoader
@@ -168,6 +169,10 @@ private[sbt] class ClassLoaderCache(
   ): ClassLoader = {
     val key = new Key(files, parent)
     get(key, mkLoader)
+  }
+  def apply(files: List[File], parent: ClassLoader): ClassLoader = {
+    val key = new Key(files, parent)
+    get(key, () => key.toClassLoader)
   }
   override def apply(files: List[File]): ClassLoader = {
     val key = new Key(files)
