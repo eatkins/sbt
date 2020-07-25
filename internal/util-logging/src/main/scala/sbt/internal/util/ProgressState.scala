@@ -78,7 +78,7 @@ private[sbt] final class ProgressState(
   }
 
   private[util] def getPrompt(terminal: Terminal): Array[Byte] = {
-    if (terminal.prompt != Prompt.Running && terminal.prompt != Prompt.Batch) {
+    if (terminal.prompt.isInstanceOf[Prompt.AskUser]) {
       val prefix = if (terminal.isAnsiSupported) s"$DeleteLine$CursorLeft1000" else ""
       prefix.getBytes ++ terminal.prompt.render().getBytes("UTF-8")
     } else Array.empty
@@ -108,8 +108,8 @@ private[sbt] final class ProgressState(
           val lines = printProgress(terminal, lastLine)
           toWrite ++= (ClearScreenAfterCursor + lines).getBytes("UTF-8")
         }
+        toWrite ++= getPrompt(terminal)
       }
-      toWrite ++= getPrompt(terminal)
       printStream.write(toWrite.toArray)
       printStream.flush()
     } else printStream.write(bytes)
@@ -158,7 +158,7 @@ private[sbt] object ProgressState {
       if (!pe.skipIfActive.getOrElse(false) || (!isRunning && !isBatch)) {
         terminal.withPrintStream { ps =>
           val commandFromThisTerminal = pe.channelName.fold(true)(_ == terminal.name)
-          val info = if ((isRunning || isBatch || noPrompt) && commandFromThisTerminal) {
+          val info = if (commandFromThisTerminal) {
             pe.items.map { item =>
               val elapsed = item.elapsedMicros / 1000000L
               s"  | => ${item.name} ${elapsed}s"
