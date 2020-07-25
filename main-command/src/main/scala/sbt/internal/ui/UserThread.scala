@@ -66,7 +66,10 @@ private[sbt] class UserThread(val channel: CommandChannel) extends AutoCloseable
       case (t, thread) =>
         t.close()
         Util.ignoreResult(thread.interrupt())
-        thread.join()
+        thread.join(1000)
+        // This join should always work, but if it doesn't log an error because
+        // it can cause problems if the thread isn't joined
+        if (thread.isAlive) System.err.println(s"Unable to join thread $thread")
         ()
     }
   }
