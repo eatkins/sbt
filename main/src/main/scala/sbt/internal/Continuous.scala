@@ -1268,6 +1268,7 @@ private[sbt] object ContinuousCommands {
     state
   }
   private[sbt] def stopWatchImpl(channelName: String): Unit = {
+    StandardMain.exchange.channelForName(channelName).foreach(_.terminal.setPrompt(Prompt.Running))
     StandardMain.exchange.unprompt(ConsoleUnpromptEvent(Some(CommandSource(channelName))))
     Option(watchStates.get(channelName)).foreach { ws =>
       ws.afterWatch()

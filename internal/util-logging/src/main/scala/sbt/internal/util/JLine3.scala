@@ -115,11 +115,11 @@ private[sbt] object JLine3 {
       override val output: OutputStream = new OutputStream {
         override def write(b: Int): Unit = write(Array[Byte](b.toByte))
         override def write(b: Array[Byte]): Unit = if (!closed.get) term.withPrintStream { ps =>
+          ps.write(b)
           term.prompt match {
             case a: Prompt.AskUser => a.write(b)
             case _                 =>
           }
-          ps.write(b)
         }
         override def write(b: Array[Byte], offset: Int, len: Int) =
           write(Arrays.copyOfRange(b, offset, offset + len))
