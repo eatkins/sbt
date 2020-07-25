@@ -152,8 +152,8 @@ final class NetworkChannel(
     if (interactive.get || ContinuousCommands.isInWatch(this)) mkUIThreadImpl(state, command)
     else
       new UITask {
-        override private[sbt] def channel = NetworkChannel.this
-        override def reader: UITask.Reader = () => {
+        override private[sbt] val channel = NetworkChannel.this
+        override private[sbt] lazy val reader: UITask.Reader = () => {
           try {
             this.synchronized(this.wait)
             Left(TerminateAction)

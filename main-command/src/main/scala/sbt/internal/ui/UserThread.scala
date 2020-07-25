@@ -31,9 +31,15 @@ private[sbt] class UserThread(val channel: CommandChannel) extends AutoCloseable
     uiThread.synchronized {
       val task = channel.makeUIThread(state)
       def submit(): Thread = {
-        val thread = new Thread(() => {
-          task.run()
-          uiThread.set(null)
+        def close(): Unit = {
+          uiThread.get match {
+            case (_, t) if t == thread => uiThread.set(null)
+            case _                     =>
+          }
+        }
+        lazy val thread = new Thread(() => {
+          try task.run()
+          finally close()
         }, s"sbt-$name-ui-thread")
         thread.setDaemon(true)
         thread.start()
@@ -60,6 +66,8 @@ private[sbt] class UserThread(val channel: CommandChannel) extends AutoCloseable
       case (t, thread) =>
         t.close()
         Util.ignoreResult(thread.interrupt())
+        thread.join()
+        ()
     }
   }
 
