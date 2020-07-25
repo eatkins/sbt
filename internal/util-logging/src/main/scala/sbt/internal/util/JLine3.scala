@@ -77,6 +77,8 @@ private[util] object JLine3 {
     new AbstractTerminal(term.name, "ansi", Charset.forName("UTF-8"), SignalHandler.SIG_DFL) {
       val closed = new AtomicBoolean(false)
       setOnClose { () =>
+        doClose()
+        reader.close()
         if (closed.compareAndSet(false, true)) {
           // This is necessary to shutdown the non blocking input reader
           // so that it doesn't keep blocking
