@@ -555,25 +555,23 @@ trait Init[ScopeType] {
     //   2. it applies to outputScope (as determined by its `filter`)
     //   3. all of its dependencies are defined for outputScope (allowing for delegation)
     // This needs to handle local settings because a derived setting wouldn't be injected if it's local setting didn't exist yet.
-    val deriveFor: ScopedKey[_] => Vector[Setting[_]] = (sk: ScopedKey[_]) => {
-      val derivedForKey: Vector[Derived] = derivedBy.get(sk.key) match {
-        case Some(s) => s.toVector
-        case _       => Vector.empty
-      }
+    val deriveFor = (sk: ScopedKey[_]) => {
+      val derivedForKey: List[Derived] = derivedBy.get(sk.key).toList.flatten
       val scope = sk.scope
-      def localAndDerived(d: Derived): Vector[Setting[_]] = {
+      def localAndDerived(d: Derived): Seq[Setting[_]] = {
         def definingScope = d.setting.key.scope
-        val outputScope = intersectSet(scope, definingScope)
+        val outputScope = intersect(scope, definingScope)
         outputScope collect {
           case s if !d.inScopes.contains(s) && d.setting.filter(s) =>
-            val local = d.dependencies.toVector.flatMap(dep => scopeLocal(ScopedKey(s, dep)))
+            val local = d.dependencies.flatMap(dep => scopeLocal(ScopedKey(s, dep)))
             if (allDepsDefined(d, s, local.map(_.key.key).toSet)) {
               d.inScopes.add(s)
               val out = local :+ d.setting.setScope(s)
               d.outputs ++= out
               out
-            } else Vector.empty
-        } getOrElse Vector.empty
+            } else
+              nilSeq
+        } getOrElse nilSeq
       }
       derivedForKey.flatMap(localAndDerived)
     }
@@ -581,15 +579,15 @@ trait Init[ScopeType] {
     val processed = new mutable.HashSet[ScopedKey[_]]
 
     // derives settings, transitively so that a derived setting can trigger another
-    def process(rem: Vector[Setting[_]]): Unit = rem.headOption match {
-      case Some(s) =>
+    def process(rem: List[Setting[_]]): Unit = rem match {
+      case s :: ss =>
         val sk = s.key
-        val ds = if (processed.add(sk)) deriveFor(sk) else Vector.empty
+        val ds = if (processed.add(sk)) deriveFor(sk) else nil
         addDefs(ds)
-        process(ds ++ rem.tail)
-      case _ =>
+        process(ds ::: ss)
+      case Nil =>
     }
-    process(defs.toVector)
+    process(defs.toList)
 
     // Take all the original defs and DerivedSettings along with locals, replace each DerivedSetting with the actual
     // settings that were derived.
