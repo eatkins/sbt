@@ -69,15 +69,24 @@ object IMap {
       new IMap0[K, V2](Map(backing.iterator.map { case (k, v) => k -> f(v) }.toArray: _*))
 
     def mapSeparate[VL[_], VR[_]](f: V ~> λ[T => Either[VL[T], VR[T]]]) = {
-      val mapped = backing.iterator.map {
+      val left = new java.util.HashMap[K[_], VL[_]]
+      val right = new java.util.HashMap[K[_], VR[_]]
+      backing.iterator.foreach {
         case (k, v) =>
           f(v) match {
-            case Left(l)  => Left((k, l)): Either[(K[_], VL[_]), (K[_], VR[_])]
-            case Right(r) => Right((k, r)): Either[(K[_], VL[_]), (K[_], VR[_])]
+            case Left(l)  => left.put(k, l)
+            case Right(r) => right.put(k, r)
           }
       }
-      val (l, r) = Util.separateE[(K[_], VL[_]), (K[_], VR[_])](mapped.toList)
-      (new IMap0[K, VL](l.toMap), new IMap0[K, VR](r.toMap))
+      import scala.collection.JavaConverters._
+      def wrap[K0, V0](jmap: java.util.HashMap[K0, V0]): Map[K0, V0] = new Map[K0, V0] {
+        def +[V1 >: V0](kv: (K0, V1)): scala.collection.immutable.Map[K0, V1] =
+          jmap.asScala.toMap + kv
+        def -(key: K0): scala.collection.immutable.Map[K0, V0] = jmap.asScala.toMap - key
+        def get(key: K0): Option[V0] = Option(jmap.get(key))
+        def iterator: Iterator[(K0, V0)] = jmap.asScala.iterator
+      }
+      (new IMap0[K, VL](wrap(left)), new IMap0[K, VR](wrap(right)))
     }
 
     def toSeq = backing.toSeq
