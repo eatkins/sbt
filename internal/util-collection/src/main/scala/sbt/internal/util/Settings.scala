@@ -259,22 +259,36 @@ trait Init[ScopeType] {
         delegateForKey(sMap, k, delegates(k.scope), ref, selfRefOk || !isFirst)
     }
 
-    type ValidatedSettings[T] = Either[Seq[Undefined], SettingSeq[T]]
-
-    val f = λ[SettingSeq ~> ValidatedSettings] { (ks: Seq[Setting[_]]) =>
-      val (undefs, valid) = Util.separate(ks.zipWithIndex) {
-        case (s, i) => s validateKeyReferenced refMap(s, i == 0)
-      }
-      if (undefs.isEmpty) Right(valid) else Left(undefs.flatten)
+    import scala.collection.JavaConverters._
+    val undefined = new java.util.ArrayList[Undefined]
+    val result = new java.util.HashMap[ScopedKey[_], Any]
+    val backing = sMap.toSeq
+    backing.foreach {
+      case (key, settings) =>
+        val valid = new java.util.ArrayList[Setting[_]]
+        val undefs = new java.util.ArrayList[Undefined]
+        def validate(s: Setting[_], first: Boolean): Unit = {
+          s.validateKeyReferenced(refMap(s, first)) match {
+            case Right(v) => valid.add(v); ()
+            case Left(us) => us.foreach(u => undefs.add(u))
+          }
+        }
+        settings.headOption match {
+          case Some(s) =>
+            validate(s, true)
+            settings.tail.foreach(validate(_, false))
+          case _ =>
+        }
+        if (undefs.isEmpty) result.put(key, valid.asScala.toVector)
+        else undefined.addAll(undefs)
     }
 
-    type Undefs[_] = Seq[Undefined]
-    val (undefineds, result) = sMap.mapSeparate[Undefs, SettingSeq](f)
-
-    if (undefineds.isEmpty)
-      result
+    if (undefined.isEmpty)
+      IMap.fromJMap[ScopedKey, SettingSeq](
+        result.asInstanceOf[java.util.HashMap[ScopedKey[_], SettingSeq[_]]]
+      )
     else
-      throw Uninitialized(sMap.keys.toSeq, delegates, undefineds.values.flatten.toList, false)
+      throw Uninitialized(sMap.keys.toSeq, delegates, undefined.asScala.toList, false)
   }
 
   private[this] def delegateForKey[T](

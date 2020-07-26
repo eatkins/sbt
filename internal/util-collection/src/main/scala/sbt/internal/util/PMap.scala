@@ -55,6 +55,17 @@ object IMap {
    */
   def empty[K[_], V[_]]: IMap[K, V] = new IMap0[K, V](Map.empty)
 
+  import scala.collection.JavaConverters._
+  private class WrappedMap[K, V](jmap: java.util.Map[K, V]) extends Map[K, V] {
+    def +[V1 >: V](kv: (K, V1)): scala.collection.immutable.Map[K, V1] =
+      jmap.asScala.toMap + kv
+    def -(key: K): scala.collection.immutable.Map[K, V] = jmap.asScala.toMap - key
+    def get(key: K): Option[V] = Option(jmap.get(key))
+    def iterator: Iterator[(K, V)] = jmap.asScala.iterator
+  }
+  private[sbt] def fromJMap[K[_], V[_]](map: java.util.Map[K[_], V[_]]): IMap[K, V] =
+    new IMap0[K, V](new WrappedMap(map))
+
   private[this] class IMap0[K[_], V[_]](backing: Map[K[_], V[_]])
       extends AbstractRMap[K, V]
       with IMap[K, V] {
@@ -78,15 +89,7 @@ object IMap {
             case Right(r) => right.put(k, r)
           }
       }
-      import scala.collection.JavaConverters._
-      def wrap[K0, V0](jmap: java.util.HashMap[K0, V0]): Map[K0, V0] = new Map[K0, V0] {
-        def +[V1 >: V0](kv: (K0, V1)): scala.collection.immutable.Map[K0, V1] =
-          jmap.asScala.toMap + kv
-        def -(key: K0): scala.collection.immutable.Map[K0, V0] = jmap.asScala.toMap - key
-        def get(key: K0): Option[V0] = Option(jmap.get(key))
-        def iterator: Iterator[(K0, V0)] = jmap.asScala.iterator
-      }
-      (new IMap0[K, VL](wrap(left)), new IMap0[K, VR](wrap(right)))
+      (new IMap0[K, VL](new WrappedMap(left)), new IMap0[K, VR](new WrappedMap(right)))
     }
 
     def toSeq = backing.toSeq
