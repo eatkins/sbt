@@ -184,19 +184,12 @@ trait Init[ScopeType] {
     result.asScala.toVector
   }
 
-  private def bm[R](tag: String)(f: => R): R = {
-    val now = System.nanoTime
-    val res = f
-    val elapsed = System.nanoTime - now
-    System.err.println(s"$tag took ${elapsed / 1.0e6} ms")
-    res
-  }
   def compiled(init: Seq[Setting[_]], actual: Boolean = true)(
       implicit delegates: ScopeType => Seq[ScopeType],
       scopeLocal: ScopeLocal,
       display: Show[ScopedKey[_]]
   ): CompiledMap = {
-    val initDefaults = bm("initDefaults")(applyDefaults(init))
+    val initDefaults = applyDefaults(init)
     // inject derived settings into scopes where their dependencies are directly defined
     // and prepend per-scope settings
     val delegateMap = new java.util.concurrent.ConcurrentHashMap[ScopeType, Set[ScopeType]]
@@ -209,14 +202,13 @@ trait Init[ScopeType] {
         case set => set
       }
     }
-    val derived = bm("deriveAndLocal")(deriveAndLocal(initDefaults))
+    val derived = deriveAndLocal(initDefaults)
     // group by Scope/Key, dropping dead initializations
-    val sMap: ScopedMap = bm("grouped")(grouped(derived))
+    val sMap: ScopedMap = grouped(derived)
     // delegate references to undefined values according to 'delegates'
-    val dMap: ScopedMap =
-      bm("dmap")(if (actual) bm("delegate")(delegate(sMap)(delegates, display)) else sMap)
+    val dMap: ScopedMap = if (actual) delegate(sMap)(delegates, display) else sMap
     // merge Seq[Setting[_]] into Compiled
-    bm("compile")(compile(dMap))
+    compile(dMap)
   }
 
   @deprecated("Use makeWithCompiledMap", "1.4.0")
@@ -517,36 +509,33 @@ trait Init[ScopeType] {
     }
 
     // separate `derived` settings from normal settings (`defs`)
-    val (derived, rawDefs) =
-      bm("derived raw")(Util.separate[Setting[_], Derived, Setting[_]](init) {
-        case d: DerivedSetting[_] => Left(new Derived(d)); case s => Right(s)
-      })
-    val defs = bm("addLocal")(addLocal(rawDefs)(scopeLocal))
+    val (derived, rawDefs) = Util.separate[Setting[_], Derived, Setting[_]](init) {
+      case d: DerivedSetting[_] => Left(new Derived(d)); case s => Right(s)
+    }
+    val defs = addLocal(rawDefs)(scopeLocal)
 
     // group derived settings by the key they define
     val derivsByDef = new mutable.HashMap[AttributeKey[_], Deriveds]
-    bm("derivsByDef")(for (s <- derived) {
+    for (s <- derived) {
       val key = s.setting.key.key
       derivsByDef.getOrElseUpdate(key, new Deriveds(key, new mutable.ListBuffer)).settings += s
-    })
+    }
 
     // index derived settings by triggering key.  This maps a key to the list of settings potentially derived from it.
     val derivedBy = new mutable.HashMap[AttributeKey[_], mutable.ListBuffer[Derived]]
-    bm("derivedBy")(
-      for (s <- derived; d <- s.triggeredBy)
-        derivedBy.getOrElseUpdate(d, new mutable.ListBuffer) += s
-    )
+    for (s <- derived; d <- s.triggeredBy)
+      derivedBy.getOrElseUpdate(d, new mutable.ListBuffer) += s
 
     // Map a DerivedSetting[_] to the `Derived` struct wrapping it. Used to ultimately replace a DerivedSetting with
     // the `Setting`s that were actually derived from it: `Derived.outputs`
-    val derivedToStruct: Map[DerivedSetting[_], Derived] = bm("derivedToStruct")((derived map { s =>
+    val derivedToStruct: Map[DerivedSetting[_], Derived] = (derived map { s =>
       s.setting -> s
-    }).toMap)
+    }).toMap
 
     // set of defined scoped keys, used to ensure a derived setting is only added if all dependencies are present
     val defined = new mutable.HashSet[ScopedKey[_]]
     def addDefs(ss: Seq[Setting[_]]): Unit = { for (s <- ss) defined += s.key }
-    bm("addDefs")(addDefs(defs))
+    addDefs(defs)
 
     // true iff the scoped key is in `defined`, taking delegation into account
     def isDefined(key: AttributeKey[_], scope: ScopeType) =
@@ -598,15 +587,15 @@ trait Init[ScopeType] {
         process(ds ::: ss)
       case Nil =>
     }
-    bm("process")(process(defs.toList))
+    process(defs.toList)
 
     // Take all the original defs and DerivedSettings along with locals, replace each DerivedSetting with the actual
     // settings that were derived.
-    val allDefs = bm("allDefs")(addLocal(init)(scopeLocal))
-    bm("allDef flatten")(allDefs.flatMap {
+    val allDefs = addLocal(init)(scopeLocal)
+    allDefs.flatMap {
       case d: DerivedSetting[_] => (derivedToStruct get d map (_.outputs)).toSeq.flatten
       case s                    => s :: nil
-    })
+    }
   }
 
   /** Abstractly defines a value of type `T`.
