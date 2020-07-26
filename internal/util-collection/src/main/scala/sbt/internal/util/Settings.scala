@@ -208,7 +208,10 @@ trait Init[ScopeType] {
       scopeLocal: ScopeLocal,
       display: Show[ScopedKey[_]]
   ): (CompiledMap, Settings[ScopeType]) = {
+    val now = System.nanoTime
     val cMap = compiled(init)(delegates, scopeLocal, display)
+    val elapsed = System.nanoTime - now
+    System.err.println(s"Took ${elapsed / 1.0e6} ms to compile settings")
     // order the initializations.  cyclic references are detected here.
     val ordered: Seq[Compiled[_]] = sort(cMap)
     // evaluation: apply the initializations.
