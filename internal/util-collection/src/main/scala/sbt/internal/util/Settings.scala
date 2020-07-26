@@ -560,7 +560,7 @@ trait Init[ScopeType] {
       val scope = sk.scope
       def localAndDerived(d: Derived): Seq[Setting[_]] = {
         def definingScope = d.setting.key.scope
-        val outputScope = intersect(scope, definingScope)
+        val outputScope = intersectSet(scope, definingScope)
         outputScope collect {
           case s if !d.inScopes.contains(s) && d.setting.filter(s) =>
             val local = d.dependencies.flatMap(dep => scopeLocal(ScopedKey(s, dep)))
