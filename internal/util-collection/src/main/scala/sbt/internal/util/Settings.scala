@@ -192,6 +192,16 @@ trait Init[ScopeType] {
     val initDefaults = applyDefaults(init)
     // inject derived settings into scopes where their dependencies are directly defined
     // and prepend per-scope settings
+    val delegateMap = new java.util.concurrent.ConcurrentHashMap[ScopeType, Set[ScopeType]]
+    implicit val setDelegates: ScopeType => Set[ScopeType] = s => {
+      delegateMap.get(s) match {
+        case null =>
+          val set = delegates(s).toSet
+          delegateMap.put(s, set)
+          set
+        case set => set
+      }
+    }
     val derived = deriveAndLocal(initDefaults)
     // group by Scope/Key, dropping dead initializations
     val sMap: ScopedMap = grouped(derived)
@@ -468,8 +478,18 @@ trait Init[ScopeType] {
     else if (delegates(s2).contains(s1)) Some(s2) // s2 is more specific
     else None
 
+  /**
+   * Intersects two scopes, returning the more specific one if they intersect, or None otherwise.
+   */
+  private[sbt] def intersectSet(s1: ScopeType, s2: ScopeType)(
+      implicit delegates: ScopeType => Set[ScopeType]
+  ): Option[ScopeType] =
+    if (delegates(s1).contains(s2)) Some(s1) // s1 is more specific
+    else if (delegates(s2).contains(s1)) Some(s2) // s2 is more specific
+    else None
+
   private[this] def deriveAndLocal(init: Seq[Setting[_]])(
-      implicit delegates: ScopeType => Seq[ScopeType],
+      implicit delegates: ScopeType => Set[ScopeType],
       scopeLocal: ScopeLocal
   ): Seq[Setting[_]] = {
     import collection.mutable
