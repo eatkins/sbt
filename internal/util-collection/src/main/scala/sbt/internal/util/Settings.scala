@@ -173,10 +173,15 @@ trait Init[ScopeType] {
       )
 
   private[this] def applyDefaults(ss: Seq[Setting[_]]): Seq[Setting[_]] = {
-    val (defaults, others) = Util.separate[Setting[_], DefaultSetting[_], Setting[_]](ss) {
-      case u: DefaultSetting[_] => Left(u); case s => Right(s)
+    val result = new java.util.LinkedHashSet[Setting[_]]
+    val others = new java.util.ArrayList[Setting[_]]
+    ss.foreach {
+      case u: DefaultSetting[_] => result.add(u)
+      case r                    => others.add(r)
     }
-    (defaults.distinct: Seq[Setting[_]]) ++ others
+    result.addAll(others)
+    import scala.collection.JavaConverters._
+    result.asScala.toVector
   }
 
   def compiled(init: Seq[Setting[_]], actual: Boolean = true)(
