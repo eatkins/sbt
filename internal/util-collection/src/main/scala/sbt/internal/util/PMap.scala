@@ -76,7 +76,7 @@ object IMap {
             case Right(r) => Right((k, r)): Either[(K[_], VL[_]), (K[_], VR[_])]
           }
       }
-      val (l, r) = Util.separateE[(K[_], VL[_]), (K[_], VR[_])](mapped)
+      val (l, r) = Util.separateE[(K[_], VL[_]), (K[_], VR[_])](mapped.toList)
       (new IMap0[K, VL](l.toMap), new IMap0[K, VR](r.toMap))
     }
 
