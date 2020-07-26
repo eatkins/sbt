@@ -16,6 +16,7 @@ import java.util.concurrent.{ ArrayBlockingQueue, Executors, LinkedBlockingQueue
 import jline.DefaultTerminal2
 import jline.console.ConsoleReader
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -782,16 +783,11 @@ object Terminal {
       out: OutputStream
   ) extends TerminalImpl(in, out, originalErr, "console0") {
     private[util] val system = JLine3.system
-    private[this] val size = new AtomicReference[(Int, Int)]((1, 1))
+    override private[sbt] def getSizeImpl: (Int, Int) = {
+      val size = system.getSize
+      (size.getColumns, size.getRows)
+    }
     private[this] def isCI = sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")
-    private[this] def getSize =
-      try {
-        val jsize = system.getSize
-        size.set((jsize.getColumns, jsize.getRows))
-        size.get
-      } catch { case NonFatal(_) => size.get }
-    override def getWidth: Int = getSize._1
-    override def getHeight: Int = getSize._2
     override def isAnsiSupported: Boolean = term.isAnsiSupported && !isCI
     override def isEchoEnabled: Boolean = system.echo()
     override def isSuccessEnabled: Boolean = true
@@ -847,6 +843,19 @@ object Terminal {
       override val errorStream: OutputStream,
       override private[sbt] val name: String
   ) extends Terminal {
+    private[sbt] def getSizeImpl: (Int, Int)
+    private[this] val sizeRefreshPeriod = 1.second
+    private[this] val size =
+      new AtomicReference[((Int, Int), Deadline)](((1, 1), Deadline.now - 1.day))
+    private[this] def setSize() = Try(getSizeImpl).foreach(s => size.set((s, Deadline.now)))
+    private[this] def getSize = size.get match {
+      case (s, d) if (d + sizeRefreshPeriod).isOverdue =>
+        setSize()
+        size.get._1
+      case (s, _) => s
+    }
+    override def getWidth: Int = getSize._1
+    override def getHeight: Int = getSize._2
     private[this] val rawMode = new AtomicBoolean(false)
     private[this] val writeLock = new AnyRef
     private[this] val writeableInputStream = in match {
