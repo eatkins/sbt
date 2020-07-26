@@ -9,21 +9,38 @@ package sbt.internal.util
 
 import java.util.Locale
 
-import scala.reflect.macros.blackbox
+import scala.collection.JavaConverters._
 import scala.language.experimental.macros
+import scala.reflect.macros.blackbox
 
 object Util {
   def makeList[T](size: Int, value: T): List[T] = List.fill(size)(value)
 
   def separateE[A, B](ps: Seq[Either[A, B]]): (Seq[A], Seq[B]) =
+    separate(ps.iterator)(Types.idFun)
+
+  def separateE[A, B](ps: Iterator[Either[A, B]]): (Seq[A], Seq[B]) =
     separate(ps)(Types.idFun)
 
-  def separate[T, A, B](ps: Seq[T])(f: T => Either[A, B]): (Seq[A], Seq[B]) = {
-    val (a, b) = ps.foldLeft((Nil: Seq[A], Nil: Seq[B]))((xs, y) => prependEither(xs, f(y)))
-    (a.reverse, b.reverse)
+  def separate[T, A, B](ps: Seq[T])(f: T => Either[A, B]): (Seq[A], Seq[B]) =
+    separate(ps.iterator)(f)
+  def separate[T, A, B](ps: Iterator[T])(f: T => Either[A, B]): (Seq[A], Seq[B]) = {
+    val left = new java.util.Vector[A]
+    val right = new java.util.Vector[B]
+    ps.foreach { p =>
+      f(p) match {
+        case Left(l)  => left.add(l)
+        case Right(r) => right.add(r)
+      }
+    }
+    (left.asScala.toVector, right.asScala.toVector)
   }
 
-  def prependEither[A, B](acc: (Seq[A], Seq[B]), next: Either[A, B]): (Seq[A], Seq[B]) =
+  @deprecated("unused", "1.4.0")
+  private[sbt] def prependEither[A, B](
+      acc: (Seq[A], Seq[B]),
+      next: Either[A, B]
+  ): (Seq[A], Seq[B]) =
     next match {
       case Left(l)  => (l +: acc._1, acc._2)
       case Right(r) => (acc._1, r +: acc._2)
