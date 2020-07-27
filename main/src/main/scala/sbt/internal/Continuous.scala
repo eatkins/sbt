@@ -1194,7 +1194,7 @@ private[sbt] object ContinuousCommands {
     Command.arb { state =>
       (cmdParser(name) ~> channelParser).map(channel => () => updateState(channel, state))
     } { case (_, newState) => newState() }
-  private[this] val runWatchCommand = watchCommand(runWatch) { (channel, state) =>
+  private[sbt] val runWatchCommand = watchCommand(runWatch) { (channel, state) =>
     watchStates.get(channel) match {
       case null => state
       case cs =>
@@ -1253,17 +1253,17 @@ private[sbt] object ContinuousCommands {
     case s    => s
   }
 
-  private[this] val preWatchCommand = watchCommand(preWatch) { (channel, state) =>
+  private[sbt] val preWatchCommand = watchCommand(preWatch) { (channel, state) =>
     StandardMain.exchange.channelForName(channel).foreach(_.terminal.setPrompt(Prompt.Watch))
     watchState(channel).beforeCommand(state)
   }
-  private[this] val postWatchCommand = watchCommand(postWatch) { (channel, state) =>
+  private[sbt] val postWatchCommand = watchCommand(postWatch) { (channel, state) =>
     StandardMain.exchange.unprompt(ConsoleUnpromptEvent(Some(CommandSource(channel))))
     val ws = watchState(channel)
     watchStates.put(channel, ws.withPending(false))
     ws.afterCommand(state)
   }
-  private[this] val stopWatchCommand = watchCommand(stopWatch) { (channel, state) =>
+  private[sbt] val stopWatchCommand = watchCommand(stopWatch) { (channel, state) =>
     stopWatchImpl(channel)
     state
   }
@@ -1274,7 +1274,7 @@ private[sbt] object ContinuousCommands {
       ws.callbacks.onExit()
     }
   }
-  private[this] val failWatchCommand = watchCommand(failWatch) { (channel, state) =>
+  private[sbt] val failWatchCommand = watchCommand(failWatch) { (channel, state) =>
     state.fail
   }
   /*
