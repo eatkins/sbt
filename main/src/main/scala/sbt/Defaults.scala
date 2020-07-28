@@ -180,10 +180,15 @@ object Defaults extends BuildCommon {
       apiMappings := Map.empty,
       autoScalaLibrary :== true,
       managedScalaInstance :== true,
+      cacheClasspathEntries :== true,
+      classpathEntryCache := {
+        if (cacheClasspathEntries.value) new Locate.CachingDefinesClass else Locate.DefinesClass
+      },
       classpathEntryDefinesClass := {
         val converter = fileConverter.value
+        val definesClass = classpathEntryCache.value
         val f = FileValueCache({ x: NioPath =>
-          if (x.getFileName.toString != "rt.jar") Locate.definesClass(converter.toVirtualFile(x))
+          if (x.getFileName.toString != "rt.jar") definesClass(converter.toVirtualFile(x))
           else ((_: String) => false): DefinesClass
         }).get;
         { (x: File) =>

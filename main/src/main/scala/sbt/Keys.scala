@@ -24,6 +24,7 @@ import sbt.internal._
 import sbt.internal.bsp._
 import sbt.internal.inc.ScalaInstance
 import sbt.internal.io.WatchState
+import sbt.internal.inc.Locate
 import sbt.internal.librarymanagement.{ CompatibilityWarningOptions, IvySbt }
 import sbt.internal.remotecache.RemoteCacheArtifact
 import sbt.internal.server.ServerHandler
@@ -219,6 +220,8 @@ object Keys {
   val compileIncSetup = taskKey[Setup]("Configures aspects of incremental compilation.").withRank(DTask)
   val compilerCache = taskKey[GlobalsCache]("Cache of scala.tools.nsc.Global instances.  This should typically be cached so that it isn't recreated every task run.").withRank(DTask)
   val stateCompilerCache = AttributeKey[GlobalsCache]("stateCompilerCache", "Internal use: Global cache.")
+  val cacheClasspathEntries = settingKey[Boolean]("Toggles whether or not to cache the class names in a jar file between commands").withRank(Invisible)
+  private[sbt] val classpathEntryCache = settingKey[Locate.DefinesClass]("The instance of Locate.DefinesClass to be used in classpathEntryDefinesClass").withRank(Invisible)
   val classpathEntryDefinesClass = taskKey[File => DefinesClass]("Internal use: provides a function that determines whether the provided file contains a given class.").withRank(Invisible)
   val doc = taskKey[File]("Generates API documentation.").withRank(AMinusTask)
   val copyResources = taskKey[Seq[(File, File)]]("Copies resources to the output directory.").withRank(AMinusTask)
