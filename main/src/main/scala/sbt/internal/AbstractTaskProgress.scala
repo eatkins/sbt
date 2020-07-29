@@ -76,6 +76,8 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
   }
 
   protected def reset(): Unit = {
+    anonOwners.clear()
+    calledBy.clear()
     timings.clear()
   }
 
