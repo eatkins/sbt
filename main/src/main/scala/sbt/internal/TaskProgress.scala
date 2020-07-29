@@ -46,20 +46,20 @@ private[sbt] class TaskProgress private ()
         }
       }
     @tailrec override def run(): Unit = {
-      if (!isClosed.get() && (!hasReported.get || active.nonEmpty)) {
+      if (!isClosed.get() && (!hasReported.get || activeTasks(System.nanoTime).nonEmpty)) {
         try {
+          val activeExceedingThreshold = activeTasks(System.nanoTime).filter {
+            case (_, d) => d > threshold
+          }
           if (activeExceedingThreshold.nonEmpty) doReport()
           val duration =
             if (firstTime.compareAndSet(true, activeExceedingThreshold.isEmpty)) threshold
             else sleepDuration
           val limit = duration.fromNow
-          while (Deadline.now < limit && !isClosed.get && active.nonEmpty) {
-            var task = tasks.poll((limit - Deadline.now).toMillis, TimeUnit.MILLISECONDS)
-            while (task != null) {
-              if (containsSkipTasks(Vector(task)) || lastTaskCount.get == 0) doReport()
-              task = tasks.poll
-              tasks.clear()
-            }
+          while (Deadline.now < limit && !isClosed.get && activeTasks(System.nanoTime).nonEmpty) {
+            tasks.poll((limit - Deadline.now).toMillis, TimeUnit.MILLISECONDS)
+            tasks.clear()
+            doReport()
           }
         } catch {
           case _: InterruptedException =>
@@ -131,17 +131,9 @@ private[sbt] class TaskProgress private ()
   }
   private[this] def appendProgress(event: ProgressEvent): Unit =
     StandardMain.exchange.updateProgress(event)
-  private[this] def active: Vector[Task[_]] = activeTasks.toVector.filterNot(Def.isDummy)
-  private[this] def activeExceedingThreshold: Vector[(Task[_], Long)] = active.flatMap { task =>
-    timings.get(task) match {
-      case null => None
-      case t =>
-        val elapsed = t.currentElapsedMicros
-        if (elapsed.micros > threshold) Some[(Task[_], Long)](task -> elapsed) else None
-    }
-  }
   private[this] def report(): Unit = {
-    val currentTasks = activeExceedingThreshold
+    val active = activeTasks(System.nanoTime)
+    val currentTasks = active.collect { case (t, d) if d > threshold => (t, d.toMicros) }
     val ltc = lastTaskCount.get
     val currentTasksCount = currentTasks.size
     def event(tasks: Vector[(Task[_], Long)]): ProgressEvent = ProgressEvent(
@@ -160,8 +152,8 @@ private[sbt] class TaskProgress private ()
     appendProgress(event(currentTasks))
   }
 
-  private[this] def containsSkipTasks(tasks: Vector[Task[_]]): Boolean = {
-    tasks.map(taskName).exists { n =>
+  private[this] def containsSkipTasks(tasks: Vector[(Task[_], FiniteDuration)]): Boolean = {
+    tasks.iterator.map(t => taskName(t._1)).exists { n =>
       val shortName = n.lastIndexOf('/') match {
         case -1 => n
         case i =>
