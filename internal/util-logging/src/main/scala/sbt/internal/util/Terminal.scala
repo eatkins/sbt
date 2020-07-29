@@ -778,7 +778,7 @@ object Terminal {
   private[sbt] def deprecatedTeminal: jline.Terminal = console.toJLine
   private class ConsoleTerminal(
       val term: jline.Terminal with jline.Terminal2,
-      in: InputStream,
+      in: WriteableInputStream,
       out: OutputStream
   ) extends TerminalImpl(in, out, originalErr, "console0") {
     private[util] lazy val system = JLine3.system
@@ -835,17 +835,13 @@ object Terminal {
     }
   }
   private[sbt] abstract class TerminalImpl private[sbt] (
-      val in: InputStream,
+      val in: WriteableInputStream,
       val out: OutputStream,
       override val errorStream: OutputStream,
       override private[sbt] val name: String
   ) extends Terminal {
     private[this] val rawMode = new AtomicBoolean(false)
     private[this] val writeLock = new AnyRef
-    private[this] val writeableInputStream = in match {
-      case w: WriteableInputStream => w
-      case _                       => new WriteableInputStream(in, name)
-    }
     def throwIfClosed[R](f: => R): R = if (isStopped.get) throw new ClosedChannelException else f
     override def getLastLine: Option[String] = progressState.currentLine
     override def getLines: Seq[String] = progressState.getLines
@@ -883,9 +879,9 @@ object Terminal {
     private def doWrite(bytes: Array[Byte]): Unit =
       progressState.write(TerminalImpl.this, bytes, rawPrintStream, hasProgress.get && !rawMode.get)
     override private[sbt] val printStream: PrintStream = new LinePrintStream(outputStream)
-    override def inputStream: InputStream = writeableInputStream
+    override def inputStream: InputStream = in
 
-    private[sbt] def write(bytes: Int*): Unit = writeableInputStream.write(bytes: _*)
+    private[sbt] def write(bytes: Int*): Unit = in.write(bytes: _*)
     private[this] val isStopped = new AtomicBoolean(false)
 
     override def getLineHeightAndWidth(line: String): (Int, Int) = getWidth match {
@@ -906,7 +902,7 @@ object Terminal {
       writeLock.synchronized(f(rawPrintStream))
 
     override def close(): Unit = if (isStopped.compareAndSet(false, true)) {
-      writeableInputStream.close()
+      in.close()
     }
   }
   private[sbt] val NullTerminal = new Terminal {
