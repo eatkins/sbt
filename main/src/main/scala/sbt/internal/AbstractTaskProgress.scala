@@ -9,8 +9,12 @@ package sbt
 package internal
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.collection.concurrent.TrieMap
+import java.util.concurrent.atomic.AtomicLong
 import scala.collection.JavaConverters._
+import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
+import scala.collection.immutable.VectorBuilder
+import scala.concurrent.duration._
 
 private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[Task] {
   import AbstractTaskExecuteProgress.Timer
@@ -18,10 +22,28 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
   private[this] val showScopedKey = Def.showShortKey(None)
   private[this] val anonOwners = new ConcurrentHashMap[Task[_], Task[_]]
   private[this] val calledBy = new ConcurrentHashMap[Task[_], Task[_]]
-  private[this] val activeTasksMap = new ConcurrentHashMap[Task[_], Unit]
-  protected val timings = new ConcurrentHashMap[Task[_], Timer]
+  private[this] val timings = new ConcurrentHashMap[Task[_], Timer]
+  private[sbt] def timingsByName: mutable.Map[String, AtomicLong] = {
+    val result = new ConcurrentHashMap[String, AtomicLong]
+    timings.forEach { (task, timing) =>
+      val duration = timing.durationNanos
+      result.putIfAbsent(taskName(task), new AtomicLong(duration)) match {
+        case null =>
+        case t    => t.getAndAdd(duration); ()
+      }
+    }
+    result.asScala
+  }
+  private[sbt] def anyTimings = !timings.isEmpty
+  def currentTimings: Iterator[(Task[_], Timer)] = timings.asScala.iterator
 
-  def activeTasks: Set[Task[_]] = activeTasksMap.keySet.asScala.toSet
+  def activeTasks(now: Long) = {
+    val result = new VectorBuilder[(Task[_], FiniteDuration)]
+    timings.forEach { (task, timing) =>
+      if (timing.isActive) result += task -> (now - timing.startNanos).nanos
+    }
+    result.result
+  }
 
   override def afterRegistered(
       task: Task[_],
@@ -38,7 +60,7 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
 
   override def beforeWork(task: Task[_]): Unit = {
     timings.put(task, new Timer)
-    activeTasksMap.put(task, ())
+    ()
   }
 
   override def afterWork[A](task: Task[A], result: Either[Task[A], Result[A]]): Unit = {
@@ -46,7 +68,6 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
       case null =>
       case t    => t.stop()
     }
-    activeTasksMap.remove(task)
 
     // we need this to infer anonymous task names
     result.left.foreach { t =>
@@ -55,7 +76,6 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
   }
 
   protected def reset(): Unit = {
-    activeTasksMap.clear()
     timings.clear()
   }
 
@@ -80,6 +100,7 @@ object AbstractTaskExecuteProgress {
     def stop(): Unit = {
       endNanos = System.nanoTime()
     }
+    def isActive = endNanos == 0L
     def durationNanos: Long = endNanos - startNanos
     def startMicros: Long = (startNanos.toDouble / 1000).toLong
     def durationMicros: Long = (durationNanos.toDouble / 1000).toLong
