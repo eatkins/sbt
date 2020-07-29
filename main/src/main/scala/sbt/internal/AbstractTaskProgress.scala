@@ -63,8 +63,10 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
     ()
   }
 
+  protected def interactiveProgess: Boolean = false
+
   override def afterWork[A](task: Task[A], result: Either[Task[A], Result[A]]): Unit = {
-    timings.get(task) match {
+    (if (interactiveProgess) timings.remove(task) else timings.get(task)) match {
       case null =>
       case t    => t.stop()
     }

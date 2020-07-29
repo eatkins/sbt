@@ -92,6 +92,8 @@ private[sbt] class TaskProgress private ()
     super.beforeWork(task)
     tasks.put(task)
   }
+
+  override protected def interactiveProgess: Boolean = true
   override def afterReady(task: Task[_]): Unit = maybeStartThread()
 
   override def afterCompleted[A](task: Task[A], result: Result[A]): Unit = maybeStartThread()
