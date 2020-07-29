@@ -11,7 +11,6 @@ package internal
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.JavaConverters._
-import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.collection.immutable.VectorBuilder
 import scala.concurrent.duration._
@@ -81,11 +80,17 @@ private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[
     anonOwners.clear()
     calledBy.clear()
     timings.clear()
+    taskNameCache.clear()
   }
 
-  private[this] val taskNameCache = TrieMap.empty[Task[_], String]
-  protected def taskName(t: Task[_]): String =
-    taskNameCache.getOrElseUpdate(t, taskName0(t))
+  private[this] val taskNameCache = new ConcurrentHashMap[Task[_], String]
+  protected def taskName(t: Task[_]): String = taskNameCache.get(t) match {
+    case null =>
+      val name = taskName0(t)
+      taskNameCache.putIfAbsent(t, name)
+      name
+    case name => name
+  }
   private[this] def taskName0(t: Task[_]): String = {
     def definedName(node: Task[_]): Option[String] =
       node.info.name orElse TaskName.transformNode(node).map(showScopedKey.show)
