@@ -650,6 +650,8 @@ final class NetworkChannel(
     }
     override def available(): Int = inputBuffer.size
   }
+  private[this] lazy val writeableInputStream: Terminal.WriteableInputStream =
+    new Terminal.WriteableInputStream(inputStream, name)
   import sjsonnew.BasicJsonProtocol._
 
   import scala.collection.JavaConverters._
@@ -726,7 +728,8 @@ final class NetworkChannel(
       write(java.util.Arrays.copyOfRange(b, off, off + len))
     }
   }
-  private class NetworkTerminal extends TerminalImpl(inputStream, outputStream, errorStream, name) {
+  private class NetworkTerminal
+      extends TerminalImpl(writeableInputStream, outputStream, errorStream, name) {
     private[this] val pending = new AtomicBoolean(false)
     private[this] val closed = new AtomicBoolean(false)
     private[this] val properties = new AtomicReference[TerminalPropertiesResponse]
