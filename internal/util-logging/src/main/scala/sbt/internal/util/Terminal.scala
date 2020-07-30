@@ -313,7 +313,7 @@ object Terminal {
     } else f
 
   private[this] object ProxyTerminal extends Terminal {
-    private def t: Terminal = activeTerminal.get
+    private def t: Terminal = Option(activeTerminal.get).getOrElse(NullTerminal)
     override def getWidth: Int = t.getWidth
     override def getHeight: Int = t.getHeight
     override def getLineHeightAndWidth(line: String): (Int, Int) = t.getLineHeightAndWidth(line)
@@ -508,7 +508,7 @@ object Terminal {
    * Terminal.console method returns this terminal and the ConsoleChannel delegates its
    * terminal method to it.
    */
-  private[this] val consoleTerminalHolder = new AtomicReference(wrap(jline.TerminalFactory.get))
+  private[this] val consoleTerminalHolder = new AtomicReference[Terminal](null)
 
   /**
    * The terminal that is currently being used by the proxyInputStream and proxyOutputStream.
@@ -516,7 +516,7 @@ object Terminal {
    * is used to change the terminal during task evaluation. This allows us to route System.in and
    * System.out through the terminal's input and output streams.
    */
-  private[this] val activeTerminal = new AtomicReference[Terminal](consoleTerminalHolder.get)
+  private[this] val activeTerminal = new AtomicReference[Terminal](null)
 
   /**
    * The boot input stream allows a remote client to forward input to the sbt process while
@@ -596,7 +596,10 @@ object Terminal {
     }
   }
   private[this] object proxyOutputStream extends OutputStream {
-    private[this] def os: OutputStream = activeTerminal.get().outputStream
+    private[this] def os: OutputStream = activeTerminal.get() match {
+      case null => NullTerminal.outputStream
+      case t    => t.outputStream
+    }
     def write(byte: Int): Unit = {
       os.write(byte)
       os.flush()
@@ -764,7 +767,11 @@ object Terminal {
   }
 
   def console: Terminal = consoleTerminalHolder.get match {
-    case null => throw new IllegalStateException("Uninitialized terminal.")
+    case null =>
+      val term = wrap(jline.TerminalFactory.get)
+      activeTerminal.set(term)
+      consoleTerminalHolder.set(term)
+      term
     case term => term
   }
 
@@ -942,15 +949,14 @@ object Terminal {
     override def isEchoEnabled: Boolean = false
     override def isSuccessEnabled: Boolean = false
     override def isSupershellEnabled: Boolean = false
-    override def outputStream: java.io.OutputStream = _ => {}
-    override def errorStream: java.io.OutputStream = _ => {}
+    override def outputStream: OutputStream = originalOut
+    override def errorStream: OutputStream = originalErr
     override private[sbt] def getAttributes: Map[String, String] = Map.empty
     override private[sbt] def setAttributes(attributes: Map[String, String]): Unit = {}
     override private[sbt] def setSize(width: Int, height: Int): Unit = {}
     override private[sbt] def name: String = "NullTerminal"
-    override private[sbt] val printStream: java.io.PrintStream =
-      new PrintStream(outputStream, false)
-    override private[sbt] def withPrintStream[T](f: java.io.PrintStream => T): T = f(printStream)
+    override private[sbt] val printStream: PrintStream = new PrintStream(outputStream, false)
+    override private[sbt] def withPrintStream[T](f: PrintStream => T): T = f(printStream)
     override private[sbt] def write(bytes: Int*): Unit = {}
     override private[sbt] def withRawOutput[R](f: => R): R = f
   }

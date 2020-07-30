@@ -114,7 +114,7 @@ object LineReader {
     cr.setHistoryEnabled(true)
     cr
   }
-  def simple(terminal: Terminal): LineReader = new SimpleReader(None, HandleCONT, terminal)
+  def simple(terminal: Terminal): LineReader = new SimpleTerminalReader(None, HandleCONT, terminal)
   def simple(
       historyPath: Option[File],
       handleCONT: Boolean = HandleCONT,
@@ -310,15 +310,22 @@ final class FullReader(
 class SimpleReader private[sbt] (
     historyPath: Option[File],
     val handleCONT: Boolean,
-    terminal: Terminal
 ) extends JLine {
   def this(historyPath: Option[File], handleCONT: Boolean, injectThreadSleep: Boolean) =
-    this(historyPath, handleCONT, Terminal.console)
-  protected[this] val reader: ConsoleReader =
+    this(historyPath, handleCONT)
+  private[this] lazy val r = LineReader.createJLine2Reader(historyPath, Terminal.console)
+  override protected[this] def reader: ConsoleReader = r
+}
+class SimpleTerminalReader private[sbt] (
+    historyPath: Option[File],
+    handleCONT: Boolean,
+    terminal: Terminal,
+) extends SimpleReader(historyPath, handleCONT) {
+  override protected[this] val reader: ConsoleReader =
     LineReader.createJLine2Reader(historyPath, terminal)
 }
 
-object SimpleReader extends SimpleReader(None, LineReader.HandleCONT, false) {
+object SimpleReader extends SimpleReader(None, LineReader.HandleCONT) {
   def apply(terminal: Terminal): SimpleReader =
-    new SimpleReader(None, LineReader.HandleCONT, terminal)
+    new SimpleTerminalReader(None, LineReader.HandleCONT, terminal)
 }
