@@ -192,19 +192,14 @@ final class ScriptedTests(
    */
   private def createAutoPlugin(testName: String) =
     s"""
-      |import sbt._, Keys._
-      |object InstrumentScripted extends AutoPlugin {
-      |  override def trigger = allRequirements
-      |  override def globalSettings: Seq[Setting[_]] =
-      |    Seq(commands += setUpScripted) ++ super.globalSettings
-      |
-      |  def setUpScripted = Command.command("setUpScripted") { (state0: State) =>
-      |    val nameScriptedSetting = name.in(LocalRootProject).:=(
-      |        if (name.value.startsWith("sbt_")) "$testName" else name.value)
-      |    val state1 = Project.extract(state0).appendWithoutSession(nameScriptedSetting, state0)
-      |    "initialize" :: state1
-      |  }
+      |def setUpScripted = Command.command("setUpScripted") { (state0: State) =>
+      |  val nameScriptedSetting = name.in(LocalRootProject).:=(
+      |      if (name.value.startsWith("sbt_")) "$testName" else name.value)
+      |  val state1 = Project.extract(state0).appendWithoutSession(nameScriptedSetting, state0)
+      |  "initialize" :: state1
       |}
+      |
+      |commands += setUpScripted
     """.stripMargin
 
   /** Defines the batch execution of scripted tests.
@@ -250,7 +245,7 @@ final class ScriptedTests(
           val runTest = () => {
             // Reload and initialize (to reload contents of .sbtrc files)
             val pluginImplementation = createAutoPlugin(name)
-            val pluginFile = tempTestDir / "project" / "InstrumentScripted.scala"
+            val pluginFile = tempTestDir / "instrument.sbt"
             IO.write(pluginFile, pluginImplementation)
             def sbtHandlerError = sys error "Missing sbt handler. Scripted is misconfigured."
             val sbtHandler = handlers.getOrElse('>', sbtHandlerError)
