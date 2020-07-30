@@ -71,6 +71,7 @@ final class SbtHandler(remoteSbtCreator: RemoteSbtCreator) extends StatementHand
   def receive(errorMessage: String, server: IPC.Server) =
     server.connection { ipc =>
       val resultMessage = ipc.receive
+      System.err.println(resultMessage)
       if (!resultMessage.toBoolean) throw new TestFailed(errorMessage)
     }
 
