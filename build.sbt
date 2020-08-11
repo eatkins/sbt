@@ -59,16 +59,13 @@ def buildLevelSettings: Seq[Setting[_]] =
     )
   )
 
-def commonBaseSettings: Seq[Setting[_]] = Def.settings(
-  headerLicense := Some(
-    HeaderLicense.Custom(
-      """|sbt
+val headerText = """|sbt
        |Copyright 2011 - 2018, Lightbend, Inc.
        |Copyright 2008 - 2010, Mark Harrah
        |Licensed under Apache License 2.0 (see LICENSE)
        |""".stripMargin
-    )
-  ),
+def commonBaseSettings: Seq[Setting[_]] = Def.settings(
+  headerLicense := Some(HeaderLicense.Custom(headerText)),
   scalaVersion := baseScalaVersion,
   componentID := None,
   resolvers += Resolver.typesafeIvyRepo("releases").withName("typesafe-sbt-build-ivy-releases"),
@@ -438,9 +435,15 @@ lazy val utilCache = (project in file("util-cache"))
   .settings(
     utilCommonSettings,
     name := "Util Cache",
+    sourceGenerators in Compile += Def.task {
+      AutoJsonTupleGenerator.write(
+        (Compile / scalaSource).value.toPath / "sbt" / "internal" / "util" / "AutoJsonTuple.scala",
+        headerText,
+      )
+    },
     libraryDependencies ++=
       Seq(sjsonNewScalaJson.value, sjsonNewMurmurhash.value, scalaReflect.value),
-    libraryDependencies ++= Seq(scalatest % "test"),
+    libraryDependencies ++= Seq(scalatest % "test", hedgehog % "test"),
     utilMimaSettings,
     mimaBinaryIssueFilters ++= Seq(
       // Added a method to a sealed trait, technically not a problem for Scala
