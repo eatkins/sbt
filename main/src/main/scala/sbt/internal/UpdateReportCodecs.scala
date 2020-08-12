@@ -15,9 +15,15 @@ import sbt.librarymanagement._
 //import sjsonnew.JsonFormat
 import AutoJson._
 import sjsonnew.JsonFormat
+import com.github.ghik.silencer.silent
 
+@silent
 object UpdateReportCodecs {
 
+  implicit val updateLogging: AutoJson[UpdateLogging] = new AutoJson[UpdateLogging] {
+    override def read(unbuilder: JsonUnbuilder): UpdateLogging = UpdateLogging.Full
+    override def write(obj: UpdateLogging, builder: JsonBuilder): Unit = {}
+  }
   implicit val af: AutoJson[Artifact] = AutoJson.macroDefault
   implicit val cs: AutoJson[Checksum] = AutoJson.macroDefault
   implicit val cv: AutoJson[CrossVersion] = new AutoJson[CrossVersion] {
@@ -35,21 +41,35 @@ object UpdateReportCodecs {
     }
 
   }
-  implicit val ui: AutoJson[sbt.internal.LibraryManagement.UpdateInputs] = implicitly
+  implicit val logicalClock: AutoJson[LogicalClock] = new AutoJson[LogicalClock] {
+    override def read(unbuilder: JsonUnbuilder): LogicalClock = LogicalClock.unknown
+    override def write(obj: LogicalClock, builder: JsonBuilder): Unit = {}
+  }
+  val smi = AutoJson.macroDefault[ScalaModuleInfo]
+  implicit val moduleSettings: AutoJson[ModuleSettings] = new AutoJson[ModuleSettings] {
+    class ModuleSettings0(
+        override val validate: Boolean,
+        override val scalaModuleInfo: Option[sbt.librarymanagement.ScalaModuleInfo]
+    ) extends ModuleSettings
+    implicit val smiFormat = implicitly[AutoJson[Option[ScalaModuleInfo]]]
+    override def read(unbuilder: JsonUnbuilder): ModuleSettings = {
+      new ModuleSettings0(unbuilder.readBoolean, smiFormat.read(unbuilder))
+    }
+    override def write(obj: ModuleSettings, builder: JsonBuilder): Unit = {
+      builder.writeBoolean(obj.validate)
+      smiFormat.write(obj.scalaModuleInfo, builder)
+    }
+  }
+  implicit val ui: AutoJson[sbt.internal.LibraryManagement.UpdateInputs] = AutoJson.macroDefault
+  implicit val uc: AutoJson[UpdateConfiguration] = AutoJson.macroDefault
+  implicit val cam: AutoJson[Configuration] = AutoJson.macroDefault
   implicit val jfui: JsonFormat[sbt.internal.LibraryManagement.UpdateInputs] = AutoJson.jsonFormat
   implicit val cr: AutoJson[ConfigRef] = AutoJson.macroDefault
   implicit val mi: AutoJson[ModuleID] = AutoJson.macroDefault
   implicit val jfmi: JsonFormat[ModuleID] = AutoJson.jsonFormat
   implicit val iel: AutoJson[InclExclRule] = AutoJson.macroDefault
-  implicit val cfj: AutoJson[ConfigurationReport] = implicitly[AutoJson[ConfigurationReport]]
+  implicit val moduleReport: AutoJson[ModuleReport] = AutoJson.macroDefault
+  implicit val oar: AutoJson[OrganizationArtifactReport] = AutoJson.macroDefault
+  implicit val cfj: AutoJson[ConfigurationReport] = AutoJson.macroDefault
   implicit val jf: JsonFormat[UpdateReport] = AutoJson.jsonFormat
-  println(s"FUCK $jf")
-  /*
- *implicit val ir: AutoJson[InclExclRule] = AutoJson.macroDefault[InclExclRule]
- *implicit val oar: AutoJson[OrganizationArtifactReport] =
- *  AutoJson.macroDefault[OrganizationArtifactReport]
- *implicit val us: AutoJson[UpdateStats] = AutoJson.macroDefault[UpdateStats]
- *implicit val aj: AutoJson[UpdateReport] = AutoJson.macroDefault[UpdateReport]
- *implicit val sj: JsonFormat[UpdateReport] = AutoJson.jsonFormat[UpdateReport]
- */
 }
