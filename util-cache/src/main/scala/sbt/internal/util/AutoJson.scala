@@ -46,6 +46,7 @@ object ForEach {
   private def traversable[M[_] <: Traversable[_]]: ForEach[M] = new ForEach[M] {
     override def apply[T](m: M[T])(f: T => Unit): Unit = m.asInstanceOf[Traversable[T]].foreach(f)
   }
+  implicit val set: ForEach[Set] = traversable[Set]
   implicit val seq: ForEach[collection.immutable.Seq] = traversable[collection.immutable.Seq]
   implicit val vector: ForEach[Vector] = traversable[Vector]
   implicit val list: ForEach[List] = traversable[List]
@@ -62,6 +63,7 @@ trait Length[M[_]] {
 object Length {
   def apply[M[_]](m: M[_])(implicit length: Length[M]): Int = length.length(m)
   implicit val seq: Length[collection.immutable.Seq] = _.size
+  implicit val set: Length[Set] = _.size
   implicit val vector: Length[Vector] = _.size
   implicit val list: Length[List] = _.size
   implicit val array: Length[Array] = _.size
@@ -70,44 +72,69 @@ object Length {
   }
 }
 trait CollectionBuilder[T, M[_]] {
+  def newBuilder(): CollectionBuilder[T, M]
   def add(t: T): Unit
   def build(): M[T]
 }
 object CollectionBuilder {
-  implicit def listBuilder[T]: CollectionBuilder[T, List] = new CollectionBuilder[T, List] {
-    private val result = new mutable.ListBuffer[T]
-    def add(t: T) = result += t
-    def build(): List[T] = {
-      val res = result.toList
-      result.clear()
-      res
+  implicit def setBuilder[T]: CollectionBuilder[T, Set] = {
+    class SetCollectionBuilder[R] extends CollectionBuilder[R, Set] {
+      private val result = new mutable.HashSet[R]
+      def newBuilder(): CollectionBuilder[R, Set] = new SetCollectionBuilder[R]
+      def add(t: R) = { result.add(t); () }
+      def build(): Set[R] = {
+        val res = result.toSet
+        result.clear()
+        res
+      }
+      override def toString: String = s"SetBuilder($result)"
     }
-    override def toString: String = s"ListBuilder($result)"
+    new SetCollectionBuilder[T]
   }
-  implicit def vectorBuilder[T]: CollectionBuilder[T, Vector] =
-    new CollectionBuilder[T, Vector] {
-      private val result = new VectorBuilder[T]
-      def add(t: T) = { result += t; () }
-      def build(): Vector[T] = {
+  implicit def listBuilder[T]: CollectionBuilder[T, List] = {
+    class ListCollectionBuilder[R] extends CollectionBuilder[R, List] {
+      private val result = new mutable.ListBuffer[R]
+      def newBuilder(): CollectionBuilder[R, List] = new ListCollectionBuilder[R]
+      def add(t: R) = { result += t; () }
+      def build(): List[R] = {
+        val res = result.toList
+        result.clear()
+        res
+      }
+      override def toString: String = s"ListBuilder($result)"
+    }
+    new ListCollectionBuilder[T]
+  }
+  implicit def vectorBuilder[T]: CollectionBuilder[T, Vector] = {
+    class VectorCollectionBuilder[R] extends CollectionBuilder[R, Vector] {
+      private val result = new VectorBuilder[R]
+      def newBuilder(): CollectionBuilder[R, Vector] = new VectorCollectionBuilder[R]
+      def add(t: R) = { result += t; () }
+      def build(): Vector[R] = {
         val res = result.result()
         result.clear()
         res
       }
       override def toString: String = s"VectorBuilder($result)"
     }
+    new VectorCollectionBuilder[T]
+  }
   implicit def seqBuilder[T]: CollectionBuilder[T, collection.immutable.Seq] =
     vectorBuilder[T].asInstanceOf[CollectionBuilder[T, collection.immutable.Seq]]
-  implicit def arrayBuilder[T: ClassTag]: CollectionBuilder[T, Array] =
-    new CollectionBuilder[T, Array] {
-      private val result = new mutable.ArrayBuffer[T]
-      def add(t: T) = result += t
-      def build(): Array[T] = {
+  implicit def arrayBuilder[T: ClassTag]: CollectionBuilder[T, Array] = {
+    class ArrayCollectionBuilder[R: ClassTag] extends CollectionBuilder[R, Array] {
+      private val result = new mutable.ArrayBuffer[R]
+      def newBuilder(): CollectionBuilder[R, Array] = new ArrayCollectionBuilder[R]
+      def add(t: R) = result += t
+      def build(): Array[R] = {
         val res = result.toArray
         result.clear()
         res
       }
       override def toString: String = s"ArrayBuilder($result)"
     }
+    new ArrayCollectionBuilder[T]
+  }
 }
 object AutoJson extends LowPriorityAutoJson {
   class SjsonBuilder[J](val builder: sjsonnew.Builder[J]) extends AnyVal with JsonBuilder {
@@ -181,22 +208,26 @@ object AutoJson extends LowPriorityAutoJson {
     }
   implicit def seqAutoJson[M[_], T](
       implicit aj: AutoJson[T],
-      b: CollectionBuilder[T, M],
+      builder: CollectionBuilder[T, M],
       t: ForEach[M],
       l: Length[M]
   ): AutoJson[M[T]] =
     new AutoJson[M[T]] {
       override def read(unbuilder: JsonUnbuilder): M[T] = unbuilder.readSeq { (u, len) =>
         var i = 0
+        val b = builder.newBuilder
         while (i < len) {
           b.add(aj.read(u))
           i += 1
         }
         b.build()
       }
-      override def write(a: M[T], builder: JsonBuilder): Unit =
+      override def write(a: M[T], builder: JsonBuilder): Unit = {
         builder.writeSeq(a)(aj.write(_, _))
+      }
     }
+  implicit def setAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Set[T]] =
+    seqAutoJson[Set, T]
   implicit def vectorAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Vector[T]] =
     seqAutoJson[Vector, T]
   implicit def mapAutoJson[K, V](implicit aj: AutoJson[(K, V)]): AutoJson[Map[K, V]] =
@@ -255,7 +286,7 @@ private object AutoJsonMacro {
               c.abort(c.enclosingPosition, s"Class $tType has private constructor parameters.")
             decl
           })
-          if (m.isPublic) (None, decls)
+          if (!tType.typeSymbol.isAbstract && m.isPublic) (None, decls)
           else {
             tType.typeSymbol.companion.typeSignature.decls
               .find(_.typeSignatureIn(tType) =:= m.typeSignatureIn(tType)) match {
@@ -282,13 +313,15 @@ private object AutoJsonMacro {
       case Some(mki) => q"$mki(...${formats.map(_.map(_._2))})"
       case None      => q"new $tType(...${formats.map(_.map(_._2))})"
     }
+    val classname = TypeName(c.freshName("auto"))
     val tree = q"""
-      new sbt.internal.util.AutoJson[$tType] {
+      class $classname extends sbt.internal.util.AutoJson[$tType] {
         def read(unbuilder: $jsonUnbuilder): $tType = $newInstance
         def write(obj: $tType, builder: $jsonBuilder): Unit = {
           ..${formats.flatten.map(_._1)}
         }
       }
+      new $classname
     """
     c.Expr[AutoJson[T]](tree)
   }
