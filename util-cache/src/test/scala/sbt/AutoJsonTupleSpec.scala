@@ -1,3 +1,10 @@
+/*
+ * sbt
+ * Copyright 2011 - 2018, Lightbend, Inc.
+ * Copyright 2008 - 2010, Mark Harrah
+ * Licensed under Apache License 2.0 (see LICENSE)
+ */
+
 package sbt
 
 import AutoJsonHelpers._
@@ -37,6 +44,10 @@ class AutoJsonTupleSpec extends org.scalatest.FlatSpec {
   }
   "generic classes" should "be serializable" in {
     check(new Foo(1))
+    check(Some(new Foo(1)))
+    check(Vector(new Foo(1), new Foo(2)))
+    check(Vector(Some(new Foo(1)), Some(new Foo(2))))
+    println(roundTrip(Vector(Some(new Foo(1)))))
   }
 }
 /*

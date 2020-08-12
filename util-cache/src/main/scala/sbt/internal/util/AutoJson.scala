@@ -13,6 +13,8 @@ import scala.collection.mutable
 import scala.language.experimental.macros
 import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox
+import java.io.File
+import java.net.URL
 
 object JsonDeserializationError extends java.lang.Throwable("", null, true, true)
 object JsonSerializationError extends java.lang.Throwable("", null, true, true)
@@ -133,7 +135,7 @@ object AutoJson extends LowPriorityAutoJson {
       res
     }
   }
-  def jsonFormat[T](aj: AutoJson[T]): JsonFormat[T] = new JsonFormat[T] {
+  implicit def jsonFormat[T](implicit aj: AutoJson[T]): JsonFormat[T] = new JsonFormat[T] {
     def read[J](jsOpt: Option[J], sunbuilder: sjsonnew.Unbuilder[J]): T = jsOpt match {
       case Some(j) =>
         sunbuilder.beginArray(j)
@@ -148,6 +150,26 @@ object AutoJson extends LowPriorityAutoJson {
       sbuilder.endArray()
     }
   }
+  trait IsoString[T] {
+    def to(t: T): String
+    def from(s: String): T
+  }
+  object IsoString {
+    implicit object file extends IsoString[File] {
+      def to(f: File): String = f.toString
+      def from(s: String): File = new File(s)
+    }
+    implicit object url extends IsoString[URL] {
+      def to(u: URL): String = u.toString
+      def from(s: String): URL = new URL(s)
+    }
+  }
+  implicit def isoStringAutoJson[T](implicit isoString: IsoString[T]): AutoJson[T] =
+    new AutoJson[T] {
+      override def read(unbuilder: JsonUnbuilder): T = isoString.from(unbuilder.readString)
+      override def write(obj: T, builder: JsonBuilder): Unit =
+        builder.writeString(isoString.to(obj))
+    }
   implicit def optionAutoJson[T: ClassTag](implicit aj: AutoJson[T]): AutoJson[Option[T]] =
     new AutoJson[Option[T]] {
       def read(unbuilder: JsonUnbuilder): Option[T] = unbuilder.readSeq { (u, len) =>
@@ -174,6 +196,17 @@ object AutoJson extends LowPriorityAutoJson {
       }
       override def write(a: M[T], builder: JsonBuilder): Unit =
         builder.writeSeq(a)(aj.write(_, _))
+    }
+  implicit def vectorAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Vector[T]] =
+    seqAutoJson[Vector, T]
+  implicit def mapAutoJson[K, V](implicit aj: AutoJson[(K, V)]): AutoJson[Map[K, V]] =
+    new AutoJson[Map[K, V]] {
+      private val vectorBuilder = seqAutoJson[Vector, (K, V)]
+      override def read(unbuilder: JsonUnbuilder): Map[K, V] = {
+        Map(vectorBuilder.read(unbuilder): _*)
+      }
+      override def write(obj: Map[K, V], builder: JsonBuilder): Unit =
+        vectorBuilder.write(obj.toVector, builder)
     }
   implicit object booleanAutoJson extends AutoJson[Boolean] {
     override def read(unbuilder: JsonUnbuilder): Boolean = unbuilder.readBoolean
@@ -206,9 +239,12 @@ private object AutoJsonMacro {
   def impl[T: c.WeakTypeTag](c: blackbox.Context): c.Expr[AutoJson[T]] = {
     import c.universe._
     val tType = weakTypeOf[T]
+    println(tType)
     val autoJson = weakTypeOf[AutoJson[_]]
     val jsonBuilder = weakTypeOf[JsonBuilder]
     val jsonUnbuilder = weakTypeOf[JsonUnbuilder]
+    if (tType <:< weakTypeOf[Seq[_]])
+      c.abort(c.enclosingPosition, s"Cannot generate AutoJson for $tType")
     val notFound = s"Couldn't find public constructor or static method to initailize $tType"
     val (mkInstance, decls) = tType.decls
       .collectFirst {
@@ -237,7 +273,9 @@ private object AutoJsonMacro {
     val formats = decls
       .map(_.map { s =>
         val tpe = c.universe.appliedType(autoJson, s.typeSignatureIn(tType).finalResultType)
-        val format = c.inferImplicitValue(tpe, silent = false)
+        val format = try c.inferImplicitValue(tpe, silent = false)
+        catch { case t: Throwable => println(s"failed to infer $tType $tpe"); throw t }
+        //println(s"$tType $tpe $format")
         (q"$format.write(obj.${s.name.toTermName}, builder)", q"$format.read(unbuilder)")
       })
     val newInstance = mkInstance match {
