@@ -20,6 +20,7 @@ import sbt.BuildSyntax._
 import sbt.Def.ScopedKey
 import sbt.KeyRanks._
 import sbt.internal.InMemoryCacheStore.CacheStoreFactoryFactory
+import sbt.internal.UpdateCache.ScalaInstanceParams
 import sbt.internal._
 import sbt.internal.bsp._
 import sbt.internal.inc.ScalaInstance
@@ -181,6 +182,7 @@ object Keys {
   val compileOptions = taskKey[CompileOptions]("Collects basic options to configure compilers").withRank(DTask)
   val compileInputs = taskKey[Inputs]("Collects all inputs needed for compilation.").withRank(DTask)
   val scalaHome = settingKey[Option[File]]("If Some, defines the local Scala installation to use for compilation, running, and testing.").withRank(ASetting)
+  val scalaInstanceParams = taskKey[ScalaInstanceParams]("Defines the parameters to use to build the scalaInstance.").withRank(Invisible)
   val scalaInstance = taskKey[ScalaInstance]("Defines the Scala instance to use for compilation, running, and testing.").withRank(DTask)
   val scalaOrganization = settingKey[String]("Organization/group ID of the Scala used in the project. Default value is 'org.scala-lang'. This is an advanced setting used for clones of the Scala Language. It should be disregarded in standard use cases.").withRank(CSetting)
   val scalaVersion = settingKey[String]("The version of Scala used for building.").withRank(APlusSetting)

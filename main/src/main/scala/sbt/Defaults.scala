@@ -33,6 +33,7 @@ import sbt.Project.{
 import sbt.Scope.{ GlobalScope, ThisScope, fillTaskAxis }
 import sbt.coursierint._
 import sbt.internal.CommandStrings.ExportStream
+import sbt.internal.UpdateCache.ScalaInstanceParams
 import sbt.internal._
 import sbt.internal.classpath.{ AlternativeZincUtil, ClassLoaderCache }
 import sbt.internal.inc.JavaInterfaceUtil._
@@ -591,6 +592,7 @@ object Defaults extends BuildCommon {
 
   // This is included into JvmPlugin.projectSettings
   def compileBase = inTask(console)(compilersSetting :: Nil) ++ compileBaseGlobal ++ Seq(
+    scalaInstanceParams := scalaInstanceParamsTask.value,
     scalaInstance := scalaInstanceTask.value,
     crossVersion := (if (crossPaths.value) CrossVersion.binary else CrossVersion.disabled),
     sbtBinaryVersion in pluginCrossBuild := binarySbtVersion(
@@ -893,6 +895,21 @@ object Defaults extends BuildCommon {
       }
     }
 
+  def scalaInstanceParamsTask: Initialize[Task[ScalaInstanceParams]] = Def.task {
+    /*
+     *val sc: AutoJson[Seq[File]] = implicitly[AutoJson[Seq[File]]]
+     *implicit val sci: AutoJson[Vector[File]] = sc
+     *implicit val f: AutoJson[ScalaInstanceParams] = AutoJson.macroDefault
+     *implicit val jf: JsonFormat[ScalaInstanceParams] = AutoJson.jsonFormat
+     */
+    /*
+     *scalaInstanceParams.previous match {
+     *  case Some(p) => p
+     *  case _       => ???
+     *}
+     */
+    new ScalaInstanceParams("", Nil, Nil, file(""), None)
+  }
   def scalaInstanceTask: Initialize[Task[ScalaInstance]] = Def.taskDyn {
     // if this logic changes, ensure that `unmanagedScalaInstanceOnly` and `update` are changed
     //  appropriately to avoid cycles
@@ -940,6 +957,20 @@ object Defaults extends BuildCommon {
     pre + post
   }
 
+  def scalaInstanceParamsFromUpdate: Initialize[Task[ScalaInstanceParams]] = Def.task {
+    val toolReport = update.value.configuration(Configurations.ScalaTool) getOrElse
+      sys.error(noToolConfiguration(managedScalaInstance.value))
+    def files(id: String) =
+      for {
+        m <- toolReport.modules if m.module.name == id;
+        (art, file) <- m.artifacts if art.`type` == Artifact.DefaultType
+      } yield file
+    def file(id: String) = files(id).headOption getOrElse sys.error(s"Missing ${id}.jar")
+    val allJars = toolReport.modules.flatMap(_.artifacts.map(_._2))
+    val libraryJar = file(ScalaArtifacts.LibraryID)
+    val compilerJar = file(ScalaArtifacts.CompilerID)
+    new ScalaInstanceParams(scalaVersion.value, allJars, Seq(libraryJar), compilerJar, None)
+  }
   def scalaInstanceFromUpdate: Initialize[Task[ScalaInstance]] = Def.task {
     val toolReport = update.value.configuration(Configurations.ScalaTool) getOrElse
       sys.error(noToolConfiguration(managedScalaInstance.value))

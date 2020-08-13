@@ -47,7 +47,9 @@ object ForEach {
     override def apply[T](m: M[T])(f: T => Unit): Unit = m.asInstanceOf[Traversable[T]].foreach(f)
   }
   implicit val set: ForEach[Set] = traversable[Set]
-  implicit val seq: ForEach[collection.immutable.Seq] = traversable[collection.immutable.Seq]
+  implicit val seq: ForEach[Seq] = traversable[Seq]
+  implicit val iseq: ForEach[scala.collection.immutable.Seq] =
+    traversable[scala.collection.immutable.Seq]
   implicit val vector: ForEach[Vector] = traversable[Vector]
   implicit val list: ForEach[List] = traversable[List]
   implicit object array extends ForEach[Array] {
@@ -56,20 +58,23 @@ object ForEach {
   implicit object option extends ForEach[Option] {
     override def apply[T](m: Option[T])(f: T => Unit): Unit = m.foreach(f)
   }
+  implicit object some extends ForEach[Some] {
+    override def apply[T](m: Some[T])(f: T => Unit): Unit = m.foreach(f)
+  }
 }
 trait Length[M[_]] {
   def length(m: M[_]): Int
 }
 object Length {
   def apply[M[_]](m: M[_])(implicit length: Length[M]): Int = length.length(m)
-  implicit val seq: Length[collection.immutable.Seq] = _.size
+  implicit val iseq: Length[scala.collection.immutable.Seq] = _.size
+  implicit val seq: Length[Seq] = _.size
   implicit val set: Length[Set] = _.size
   implicit val vector: Length[Vector] = _.size
   implicit val list: Length[List] = _.size
   implicit val array: Length[Array] = _.size
-  implicit object option extends Length[Option] {
-    override def length(m: Option[_]): Int = if (m.isDefined) 1 else 0
-  }
+  implicit val obj: Length[Option] = _.size
+  implicit val some: Length[Some] = _.size
 }
 trait CollectionBuilder[T, M[_]] {
   def newBuilder(): CollectionBuilder[T, M]
@@ -119,8 +124,24 @@ object CollectionBuilder {
     }
     new VectorCollectionBuilder[T]
   }
-  implicit def seqBuilder[T]: CollectionBuilder[T, collection.immutable.Seq] =
-    vectorBuilder[T].asInstanceOf[CollectionBuilder[T, collection.immutable.Seq]]
+  implicit def seqBuilder[T]: CollectionBuilder[T, Seq] =
+    vectorBuilder[T].asInstanceOf[CollectionBuilder[T, Seq]]
+  implicit def iSeqBuilder[T]: CollectionBuilder[T, scala.collection.immutable.Seq] = {
+    class ImmutableSeqCollectionBuilder[R]
+        extends CollectionBuilder[R, scala.collection.immutable.Seq] {
+      private val result = new VectorBuilder[R]
+      def newBuilder(): CollectionBuilder[R, scala.collection.immutable.Seq] =
+        new ImmutableSeqCollectionBuilder[R]
+      def add(t: R) = { result += t; () }
+      def build(): scala.collection.immutable.Seq[R] = {
+        val res = result.result()
+        result.clear()
+        res
+      }
+      override def toString: String = s"ImmutableSeqCollectionBuilder($result)"
+    }
+    new ImmutableSeqCollectionBuilder[T]
+  }
   implicit def arrayBuilder[T: ClassTag]: CollectionBuilder[T, Array] = {
     class ArrayCollectionBuilder[R: ClassTag] extends CollectionBuilder[R, Array] {
       private val result = new mutable.ArrayBuffer[R]
@@ -197,6 +218,7 @@ object AutoJson extends LowPriorityAutoJson {
       override def write(obj: T, builder: JsonBuilder): Unit =
         builder.writeString(isoString.to(obj))
     }
+  implicit val fileJson: AutoJson[File] = isoStringAutoJson[File]
   implicit def optionAutoJson[T: ClassTag](implicit aj: AutoJson[T]): AutoJson[Option[T]] =
     new AutoJson[Option[T]] {
       def read(unbuilder: JsonUnbuilder): Option[T] = unbuilder.readSeq { (u, len) =>
@@ -204,6 +226,15 @@ object AutoJson extends LowPriorityAutoJson {
         else Some(aj.read(u))
       }
       def write(obj: Option[T], builder: JsonBuilder): Unit =
+        builder.writeSeq(obj)(aj.write(_, _))
+    }
+  implicit def someAutoJson[T: ClassTag](implicit aj: AutoJson[T]): AutoJson[Some[T]] =
+    new AutoJson[Some[T]] {
+      def read(unbuilder: JsonUnbuilder): Some[T] = unbuilder.readSeq { (u, len) =>
+        if (len == 0) throw JsonDeserializationError
+        else Some(aj.read(u))
+      }
+      def write(obj: Some[T], builder: JsonBuilder): Unit =
         builder.writeSeq(obj)(aj.write(_, _))
     }
   implicit def seqAutoJson[M[_], T](
@@ -226,6 +257,14 @@ object AutoJson extends LowPriorityAutoJson {
         builder.writeSeq(a)(aj.write(_, _))
       }
     }
+  implicit def iseqAutoJson[T](
+      implicit aj: AutoJson[T]
+  ): AutoJson[scala.collection.immutable.Seq[T]] =
+    seqAutoJson[scala.collection.immutable.Seq, T]
+  implicit def listAutoJson[T](implicit aj: AutoJson[T]): AutoJson[List[T]] =
+    seqAutoJson[List, T]
+  implicit def seqAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Seq[T]] =
+    seqAutoJson[Seq, T]
   implicit def setAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Set[T]] =
     seqAutoJson[Set, T]
   implicit def vectorAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Vector[T]] =
@@ -274,8 +313,6 @@ private object AutoJsonMacro {
     val autoJson = weakTypeOf[AutoJson[_]]
     val jsonBuilder = weakTypeOf[JsonBuilder]
     val jsonUnbuilder = weakTypeOf[JsonUnbuilder]
-    if (tType <:< weakTypeOf[Seq[_]])
-      c.abort(c.enclosingPosition, s"Cannot generate AutoJson for $tType")
     val notFound = s"Couldn't find public constructor or static method to initailize $tType"
     val (mkInstance, decls) = tType.decls
       .collectFirst {
@@ -304,8 +341,12 @@ private object AutoJsonMacro {
     val formats = decls
       .map(_.map { s =>
         val tpe = c.universe.appliedType(autoJson, s.typeSignatureIn(tType).finalResultType)
-        val format = try c.inferImplicitValue(tpe, silent = false)
-        catch { case t: Throwable => println(s"failed to infer $tType $tpe"); throw t }
+        val format = try c.inferImplicitValue(tpe, withMacrosDisabled = true, silent = false)
+        catch {
+          case t: Throwable =>
+            try c.inferImplicitValue(tpe, withMacrosDisabled = false, silent = false)
+            catch { case _: Throwable => c.abort(c.enclosingPosition, "") }
+        }
         //println(s"$tType $tpe $format")
         (q"$format.write(obj.${s.name.toTermName}, builder)", q"$format.read(unbuilder)")
       })

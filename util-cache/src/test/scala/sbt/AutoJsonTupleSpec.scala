@@ -47,6 +47,7 @@ class AutoJsonTupleSpec extends org.scalatest.FlatSpec {
     check(Some(new Foo(1)))
     check(Vector(new Foo(1), new Foo(2)))
     check(Vector(Some(new Foo(1)), Some(new Foo(2))))
+    check(Seq(new java.io.File("foo")))
     println(roundTrip(Vector(Some(new Foo(1)))))
   }
 }
