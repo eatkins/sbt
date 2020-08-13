@@ -219,16 +219,17 @@ object AutoJson extends LowPriorityAutoJson {
         builder.writeString(isoString.to(obj))
     }
   implicit val fileJson: AutoJson[File] = isoStringAutoJson[File]
-  implicit def optionAutoJson[T: ClassTag](implicit aj: AutoJson[T]): AutoJson[Option[T]] =
+  implicit def optionAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Option[T]] =
     new AutoJson[Option[T]] {
       def read(unbuilder: JsonUnbuilder): Option[T] = unbuilder.readSeq { (u, len) =>
         if (len == 0) None
         else Some(aj.read(u))
       }
-      def write(obj: Option[T], builder: JsonBuilder): Unit =
+      def write(obj: Option[T], builder: JsonBuilder): Unit = {
         builder.writeSeq(obj)(aj.write(_, _))
+      }
     }
-  implicit def someAutoJson[T: ClassTag](implicit aj: AutoJson[T]): AutoJson[Some[T]] =
+  implicit def someAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Some[T]] =
     new AutoJson[Some[T]] {
       def read(unbuilder: JsonUnbuilder): Some[T] = unbuilder.readSeq { (u, len) =>
         if (len == 0) throw JsonDeserializationError
@@ -309,7 +310,6 @@ private object AutoJsonMacro {
   def impl[T: c.WeakTypeTag](c: blackbox.Context): c.Expr[AutoJson[T]] = {
     import c.universe._
     val tType = weakTypeOf[T]
-    println(tType)
     val autoJson = weakTypeOf[AutoJson[_]]
     val jsonBuilder = weakTypeOf[JsonBuilder]
     val jsonUnbuilder = weakTypeOf[JsonUnbuilder]
@@ -347,7 +347,6 @@ private object AutoJsonMacro {
             try c.inferImplicitValue(tpe, withMacrosDisabled = false, silent = false)
             catch { case _: Throwable => c.abort(c.enclosingPosition, "") }
         }
-        //println(s"$tType $tpe $format")
         (q"$format.write(obj.${s.name.toTermName}, builder)", q"$format.read(unbuilder)")
       })
     val newInstance = mkInstance match {
@@ -364,6 +363,7 @@ private object AutoJsonMacro {
       }
       new $classname
     """
+    if (tree.toString.contains("ScalaInstance")) println(tree)
     c.Expr[AutoJson[T]](tree)
   }
 }
