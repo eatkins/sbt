@@ -911,15 +911,13 @@ object Defaults extends BuildCommon {
                 val libraryJars = allJars.filter(_.getName == "scala-library.jar")
                 allJars.filter(_.getName == "scala-compiler.jar") match {
                   case Array(compilerJar) if libraryJars.nonEmpty =>
-                    val res = new ScalaInstanceParams(
+                    new ScalaInstanceParams(
                       version,
                       allJars,
                       libraryJars,
                       compilerJar,
                       None
                     )
-                    println(s"da fuck $res")
-                    res
                   case _ =>
                     new ScalaInstanceParams(
                       version,
@@ -2403,8 +2401,9 @@ object Classpaths {
         else mjars
       },
       sbt.Keys.managedJars := Def.taskDyn {
+        import UpdateCache.AttributedFormats._
         sbt.Keys.managedJars.previous match {
-          case Some(p) => Def.task(p)
+          case Some(j) => Def.task(j)
           case _ =>
             Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
         }
@@ -3217,7 +3216,8 @@ object Classpaths {
 
   def deliverTask(config: TaskKey[PublishConfiguration]): Initialize[Task[File]] =
     Def.task {
-      Def.unit(update.value)
+      //Def.unit(update.value)
+      //val _ = update.value
       IvyActions.deliver(ivyModule.value, config.value, streams.value.log)
     }
 
@@ -3729,6 +3729,19 @@ object Classpaths {
   def autoPlugins(report: UpdateReport, internalPluginClasspath: Seq[File]): Seq[String] =
     autoPlugins(report, internalPluginClasspath, isDotty = false)
 
+  def autoPluginsTask: Initialize[Task[Seq[String]]] = Def.taskDyn {
+    Keys.autoPlugins.previous match {
+      case Some(p) => Def.task(p)
+      case _ =>
+        Def.task {
+          autoPlugins(
+            update.value,
+            internalCompilerPluginClasspath.value.files,
+            ScalaInstance.isDotty(scalaVersion.value)
+          )
+        }
+    }
+  }
   def autoPlugins(
       report: UpdateReport,
       internalPluginClasspath: Seq[File],
@@ -3757,16 +3770,13 @@ object Classpaths {
     }
 
   lazy val compilerPluginConfig = Seq(
+    Keys.autoPlugins := autoPluginsTask.value,
     scalacOptions := {
       val options = scalacOptions.value
-      val newPlugins = autoPlugins(
-        update.value,
-        internalCompilerPluginClasspath.value.files,
-        ScalaInstance.isDotty(scalaVersion.value)
-      )
+      val newPlugins = Keys.autoPlugins.value
       val existing = options.toSet
       if (autoCompilerPlugins.value) options ++ newPlugins.filterNot(existing) else options
-    }
+    },
   )
 
   def substituteScalaFiles(scalaOrg: String, report: UpdateReport)(
