@@ -351,6 +351,7 @@ object Keys {
   val exportedProductsNoTracking = taskKey[Classpath]("Just the exported classpath without triggering the compilation.").withRank(CTask)
   val unmanagedClasspath = taskKey[Classpath]("Classpath entries (deep) that are manually managed.").withRank(BPlusTask)
   val unmanagedJars = taskKey[Classpath]("Classpath entries for the current project (shallow) that are manually managed.").withRank(BPlusTask)
+  val managedJars = taskKey[Classpath]("Classpath entries for the current project (shallow) that are manually managed.").withRank(BPlusTask)
   val managedClasspath = taskKey[Classpath]("The classpath consisting of external, managed library dependencies.").withRank(BMinusTask)
   val internalDependencyClasspath = taskKey[Classpath]("The internal (inter-project) classpath.").withRank(CTask)
   val externalDependencyClasspath = taskKey[Classpath]("The classpath consisting of library dependencies, both managed and unmanaged.").withRank(BMinusTask)

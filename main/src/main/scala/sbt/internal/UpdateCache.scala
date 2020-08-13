@@ -9,6 +9,7 @@ package sbt.internal
 
 import java.io.File
 import sbt.internal.util.AutoJson
+import sjsonnew.JsonFormat
 
 object UpdateCache {
   class ScalaInstanceParams(
@@ -33,5 +34,6 @@ object UpdateCache {
   }
   object ScalaInstanceParams {
     implicit val format: AutoJson[ScalaInstanceParams] = AutoJson.macroDefault
+    implicit val jf: JsonFormat[ScalaInstanceParams] = AutoJson.jsonFormat[ScalaInstanceParams]
   }
 }

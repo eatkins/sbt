@@ -895,49 +895,49 @@ object Defaults extends BuildCommon {
       }
     }
 
-  def scalaInstanceParamsTask: Initialize[Task[ScalaInstanceParams]] = Def.task {
-    /*
-     *val sc: AutoJson[Seq[File]] = implicitly[AutoJson[Seq[File]]]
-     *implicit val sci: AutoJson[Vector[File]] = sc
-     *implicit val f: AutoJson[ScalaInstanceParams] = AutoJson.macroDefault
-     *implicit val jf: JsonFormat[ScalaInstanceParams] = AutoJson.jsonFormat
-     */
-    /*
-     *scalaInstanceParams.previous match {
-     *  case Some(p) => p
-     *  case _       => ???
-     *}
-     */
-    new ScalaInstanceParams("", Nil, Nil, file(""), None)
+  def scalaInstanceParamsTask: Initialize[Task[ScalaInstanceParams]] = Def.taskDyn {
+    val home = scalaHome.value
+    scalaInstanceParams.previous match {
+      case Some(p) => Def.task(p)
+      case _ =>
+        home match {
+          case Some(h) => scalaInstanceParamsFromHome(h)
+          case None =>
+            val scalaProvider = appConfiguration.value.provider.scalaProvider
+            val version = scalaVersion.value
+            if (version == scalaProvider.version) // use the same class loader as the Scala classes used by sbt
+              Def.task {
+                val allJars = scalaProvider.jars
+                val libraryJars = allJars.filter(_.getName == "scala-library.jar")
+                allJars.filter(_.getName == "scala-compiler.jar") match {
+                  case Array(compilerJar) if libraryJars.nonEmpty =>
+                    val res = new ScalaInstanceParams(
+                      version,
+                      allJars,
+                      libraryJars,
+                      compilerJar,
+                      None
+                    )
+                    println(s"da fuck $res")
+                    res
+                  case _ =>
+                    new ScalaInstanceParams(
+                      version,
+                      scalaProvider.jars,
+                      scalaProvider.jars,
+                      null,
+                      None
+                    )
+                }
+              } else scalaInstanceParamsFromUpdate
+        }
+    }
   }
-  def scalaInstanceTask: Initialize[Task[ScalaInstance]] = Def.taskDyn {
+  def scalaInstanceTask: Initialize[Task[ScalaInstance]] = Def.task {
     // if this logic changes, ensure that `unmanagedScalaInstanceOnly` and `update` are changed
     //  appropriately to avoid cycles
-    scalaHome.value match {
-      case Some(h) => scalaInstanceFromHome(h)
-      case None =>
-        val scalaProvider = appConfiguration.value.provider.scalaProvider
-        val version = scalaVersion.value
-        if (version == scalaProvider.version) // use the same class loader as the Scala classes used by sbt
-          Def.task {
-            val allJars = scalaProvider.jars
-            val libraryJars = allJars.filter(_.getName == "scala-library.jar")
-            allJars.filter(_.getName == "scala-compiler.jar") match {
-              case Array(compilerJar) if libraryJars.nonEmpty =>
-                val cache = state.value.extendedClassLoaderCache
-                mkScalaInstance(
-                  version,
-                  allJars,
-                  libraryJars,
-                  compilerJar,
-                  cache,
-                  scalaInstanceTopLoader.value
-                )
-              case _ => ScalaInstance(version, scalaProvider)
-            }
-          } else
-          scalaInstanceFromUpdate
-    }
+    val params = scalaInstanceParamsTask.value
+    mkScalaInstance(params, state.value.extendedClassLoaderCache, scalaInstanceTopLoader.value)
   }
 
   // Returns the ScalaInstance only if it was not constructed via `update`
@@ -993,6 +993,24 @@ object Defaults extends BuildCommon {
     )
   }
   private[this] def mkScalaInstance(
+      params: ScalaInstanceParams,
+      classLoaderCache: ClassLoaderCache,
+      topLoader: ClassLoader
+  ): ScalaInstance = {
+    val allJarsDistinct = params.allJars.distinct
+    val libraryLoader = classLoaderCache(params.libraryJars.toList, topLoader)
+    val fullLoader = classLoaderCache(allJarsDistinct.toList, libraryLoader)
+    new ScalaInstance(
+      params.version,
+      fullLoader,
+      libraryLoader,
+      params.libraryJars.toArray,
+      params.compilerJar,
+      allJarsDistinct.toArray,
+      Some(params.version)
+    )
+  }
+  private[this] def mkScalaInstance(
       version: String,
       allJars: Seq[File],
       libraryJars: Array[File],
@@ -1013,20 +1031,24 @@ object Defaults extends BuildCommon {
       Some(version)
     )
   }
-  def scalaInstanceFromHome(dir: File): Initialize[Task[ScalaInstance]] = Def.task {
-    val dummy = ScalaInstance(dir)(state.value.classLoaderCache.apply)
-    Seq(dummy.loader, dummy.loaderLibraryOnly).foreach {
-      case a: AutoCloseable => a.close()
-      case _                =>
+  private def scalaInstanceParamsFromHome(dir: File): Initialize[Task[ScalaInstanceParams]] =
+    Def.task {
+      val dummy = ScalaInstance(dir)(state.value.classLoaderCache.apply)
+      Seq(dummy.loader, dummy.loaderLibraryOnly).foreach {
+        case a: AutoCloseable => a.close()
+        case _                =>
+      }
+      new ScalaInstanceParams(
+        dummy.version,
+        dummy.allJars,
+        dummy.libraryJars,
+        dummy.compilerJar,
+        Some(dir),
+      )
     }
-    mkScalaInstance(
-      dummy.version,
-      dummy.allJars,
-      dummy.libraryJars,
-      dummy.compilerJar,
-      state.value.extendedClassLoaderCache,
-      scalaInstanceTopLoader.value,
-    )
+  def scalaInstanceFromHome(dir: File): Initialize[Task[ScalaInstance]] = Def.task {
+    val params = scalaInstanceParamsFromHome(dir).value
+    mkScalaInstance(params, state.value.extendedClassLoaderCache, scalaInstanceTopLoader.value)
   }
 
   private[this] def testDefaults =
@@ -2376,14 +2398,17 @@ object Classpaths {
         val app = appConfiguration.value
         val sbtCp0 = app.provider.mainClasspath.toList
         val sbtCp = sbtCp0 map { Attributed.blank(_) }
-        val mjars = managedJars(
-          classpathConfiguration.value,
-          classpathTypes.value,
-          update.value
-        )
+        val mjars = sbt.Keys.managedJars.value
         if (isMeta && !force && !csr) mjars ++ sbtCp
         else mjars
       },
+      sbt.Keys.managedJars := Def.taskDyn {
+        sbt.Keys.managedJars.previous match {
+          case Some(p) => Def.task(p)
+          case _ =>
+            Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
+        }
+      }.value,
       exportedProducts := ClasspathImpl.trackedExportedProducts(TrackLevel.TrackAlways).value,
       exportedProductsIfMissing := ClasspathImpl
         .trackedExportedProducts(TrackLevel.TrackIfMissing)
