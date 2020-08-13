@@ -15,6 +15,7 @@ import scala.util.Success
 import AutoJsonHelpers._
 
 object AutoJsonPrimitiveSpec extends Properties {
+  val sc: AutoJson[Seq[java.io.File]] = implicitly[AutoJson[Seq[java.io.File]]]
   def tests: List[Test] =
     primitiveTests ::: primitiveOptionTests ::: primitiveArrayTests
 
@@ -41,6 +42,7 @@ object AutoJsonPrimitiveSpec extends Properties {
       Test("Seq[Int] serialization/deserialization", testIntArray) ::
       Test("Seq[Long] serialization/deserialization", testLongArray) ::
       Test("Seq[String] serialization/deserialization", testStringArray) ::
+      Test("Seq[File] serialization/deserialization", testFileArray) ::
       Nil
 
   private def randomBoolean = Gen.boolean
@@ -48,6 +50,11 @@ object AutoJsonPrimitiveSpec extends Properties {
   private def randomInt = Gen.int(Range.linear(Int.MinValue, Int.MaxValue))
   private def randomLong = Gen.long(Range.linear(Long.MinValue, Long.MaxValue))
   private def randomString = Gen.string(Gen.alphaNum, Range.linear(0, 256))
+  private def randomFile =
+    Gen.list(Gen.string(Gen.alphaNum, Range.linear(0, 64)), Range.linear(0, 12)).map {
+      case h :: tail => tail.foldLeft(new java.io.File(h)) { case (f, p) => new java.io.File(f, p) }
+      case Nil       => new java.io.File("")
+    }
 
   private def testBoolean: Property = randomBoolean.forAll.map(check[Boolean])
   private def testDouble: Property = randomDouble.forAll.map(check[Double])
@@ -71,6 +78,7 @@ object AutoJsonPrimitiveSpec extends Properties {
   private def testIntArray: Property = testSeq(randomInt)
   private def testLongArray: Property = testSeq(randomLong)
   private def testStringArray: Property = testSeq(randomString)
+  private def testFileArray: Property = testSeq(randomFile)
 
   private def checkArray[A](a: A)(implicit aj: AutoJson[A]) = roundTrip(a) ==== a
   private def checkSjson[A](a: A)(implicit aj: AutoJson[A]) = roundTripSjson(a) ==== Success(a)
