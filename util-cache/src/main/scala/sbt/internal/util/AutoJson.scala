@@ -363,7 +363,6 @@ private object AutoJsonMacro {
       }
       new $classname
     """
-    if (tree.toString.contains("ScalaInstance")) println(tree)
     c.Expr[AutoJson[T]](tree)
   }
 }

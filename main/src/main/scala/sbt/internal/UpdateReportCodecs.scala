@@ -24,7 +24,7 @@ object UpdateReportCodecs {
     override def read(unbuilder: JsonUnbuilder): UpdateLogging = UpdateLogging.Full
     override def write(obj: UpdateLogging, builder: JsonBuilder): Unit = {}
   }
-  implicit val af: AutoJson[Artifact] = AutoJson.macroDefault
+  implicit val artifact: AutoJson[Artifact] = AutoJson.macroDefault
   implicit val cs: AutoJson[Checksum] = AutoJson.macroDefault
   implicit val cv: AutoJson[CrossVersion] = new AutoJson[CrossVersion] {
     override def read(unbuilder: JsonUnbuilder): CrossVersion = CrossVersion.Full()
@@ -62,10 +62,10 @@ object UpdateReportCodecs {
   }
   implicit val ui: AutoJson[sbt.internal.LibraryManagement.UpdateInputs] = AutoJson.macroDefault
   implicit val uc: AutoJson[UpdateConfiguration] = AutoJson.macroDefault
-  implicit val cam: AutoJson[Configuration] = AutoJson.macroDefault
+  implicit val configuration: AutoJson[Configuration] = AutoJson.macroDefault
   implicit val jfui: JsonFormat[sbt.internal.LibraryManagement.UpdateInputs] = AutoJson.jsonFormat
   implicit val cr: AutoJson[ConfigRef] = AutoJson.macroDefault
-  implicit val mi: AutoJson[ModuleID] = AutoJson.macroDefault
+  implicit val moduleID: AutoJson[ModuleID] = AutoJson.macroDefault
   implicit val jfmi: JsonFormat[ModuleID] = AutoJson.jsonFormat
   implicit val iel: AutoJson[InclExclRule] = AutoJson.macroDefault
   implicit val moduleReport: AutoJson[ModuleReport] = AutoJson.macroDefault

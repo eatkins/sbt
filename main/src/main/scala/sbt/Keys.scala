@@ -441,6 +441,7 @@ object Keys {
   val updateHash = taskKey[Int]("Gets the potentially cached update report")
   val updateFiles = taskKey[Seq[java.nio.file.Path]]("All of the files used by the update report")
   val update = taskKey[UpdateReport]("Resolves and optionally retrieves dependencies, producing a report.").withRank(ATask)
+  val updateImpl = taskKey[UpdateReport]("Resolves and optionally retrieves dependencies, producing a report.").withRank(ATask)
   val updateFull = taskKey[UpdateReport]("Resolves and optionally retrieves dependencies, producing a full report with callers.").withRank(CTask)
   val evicted = taskKey[EvictionWarning]("Display detailed eviction warnings.").withRank(CTask)
   val evictionWarningOptions = settingKey[EvictionWarningOptions]("Options on eviction warnings after resolving managed dependencies.").withRank(DSetting)
