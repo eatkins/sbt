@@ -2901,6 +2901,11 @@ object Classpaths {
       ConflictWarning(conflictWarning.value, report, log)
       report
     },
+    updateFiles := {
+      val report = update.value
+      println(report.cachedDescriptor)
+      Vector(report.cachedDescriptor.toPath) ++ report.allFiles.map(_.toPath)
+    },
     evictionWarningOptions in update := evictionWarningOptions.value,
     evictionWarningOptions in evicted := EvictionWarningOptions.full,
     evicted := {
