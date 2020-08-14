@@ -2406,14 +2406,21 @@ object Classpaths {
         if (isMeta && !force && !csr) mjars ++ sbtCp
         else mjars
       },
-      sbt.Keys.managedJars := Def.taskDyn {
-        import UpdateCache.AttributedFormats._
-        sbt.Keys.managedJars.previous match {
-          case Some(j) => Def.task(j)
-          case _ =>
-            Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
-        }
-      }.value,
+      sbt.Keys.managedJars := managedJars(
+        classpathConfiguration.value,
+        classpathTypes.value,
+        update.value
+      ),
+      /*
+       *sbt.Keys.managedJars := Def.taskDyn {
+       *  import UpdateCache.AttributedFormats._
+       *  sbt.Keys.managedJars.previous match {
+       *    case Some(j) => Def.task(j)
+       *    case _ =>
+       *      Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
+       *  }
+       *}.value,
+       */
       exportedProducts := ClasspathImpl.trackedExportedProducts(TrackLevel.TrackAlways).value,
       exportedProductsIfMissing := ClasspathImpl
         .trackedExportedProducts(TrackLevel.TrackIfMissing)
