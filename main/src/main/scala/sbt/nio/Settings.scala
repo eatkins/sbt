@@ -8,7 +8,7 @@
 package sbt
 package nio
 
-import java.nio.file.{ Files, Path }
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
 import sbt.Keys._
@@ -19,7 +19,7 @@ import sbt.internal.{ Clean, Continuous, DynamicInput, WatchTransitiveDependenci
 import sbt.nio.FileStamp.Formats._
 import sbt.nio.FileStamper.{ Hash, LastModified }
 import sbt.nio.Keys._
-import sbt.nio.file.{ AllPass, FileAttributes, Glob, RecursiveGlob }
+import sbt.nio.file.{ AllPass, FileAttributes }
 import sbt.std.TaskExtra._
 import sjsonnew.JsonFormat
 
@@ -311,10 +311,6 @@ private[sbt] object Settings {
       val fileOutputGlobs = (fileOutputs in scope).value
       val allFileOutputs = view.list(fileOutputGlobs).map(_._1)
       val dynamicOutputs = (dynamicFileOutputs in scope).value
-      val allDynamicOutputs = dynamicOutputs.flatMap {
-        case p if Files.isDirectory(p) => p +: view.list(Glob(p, RecursiveGlob)).map(_._1)
-        case p                         => p :: Nil
-      }
       /*
        * We want to avoid computing the FileAttributes in the common case where nothing is
        * being filtered (which is the case with the default filters:
@@ -324,7 +320,7 @@ private[sbt] object Settings {
         case AllPass => _ => true
         case f       => p => FileAttributes(p).map(f.accept(p, _)).getOrElse(false)
       }
-      allFileOutputs ++ allDynamicOutputs.filterNot { p =>
+      allFileOutputs ++ dynamicOutputs.filterNot { p =>
         fileOutputGlobs.exists(_.matches(p)) || !attributeFilter(p)
       }
     })
