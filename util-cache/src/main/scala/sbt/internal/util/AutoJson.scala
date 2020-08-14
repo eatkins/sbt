@@ -15,6 +15,8 @@ import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox
 import java.io.File
 import java.net.URL
+import scala.concurrent.duration._
+import java.util.concurrent.TimeUnit
 
 object JsonDeserializationError extends java.lang.Throwable("", null, true, true)
 object JsonSerializationError extends java.lang.Throwable("", null, true, true)
@@ -299,6 +301,20 @@ object AutoJson extends LowPriorityAutoJson {
     override def read(unbuilder: JsonUnbuilder): String = unbuilder.readString
     override def write(s: String, builder: JsonBuilder): Unit = builder.writeString(s)
   }
+  implicit object durationAutoJson extends AutoJson[Duration] {
+    override def read(unbuilder: JsonUnbuilder): Duration = {
+      if (unbuilder.readBoolean) new FiniteDuration(unbuilder.readLong, TimeUnit.MILLISECONDS)
+      else Duration.Inf
+    }
+    override def write(obj: Duration, builder: JsonBuilder): Unit = {
+      obj match {
+        case fd: FiniteDuration =>
+          builder.writeBoolean(true)
+          builder.writeLong(fd.toMillis)
+        case _ => builder.writeBoolean(false)
+      }
+    }
+  }
 }
 
 trait LowPriorityAutoJson extends AutoJsonTuple with LowLowPriorityAutoJson
@@ -345,7 +361,10 @@ private object AutoJsonMacro {
         catch {
           case t: Throwable =>
             try c.inferImplicitValue(tpe, withMacrosDisabled = false, silent = false)
-            catch { case _: Throwable => c.abort(c.enclosingPosition, "") }
+            catch {
+              case _: Throwable =>
+                c.abort(c.enclosingPosition, s"Couldn't infer AutoJson for type $tpe")
+            }
         }
         (q"$format.write(obj.${s.name.toTermName}, builder)", q"$format.read(unbuilder)")
       })
