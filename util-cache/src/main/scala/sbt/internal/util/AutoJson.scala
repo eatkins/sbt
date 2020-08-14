@@ -159,7 +159,8 @@ object CollectionBuilder {
     new ArrayCollectionBuilder[T]
   }
 }
-object AutoJson extends LowPriorityAutoJson {
+object AutoJson extends AutoJsonTuple {
+  def macroDefault[T]: AutoJson[T] = macro AutoJsonMacro.impl[T]
   class SjsonBuilder[J](val builder: sjsonnew.Builder[J]) extends AnyVal with JsonBuilder {
     def writeBoolean(b: Boolean): Unit = builder.writeBoolean(b)
     def writeDouble(d: Double): Unit = builder.writeDouble(d)
@@ -315,11 +316,6 @@ object AutoJson extends LowPriorityAutoJson {
       }
     }
   }
-}
-
-trait LowPriorityAutoJson extends AutoJsonTuple with LowLowPriorityAutoJson
-trait LowLowPriorityAutoJson {
-  def macroDefault[T]: AutoJson[T] = macro AutoJsonMacro.impl[T]
 }
 
 private object AutoJsonMacro {
