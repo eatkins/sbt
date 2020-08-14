@@ -95,8 +95,8 @@ private[sbt] object LibraryManagement {
       ur.withStats(ur.stats.withCached(true))
 
     def doResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
+      import UpdateReportCodecs._
       val doCachedResolve = { (inChanged: Boolean, updateInputs: UpdateInputs) =>
-        import sbt.librarymanagement.LibraryManagementCodec._
         val cachedResolve = Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
           case (_, Some(out)) if upToDate(inChanged, out) => markAsCached(out)
           case pair =>
@@ -116,7 +116,6 @@ private[sbt] object LibraryManagement {
           }
           .apply(cachedResolve(updateInputs))
       }
-      import UpdateReportCodecs.updateKeyJsonFormat
       Tracked.inputChanged(cacheStoreFactory.make("inputs"))(doCachedResolve)
     }
 
