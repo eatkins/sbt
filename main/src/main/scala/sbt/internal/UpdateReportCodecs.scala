@@ -16,9 +16,11 @@ import sbt.librarymanagement._
 import AutoJson._
 import sjsonnew.JsonFormat
 import com.github.ghik.silencer.silent
+import lmcoursier.CoursierConfiguration
 
 @silent
 object UpdateReportCodecs {
+  private[sbt] type UpdateKey = (Long, ModuleSettings, UpdateConfiguration, CoursierConfiguration)
 
   implicit val inclExclRule: AutoJson[InclExclRule] = AutoJson.macroDefault
   implicit val updateLogging: AutoJson[UpdateLogging] = new AutoJson[UpdateLogging] {
@@ -66,10 +68,15 @@ object UpdateReportCodecs {
   implicit val retrieveConfiguration: AutoJson[RetrieveConfiguration] = AutoJson.macroDefault
   implicit val artifactTypeFilter: AutoJson[ArtifactTypeFilter] = AutoJson.macroDefault
   implicit val updateConfiguration: AutoJson[UpdateConfiguration] = AutoJson.macroDefault
-  implicit val updateInputsFormat: AutoJson[sbt.internal.LibraryManagement.UpdateInputs] =
-    AutoJson.macroDefault
-  implicit val updateInputsJsonFormat: JsonFormat[sbt.internal.LibraryManagement.UpdateInputs] =
-    AutoJson.jsonFormat
+  implicit val updateKeyFormat: AutoJson[UpdateKey] = {
+    import LibraryManagementCodec._
+    implicit val _: AutoJson[CoursierConfiguration] = new AutoJson[CoursierConfiguration] {
+      override def read(unbuilder: JsonUnbuilder): CoursierConfiguration = ???
+      override def write(obj: CoursierConfiguration, builder: JsonBuilder): Unit = {}
+    }
+    implicitly[AutoJson[UpdateKey]]
+  }
+  implicit val updateKeyJsonFormat: JsonFormat[UpdateKey] = AutoJson.jsonFormat
   implicit val moduleID: AutoJson[ModuleID] = AutoJson.macroDefault
   implicit val moduleIDJsonFormat: JsonFormat[ModuleID] = AutoJson.jsonFormat
   implicit val caller: AutoJson[Caller] = AutoJson.macroDefault
@@ -79,4 +86,5 @@ object UpdateReportCodecs {
   implicit val us: AutoJson[UpdateStats] = AutoJson.macroDefault
   implicit val updateReportFormat: AutoJson[UpdateReport] = AutoJson.macroDefault
   implicit val jf: JsonFormat[UpdateReport] = AutoJson.jsonFormat
+
 }
