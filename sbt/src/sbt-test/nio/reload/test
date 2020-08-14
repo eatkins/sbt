@@ -24,8 +24,6 @@ $ copy-file changes/working.sbt build.sbt
 
 $ copy-file changes/sub.sbt sub/build.sbt
 
-> show Compile / dependencyClasspath
-
 > compile
 
 -> scalafmt
