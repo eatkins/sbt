@@ -11,6 +11,7 @@ package internal
 import java.io.File
 import java.util.concurrent.Callable
 
+import lmcoursier.CoursierConfiguration
 import sbt.internal.librarymanagement._
 import sbt.librarymanagement._
 import sbt.librarymanagement.syntax._
@@ -18,15 +19,14 @@ import sbt.util.{ CacheStore, CacheStoreFactory, Level, Logger, Tracked }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.Project.richInitializeTask
-import sjsonnew.JsonFormat
-import com.github.ghik.silencer.silent
+import sjsonnew._
 
 private[sbt] object LibraryManagement {
   implicit val linter: sbt.dsl.LinterLevel.Ignore.type = sbt.dsl.LinterLevel.Ignore
-
-  private[sbt] type UpdateInputs = (Long, ModuleSettings, UpdateConfiguration)
+  private type UpdateInputs = UpdateReportCodecs.UpdateKey
 
   def cachedUpdate(
+      csrConfig: CoursierConfiguration,
       lm: DependencyResolution,
       module: ModuleDescriptor,
       cacheStoreFactory: CacheStoreFactory,
@@ -42,7 +42,7 @@ private[sbt] object LibraryManagement {
       compatWarning: CompatibilityWarningOptions,
       includeCallers: Boolean,
       includeDetails: Boolean,
-      log: Logger
+      log: Logger,
   ): UpdateReport = {
 
     /* Resolve the module settings from the inputs. */
@@ -80,12 +80,8 @@ private[sbt] object LibraryManagement {
     }
 
     /* Skip resolve if last output exists, otherwise error. */
-    @silent
     def skipResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
-      // import sbt.librarymanagement.LibraryManagementCodec._
-      import UpdateReportCodecs._
-      println(s"HUH")
-      println(implicitly[JsonFormat[UpdateReport]])
+      import sbt.librarymanagement.LibraryManagementCodec._
       Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
         case (_, Some(out)) => markAsCached(out)
         case _ =>
@@ -100,7 +96,7 @@ private[sbt] object LibraryManagement {
 
     def doResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
       val doCachedResolve = { (inChanged: Boolean, updateInputs: UpdateInputs) =>
-        import UpdateReportCodecs._
+        import sbt.librarymanagement.LibraryManagementCodec._
         val cachedResolve = Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
           case (_, Some(out)) if upToDate(inChanged, out) => markAsCached(out)
           case pair =>
@@ -120,19 +116,26 @@ private[sbt] object LibraryManagement {
           }
           .apply(cachedResolve(updateInputs))
       }
-      import UpdateReportCodecs._
+      import UpdateReportCodecs.updateKeyJsonFormat
       Tracked.inputChanged(cacheStoreFactory.make("inputs"))(doCachedResolve)
     }
 
     // Get the handler to use and feed it in the inputs
     // This is lm-engine specific input hashed into Long
-    val extraInputHash = module.extraInputHash
-    val settings = module.moduleSettings
     val outStore = cacheStoreFactory.make("output")
     val handler = if (skip && !force) skipResolve(outStore) else doResolve(outStore)
-    // Remove clock for caching purpose
+    handler(updateKey(module, updateConfig, csrConfig))
+  }
+  private[sbt] def updateKey(
+      module: ModuleDescriptor,
+      updateConfig: UpdateConfiguration,
+      csrConfig: CoursierConfiguration
+  ) = {
+    val extraInputHash = module.extraInputHash
+    val settings = module.moduleSettings
     val withoutClock = updateConfig.withLogicalClock(LogicalClock.unknown)
-    handler((extraInputHash, settings, withoutClock))
+    // Remove clock for caching purpose
+    (extraInputHash, settings, withoutClock, csrConfig)
   }
 
   private[this] def fileUptodate(file: File, stamps: Map[File, Long], log: Logger): Boolean = {
@@ -199,7 +202,7 @@ private[sbt] object LibraryManagement {
 
   val moduleIdJsonKeyFormat: sjsonnew.JsonKeyFormat[ModuleID] =
     new sjsonnew.JsonKeyFormat[ModuleID] {
-      import UpdateReportCodecs._
+      import LibraryManagementCodec._
       import sjsonnew.support.scalajson.unsafe._
       val moduleIdFormat: JsonFormat[ModuleID] = implicitly[JsonFormat[ModuleID]]
       def write(key: ModuleID): String =
@@ -218,6 +221,7 @@ private[sbt] object LibraryManagement {
       val s = streams.value
       val cacheDirectory = streams.value.cacheDirectory
       val csr = useCoursier.value
+      val csrConfig = csrConfiguration.value
       val lm = dependencyResolution.value
 
       if (csr) {
@@ -256,6 +260,7 @@ private[sbt] object LibraryManagement {
           else Def.task((evictionWarningOptions in update).value)
         }.value
         cachedUpdate(
+          csrConfig.withLog(None).withCredentials(Nil),
           // LM API
           lm = lm,
           // Ivy-free ModuleDescriptor
@@ -313,9 +318,8 @@ private[sbt] object LibraryManagement {
       f: Map[ModuleID, Vector[ConfigRef]] => UpdateReport
   ): UpdateReport = {
     import sjsonnew.shaded.scalajson.ast.unsafe.JValue
-    import UpdateReportCodecs._
+    import sbt.librarymanagement.LibraryManagementCodec._
     import sbt.util.FileBasedStore
-    import sbt.internal.util.AutoJson._
     implicit val isoString: sjsonnew.IsoString[JValue] =
       sjsonnew.IsoString.iso(
         sjsonnew.support.scalajson.unsafe.CompactPrinter.apply,
@@ -328,7 +332,7 @@ private[sbt] object LibraryManagement {
       out / (exclName + ".lock"),
       new Callable[UpdateReport] {
         def call = {
-          //implicit val midJsonKeyFmt: sjsonnew.JsonKeyFormat[ModuleID] = moduleIdJsonKeyFormat
+          implicit val midJsonKeyFmt: sjsonnew.JsonKeyFormat[ModuleID] = moduleIdJsonKeyFormat
           val excludes =
             store
               .read[Map[ModuleID, Vector[ConfigRef]]](
@@ -338,7 +342,6 @@ private[sbt] object LibraryManagement {
           val allExcludes: Map[ModuleID, Vector[ConfigRef]] = excludes ++ IvyActions
             .extractExcludes(report)
             .mapValues(cs => cs.map(c => ConfigRef(c)).toVector)
-          println(s"WTF!")
           store.write(allExcludes)
           IvyActions
             .addExcluded(report, classifiers.toVector, allExcludes.mapValues(_.map(_.name).toSet))

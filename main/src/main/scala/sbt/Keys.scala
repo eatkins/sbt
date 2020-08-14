@@ -429,7 +429,7 @@ object Keys {
   val moduleSettings = taskKey[ModuleSettings]("Module settings, which configure dependency management for a specific module, such as a project.").withRank(DTask)
   val unmanagedBase = settingKey[File]("The default directory for manually managed libraries.").withRank(ASetting)
   val updateConfiguration = settingKey[UpdateConfiguration]("Configuration for resolving and retrieving managed dependencies.").withRank(DSetting)
-  private[sbt] val updateKey = taskKey[LibraryManagement.UpdateKey]("The parameters used by the update task.")
+  private[sbt] val updateKey = taskKey[UpdateReportCodecs.UpdateKey]("The parameters used by the update task.")
   val updateOptions = settingKey[UpdateOptions]("Options for resolving managed dependencies.").withRank(DSetting)
   val unresolvedWarningConfiguration = taskKey[UnresolvedWarningConfiguration]("Configuration for unresolved dependency warning.").withRank(DTask)
   val dependencyPositions = taskKey[Map[ModuleID, SourcePosition]]("Source positions where the dependencies are defined.").withRank(DTask)

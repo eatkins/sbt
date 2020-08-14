@@ -3371,6 +3371,7 @@ object Classpaths {
       else Def.displayRelativeReference(extracted.currentRef, thisRef)
 
     LibraryManagement.cachedUpdate(
+      csrConfiguration.value,
       // LM API
       lm = dependencyResolution.value,
       // Ivy-free ModuleDescriptor
