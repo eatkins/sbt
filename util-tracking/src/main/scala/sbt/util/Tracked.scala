@@ -79,6 +79,13 @@ object Tracked {
   def lastOutput[I, O: JsonFormat](cacheFile: File)(f: (I, Option[O]) => O): I => O =
     lastOutput(CacheStore(cacheFile))(f)
 
+  /*
+   *def cache[I: AutoJson, O: AutoJson](cacheBase: File)(f: I => O) = {
+   *  val inputFile = new File(cacheBase, "inputs")
+   *  val ouputsFile = new File(cacheBase, "outputs")
+   *}
+   */
+
   /**
    * Creates a tracker that indicates whether the output returned from `p` has changed or not.
    *
