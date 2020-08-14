@@ -45,15 +45,13 @@ trait ForEach[M[_]] {
 }
 object ForEach {
   def apply[T, M[_]](m: M[T])(f: T => Unit)(implicit foreach: ForEach[M]): Unit = foreach(m)(f)
-  private def traversable[M[_] <: Traversable[_]]: ForEach[M] = new ForEach[M] {
-    override def apply[T](m: M[T])(f: T => Unit): Unit = m.asInstanceOf[Traversable[T]].foreach(f)
+  private def iterable[M[_] <: Iterable[_]]: ForEach[M] = new ForEach[M] {
+    override def apply[T](m: M[T])(f: T => Unit): Unit = m.asInstanceOf[Iterable[T]].foreach(f)
   }
-  implicit val set: ForEach[Set] = traversable[Set]
-  implicit val seq: ForEach[Seq] = traversable[Seq]
-  implicit val iseq: ForEach[scala.collection.immutable.Seq] =
-    traversable[scala.collection.immutable.Seq]
-  implicit val vector: ForEach[Vector] = traversable[Vector]
-  implicit val list: ForEach[List] = traversable[List]
+  implicit val set: ForEach[Set] = iterable[Set]
+  implicit val seq: ForEach[Seq] = iterable[Seq]
+  implicit val vector: ForEach[Vector] = iterable[Vector]
+  implicit val list: ForEach[List] = iterable[List]
   implicit object array extends ForEach[Array] {
     override def apply[T](m: Array[T])(f: T => Unit): Unit = m.foreach(f)
   }
@@ -69,7 +67,6 @@ trait Length[M[_]] {
 }
 object Length {
   def apply[M[_]](m: M[_])(implicit length: Length[M]): Int = length.length(m)
-  implicit val iseq: Length[scala.collection.immutable.Seq] = _.size
   implicit val seq: Length[Seq] = _.size
   implicit val set: Length[Set] = _.size
   implicit val vector: Length[Vector] = _.size
@@ -128,22 +125,24 @@ object CollectionBuilder {
   }
   implicit def seqBuilder[T]: CollectionBuilder[T, Seq] =
     vectorBuilder[T].asInstanceOf[CollectionBuilder[T, Seq]]
-  implicit def iSeqBuilder[T]: CollectionBuilder[T, scala.collection.immutable.Seq] = {
-    class ImmutableSeqCollectionBuilder[R]
-        extends CollectionBuilder[R, scala.collection.immutable.Seq] {
-      private val result = new VectorBuilder[R]
-      def newBuilder(): CollectionBuilder[R, scala.collection.immutable.Seq] =
-        new ImmutableSeqCollectionBuilder[R]
-      def add(t: R) = { result += t; () }
-      def build(): scala.collection.immutable.Seq[R] = {
-        val res = result.result()
-        result.clear()
-        res
-      }
-      override def toString: String = s"ImmutableSeqCollectionBuilder($result)"
-    }
-    new ImmutableSeqCollectionBuilder[T]
-  }
+  /*
+   *implicit def iSeqBuilder[T]: CollectionBuilder[T, scala.collection.immutable.Seq] = {
+   *  class ImmutableSeqCollectionBuilder[R]
+   *      extends CollectionBuilder[R, scala.collection.immutable.Seq] {
+   *    private val result = new VectorBuilder[R]
+   *    def newBuilder(): CollectionBuilder[R, scala.collection.immutable.Seq] =
+   *      new ImmutableSeqCollectionBuilder[R]
+   *    def add(t: R) = { result += t; () }
+   *    def build(): scala.collection.immutable.Seq[R] = {
+   *      val res = result.result()
+   *      result.clear()
+   *      res
+   *    }
+   *    override def toString: String = s"ImmutableSeqCollectionBuilder($result)"
+   *  }
+   *  new ImmutableSeqCollectionBuilder[T]
+   *}
+   */
   implicit def arrayBuilder[T: ClassTag]: CollectionBuilder[T, Array] = {
     class ArrayCollectionBuilder[R: ClassTag] extends CollectionBuilder[R, Array] {
       private val result = new mutable.ArrayBuffer[R]
@@ -250,7 +249,7 @@ object AutoJson extends AutoJsonTuple {
     new AutoJson[M[T]] {
       override def read(unbuilder: JsonUnbuilder): M[T] = unbuilder.readSeq { (u, len) =>
         var i = 0
-        val b = builder.newBuilder
+        val b = builder.newBuilder()
         while (i < len) {
           b.add(aj.read(u))
           i += 1
@@ -261,10 +260,6 @@ object AutoJson extends AutoJsonTuple {
         builder.writeSeq(a)(aj.write(_, _))
       }
     }
-  implicit def iseqAutoJson[T](
-      implicit aj: AutoJson[T]
-  ): AutoJson[scala.collection.immutable.Seq[T]] =
-    seqAutoJson[scala.collection.immutable.Seq, T]
   implicit def listAutoJson[T](implicit aj: AutoJson[T]): AutoJson[List[T]] =
     seqAutoJson[List, T]
   implicit def seqAutoJson[T](implicit aj: AutoJson[T]): AutoJson[Seq[T]] =

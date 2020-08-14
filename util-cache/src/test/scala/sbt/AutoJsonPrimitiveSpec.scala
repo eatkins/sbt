@@ -71,7 +71,7 @@ object AutoJsonPrimitiveSpec extends Properties {
   private def listLen = Range.linear(0, 256)
   def testSeq[T: AutoJson: scala.reflect.ClassTag](gen: core.GenT[T]) =
     Gen.list(gen, listLen).forAll.map { l =>
-      check(l) and check(l.toSeq) and check(l.toVector)
+      check(l) and check(Seq(l: _*)) and check(l.toVector)
     }
   private def testBooleanArray: Property = testSeq(randomBoolean)
   private def testDoubleArray: Property = testSeq(randomDouble)
