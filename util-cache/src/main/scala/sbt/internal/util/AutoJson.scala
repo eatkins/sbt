@@ -303,7 +303,7 @@ object AutoJson extends LowPriorityAutoJson {
 
 trait LowPriorityAutoJson extends AutoJsonTuple with LowLowPriorityAutoJson
 trait LowLowPriorityAutoJson {
-  implicit def macroDefault[T]: AutoJson[T] = macro AutoJsonMacro.impl[T]
+  def macroDefault[T]: AutoJson[T] = macro AutoJsonMacro.impl[T]
 }
 
 private object AutoJsonMacro {

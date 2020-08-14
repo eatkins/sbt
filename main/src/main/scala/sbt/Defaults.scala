@@ -1980,9 +1980,15 @@ object Defaults extends BuildCommon {
     args => w.println((command +: args).mkString(" "))
 
   private[this] def exported(s: TaskStreams, command: String): Seq[String] => Unit = {
-    val w = s.text(ExportStream)
-    try exported(w, command)
-    finally w.close() // workaround for #937
+    val prev = s.readText(ExportStream).readLine()
+    args => {
+      val newExported = (command +: args).mkString(" ")
+      if (newExported != prev) {
+        val w = s.text(ExportStream)
+        try exported(w, command)(args)
+        finally w.close() // workaround for #937
+      }
+    }
   }
 
   /** Handles traditional Scalac compilation. For non-pipelined compilation,
@@ -2476,9 +2482,13 @@ object Classpaths {
   private[this] def exportClasspath(s: Setting[Task[Classpath]]): Setting[Task[Classpath]] =
     s.mapInitialize(init => Def.task { exportClasspath(streams.value, init.value) })
   private[this] def exportClasspath(s: TaskStreams, cp: Classpath): Classpath = {
-    val w = s.text(ExportStream)
-    try w.println(Path.makeString(data(cp)))
-    finally w.close() // workaround for #937
+    val prev = s.readText(ExportStream).readLine()
+    val current = Path.makeString(data(cp))
+    if (current != prev) {
+      val w = s.text(ExportStream)
+      try w.println(Path.makeString(data(cp)))
+      finally w.close() // workaround for #937
+    }
     cp
   }
 
