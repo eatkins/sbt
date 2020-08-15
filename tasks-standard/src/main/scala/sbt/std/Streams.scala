@@ -50,7 +50,7 @@ sealed trait TaskStreams[Key] {
    */
   def readBinary(a: Key, sid: String = default): BufferedInputStream
 
-  def readText(sid: String): BufferedReader
+  def readText(sid: String): String
   final def readText(a: Key, sid: Option[String]): BufferedReader = readText(a, getID(sid))
   final def readBinary(a: Key, sid: Option[String]): BufferedInputStream =
     readBinary(a, getID(sid))
@@ -152,7 +152,14 @@ object Streams {
       def getOutput(sid: String = default): Output =
         make(a, sid)(f => new PlainOutput(new FileOutputStream(f), converter))
 
-      def readText(sid: String): BufferedReader = readText(a, sid)
+      def readText(sid: String): String = {
+        import scala.collection.JavaConverters._
+        try IO.read(taskDirectory(a) / sid)
+        catch {
+          case _: IOException =>
+            readText(a, sid).lines.iterator.asScala.mkString(System.lineSeparator)
+        }
+      }
       def readText(a: Key, sid: String = default): BufferedReader =
         make(a, sid)(
           f => new BufferedReader(new InputStreamReader(new FileInputStream(f), IO.defaultCharset))
