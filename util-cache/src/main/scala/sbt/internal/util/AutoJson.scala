@@ -306,6 +306,7 @@ object AutoJson extends AutoJsonTuple {
       obj match {
         case fd: FiniteDuration =>
           builder.writeBoolean(true)
+          builder.writeString(fd.unit.toString)
           builder.writeLong(fd.toMillis)
         case _ => builder.writeBoolean(false)
       }

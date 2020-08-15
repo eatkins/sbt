@@ -51,17 +51,31 @@ object UpdateReportCodecs {
     }
 
   }
+  case object NullLogicalClock extends LogicalClock
   implicit val logicalClock: AutoJson[LogicalClock] = new AutoJson[LogicalClock] {
-    override def read(unbuilder: JsonUnbuilder): LogicalClock = LogicalClock.unknown
+    override def read(unbuilder: JsonUnbuilder): LogicalClock = NullLogicalClock
     override def write(obj: LogicalClock, builder: JsonBuilder): Unit = {}
   }
   implicit val configuration: AutoJson[Configuration] = AutoJson.macroDefault
+  implicit val configurationJsonFormat: JsonFormat[Configuration] = AutoJson.jsonFormat
   implicit val scalaModuleInfo = AutoJson.macroDefault[ScalaModuleInfo]
   implicit val moduleSettings: AutoJson[ModuleSettings] = new AutoJson[ModuleSettings] {
     class ModuleSettings0(
         override val validate: Boolean,
         override val scalaModuleInfo: Option[sbt.librarymanagement.ScalaModuleInfo]
-    ) extends ModuleSettings
+    ) extends ModuleSettings {
+      override def equals(o: Any): Boolean = o match {
+        case that: ModuleSettings =>
+          this.validate == that.validate && this.scalaModuleInfo == that.scalaModuleInfo
+        case _ => false
+      }
+      override def hashCode: Int = {
+        37 * (37 * (37 * (17 + "sbt.librarymanagement.ModuleSettings".##) + validate.##) + scalaModuleInfo.##)
+      }
+      override def toString: String = {
+        "ModuleSettings(" + validate + ", " + scalaModuleInfo + ")"
+      }
+    }
     implicit val smiFormat = implicitly[AutoJson[Option[ScalaModuleInfo]]]
     override def read(unbuilder: JsonUnbuilder): ModuleSettings = {
       new ModuleSettings0(unbuilder.readBoolean, smiFormat.read(unbuilder))
@@ -162,7 +176,19 @@ object UpdateReportCodecs {
   }
   implicit val coursierConfigurationFormat: AutoJson[CoursierConfiguration] =
     AutoJson.macroDefault
-  implicit val updateKeyFormat: AutoJson[UpdateKey] = implicitly[AutoJson[UpdateKey]]
+  private val updateKeyFormatRaw: AutoJson[UpdateKey] = AutoJson.tuple4
+  assert(updateKeyFormatRaw != null)
+  implicit val updateKeyFormat: AutoJson[UpdateKey] = new AutoJson[UpdateKey] {
+    override def read(unbuilder: JsonUnbuilder): UpdateKey = {
+      try updateKeyFormatRaw.read(unbuilder)
+      catch { case t: Throwable => t.printStackTrace(); throw t }
+    }
+    override def write(obj: UpdateKey, builder: JsonBuilder): Unit = {
+      println(updateKeyFormatRaw)
+      try updateKeyFormatRaw.write(obj, builder)
+      catch { case t: Throwable => t.printStackTrace(); throw t }
+    }
+  }
   implicit val csrJsonFormat: JsonFormat[CoursierConfiguration] =
     AutoJson.jsonFormat[CoursierConfiguration]
   implicit val updateKeyJsonFormat: JsonFormat[UpdateKey] = AutoJson.jsonFormat
