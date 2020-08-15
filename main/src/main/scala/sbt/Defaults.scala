@@ -2947,7 +2947,7 @@ object Classpaths {
       val key = updateKeyHash.value
       val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
       import FileStamp.Formats.seqPathFileStampJsonFormatter
-      val force = false && ((updateFiles / outputFileStamps).previous match {
+      val force = (ThisBuild / turbo).value && ((updateFiles / outputFileStamps).previous match {
         case Some(stamps) =>
           stamps.exists { case (p, s) => FileStamp.lastModified(p) != Some(s) }
         case _ => true
