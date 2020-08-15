@@ -956,7 +956,6 @@ object Defaults extends BuildCommon {
   }
 
   def scalaInstanceParamsFromUpdate: Initialize[Task[ScalaInstanceParams]] = Def.task {
-    println(s"params from update")
     val toolReport = update.value.configuration(Configurations.ScalaTool) getOrElse
       sys.error(noToolConfiguration(managedScalaInstance.value))
     def files(id: String) =
