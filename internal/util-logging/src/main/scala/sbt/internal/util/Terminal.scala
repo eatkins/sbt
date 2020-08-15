@@ -395,7 +395,7 @@ object Terminal {
   private[sbt] class WriteableInputStream(in: InputStream, name: String)
       extends InputStream
       with AutoCloseable {
-    if (name.contains("console")) new Exception("").printStackTrace()
+    //if (name.contains("console")) new Exception("").printStackTrace()
     final def write(bytes: Int*): Unit = readThread.synchronized {
       bytes.foreach(b => buffer.put(b))
     }
