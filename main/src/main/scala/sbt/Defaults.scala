@@ -1982,7 +1982,7 @@ object Defaults extends BuildCommon {
     args => w.println((command +: args).mkString(" "))
 
   private[this] def exported(s: TaskStreams, command: String): Seq[String] => Unit = {
-    val prev = s.readText(ExportStream).readLine()
+    val prev = s.readText(ExportStream)
     args => {
       val newExported = (command +: args).mkString(" ")
       if (newExported != prev) {
@@ -2509,7 +2509,7 @@ object Classpaths {
   private[this] def exportClasspath(s: Setting[Task[Classpath]]): Setting[Task[Classpath]] =
     s.mapInitialize(init => Def.task { exportClasspath(streams.value, init.value) })
   private[this] def exportClasspath(s: TaskStreams, cp: Classpath): Classpath = {
-    val prev = s.readText(ExportStream).readLine()
+    val prev = s.readText(ExportStream)
     val current = Path.makeString(data(cp))
     if (current != prev) {
       val w = s.text(ExportStream)

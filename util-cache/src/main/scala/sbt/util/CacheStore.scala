@@ -70,7 +70,7 @@ class DirectoryStoreFactory[J: IsoString](base: File, converter: SupportConverte
 
 /** A `CacheStore` that persists information in `file`. */
 class FileBasedStore[J: IsoString](file: File, converter: SupportConverter[J]) extends CacheStore {
-  IO.touch(file, setModified = false)
+  if (!file.exists) IO.touch(file, setModified = false)
 
   def read[T: JsonReader]() =
     Using.fileInputStream(file)(stream => new PlainInput(stream, converter).read())
