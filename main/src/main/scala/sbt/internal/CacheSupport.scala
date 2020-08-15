@@ -63,16 +63,6 @@ private[sbt] object CacheSupport {
         }
       }
   }
-  /*
-   *final class Configuration private[sbt] (
-   *    val id: String,
-   *    val name: String,
-   *    val description: String,
-   *    val isPublic: Boolean,
-   *    val extendsConfigs: Vector[Configuration],
-   *    val transitive: Boolean
-   *) extends ConfigurationExtra
-   */
   object Formats {
     implicit val configurationFormat: JsonFormat[Configuration] = new JsonFormat[Configuration] {
       override def read[J](jsOpt: Option[J], unbuilder: Unbuilder[J]): Configuration =
@@ -109,6 +99,32 @@ private[sbt] object CacheSupport {
           builder.endArray()
         }
         impl(obj)
+      }
+    }
+    implicit val mapFormat: AutoJson[AttributeMap] = new AutoJson[AttributeMap] {
+      def read(unbuilder: JsonUnbuilder): AttributeMap = {
+        val result = AttributeMap.empty
+        val art = artifact.read(unbuilder)
+        val module = moduleID.read(unbuilder)
+        val config = configuration.read(unbuilder)
+        result
+          .put(Keys.artifact.key, art)
+          .put(Keys.moduleID.key, module)
+          .put(Keys.configuration.key, config)
+      }
+      def write(obj: AttributeMap, builder: JsonBuilder): Unit = {
+        obj.get(Keys.artifact.key) match {
+          case Some(a) => artifact.write(a, builder)
+          case _       =>
+        }
+        obj.get(Keys.moduleID.key) match {
+          case Some(m) => moduleID.write(m, builder)
+          case _       =>
+        }
+        obj.get(Keys.configuration.key) match {
+          case Some(c) => configuration.write(c, builder)
+          case _       =>
+        }
       }
     }
   }
