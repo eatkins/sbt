@@ -33,7 +33,7 @@ import sbt.Project.{
 import sbt.Scope.{ GlobalScope, ThisScope, fillTaskAxis }
 import sbt.coursierint._
 import sbt.internal.CommandStrings.ExportStream
-import sbt.internal.UpdateCache.ScalaInstanceParams
+import sbt.internal.CacheSupport.ScalaInstanceParams
 import sbt.internal._
 import sbt.internal.classpath.{ AlternativeZincUtil, ClassLoaderCache }
 import sbt.internal.inc.JavaInterfaceUtil._
@@ -2386,7 +2386,6 @@ object Classpaths {
     classpathConfiguration := Def.taskDyn {
       val hash = updateHash.value
       val prevHash = Previous.runtimeInEnclosingTask(classpathConfiguration / updateHash).value
-      import UpdateReportCodecs.configurationJsonFormat
 
       classpathConfiguration.previous match {
         case Some(p) if Some(hash) == prevHash =>
