@@ -2384,16 +2384,16 @@ object Classpaths {
     pickleProducts := makePickleProducts.value,
     productDirectories := classDirectory.value :: Nil,
     classpathConfiguration := Def.taskDyn {
+      import CacheSupport.Formats._
       val hash = updateHash.value
       val prevHash = Previous.runtimeInEnclosingTask(classpathConfiguration / updateHash).value
 
       classpathConfiguration.previous match {
         case Some(p) if Some(hash) == prevHash =>
-          //println("cached classpath configuration")
+          println("cached classpath configuration")
           Def.task(p)
         case p =>
           Def.task {
-            println(s"aargh classpath config ${p.isDefined} $hash $prevHash")
             findClasspathConfig(
               internalConfigurationMap.value,
               configuration.value,
@@ -2422,26 +2422,26 @@ object Classpaths {
         if (isMeta && !force && !csr) mjars ++ sbtCp
         else mjars
       },
+      sbt.Keys.managedJars := managedJars(
+        classpathConfiguration.value,
+        classpathTypes.value,
+        update.value
+      ),
       /*
-       *sbt.Keys.managedJars := managedJars(
-       *  classpathConfiguration.value,
-       *  classpathTypes.value,
-       *  update.value
-       *),
+       *sbt.Keys.managedJars := Def.taskDyn {
+       *  import UpdateCache.AttributedFormats._
+       *  val hash = updateHash.value
+       *  val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
+       *  sbt.Keys.managedJars.previous match {
+       *    case Some(j) if Some(hash) == prevHash =>
+       *      //println("cached managed jars")
+       *      Def.task(j)
+       *    case _ =>
+       *      println(s"HUH managed jars")
+       *      Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
+       *  }
+       *}.value,
        */
-      sbt.Keys.managedJars := Def.taskDyn {
-        import UpdateCache.AttributedFormats._
-        val hash = updateHash.value
-        val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
-        sbt.Keys.managedJars.previous match {
-          case Some(j) if Some(hash) == prevHash =>
-            //println("cached managed jars")
-            Def.task(j)
-          case _ =>
-            println(s"HUH managed jars")
-            Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
-        }
-      }.value,
       exportedProducts := ClasspathImpl.trackedExportedProducts(TrackLevel.TrackAlways).value,
       exportedProductsIfMissing := ClasspathImpl
         .trackedExportedProducts(TrackLevel.TrackIfMissing)
@@ -2945,14 +2945,12 @@ object Classpaths {
       )
       .hashCode,
     updateHash := Def.taskDyn {
-      import UpdateReportCodecs._
       val key = updateKeyHash.value
       val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
       updateHash.previous match {
         case Some(h) if prevKey == Some(key) =>
           Def.task(h)
         case p =>
-          println(s"run update")
           Def.task(update.value.hashCode)
       }
     }.value,

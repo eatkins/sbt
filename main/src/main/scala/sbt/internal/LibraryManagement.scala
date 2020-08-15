@@ -125,6 +125,9 @@ private[sbt] object LibraryManagement {
     val handler = if (skip && !force) skipResolve(outStore) else doResolve(outStore)
     handler(updateKey(module, updateConfig))
   }
+  private case object UnknownLogicalClock extends LogicalClock {
+    override def toString: String = "unknown"
+  }
   private[sbt] def updateKey(
       module: ModuleDescriptor,
       updateConfig: UpdateConfiguration,
@@ -132,7 +135,7 @@ private[sbt] object LibraryManagement {
   ) = {
     val extraInputHash = module.extraInputHash
     val settings = module.moduleSettings
-    val withoutClock = updateConfig.withLogicalClock(UpdateReportCodecs.NullLogicalClock)
+    val withoutClock = updateConfig.withLogicalClock(UnknownLogicalClock)
     // Remove clock for caching purpose
     (extraInputHash, settings, withoutClock)
   }
