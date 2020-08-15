@@ -2422,26 +2422,25 @@ object Classpaths {
         if (isMeta && !force && !csr) mjars ++ sbtCp
         else mjars
       },
-      sbt.Keys.managedJars := managedJars(
-        classpathConfiguration.value,
-        classpathTypes.value,
-        update.value
-      ),
       /*
-       *sbt.Keys.managedJars := Def.taskDyn {
-       *  import UpdateCache.AttributedFormats._
-       *  val hash = updateHash.value
-       *  val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
-       *  sbt.Keys.managedJars.previous match {
-       *    case Some(j) if Some(hash) == prevHash =>
-       *      //println("cached managed jars")
-       *      Def.task(j)
-       *    case _ =>
-       *      println(s"HUH managed jars")
-       *      Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
-       *  }
-       *}.value,
+       *sbt.Keys.managedJars := managedJars(
+       *  classpathConfiguration.value,
+       *  classpathTypes.value,
+       *  update.value
+       *),
        */
+      sbt.Keys.managedJars := Def.taskDyn {
+        import CacheSupport.Formats.classpathFormat
+        val hash = updateHash.value
+        val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
+        sbt.Keys.managedJars.previous match {
+          case Some(j) if Some(hash) == prevHash =>
+            println("cached managed jars")
+            Def.task(j)
+          case _ =>
+            Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
+        }
+      }.value,
       exportedProducts := ClasspathImpl.trackedExportedProducts(TrackLevel.TrackAlways).value,
       exportedProductsIfMissing := ClasspathImpl
         .trackedExportedProducts(TrackLevel.TrackIfMissing)
