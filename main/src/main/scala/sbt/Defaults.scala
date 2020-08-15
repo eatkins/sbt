@@ -2944,20 +2944,22 @@ object Classpaths {
         shouldForceTask("update").value,
         transitiveUpdateIsCached.value
       )
-      key.hashCode -> scalaVersion.value
+      key.hashCode
     },
     updateHash := Def.taskDyn {
       val key = updateKeyHash.value
       val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
-      import FileStamp.Formats.seqPathFileStampJsonFormatter
-      val force = ((updateFiles / outputFileStamps).previous match {
-        case Some(stamps) =>
-          stamps.exists { case (p, s) => FileStamp.lastModified(p) != Some(s) }
-        case _ => true
-      })
+      //  import FileStamp.Formats.seqPathFileStampJsonFormatter
+      /*
+       *val force = ((updateFiles / outputFileStamps).previous match {
+       *  case Some(stamps) =>
+       *    stamps.exists { case (p, s) => FileStamp.lastModified(p) != Some(s) }
+       *  case _ => true
+       *})
+       */
 
       updateHash.previous match {
-        case Some(h) if !force && prevKey == Some(key) =>
+        case Some(h) if prevKey == Some(key) =>
           Def.task(h)
         case p =>
           Def.task(update.value.hashCode)
