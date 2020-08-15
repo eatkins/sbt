@@ -1,8 +1,10 @@
-package sbt.internal
+package sbt
+package internal
 
-import sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
+import sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError, serializationError }
 import java.io.File
 import sbt.librarymanagement.Configuration
+import sbt.internal.util.AttributeMap
 
 private[sbt] object CacheSupport {
   private[sbt] class ScalaInstanceParams(
@@ -101,29 +103,37 @@ private[sbt] object CacheSupport {
         impl(obj)
       }
     }
-    implicit val mapFormat: AutoJson[AttributeMap] = new AutoJson[AttributeMap] {
-      def read(unbuilder: JsonUnbuilder): AttributeMap = {
-        val result = AttributeMap.empty
-        val art = artifact.read(unbuilder)
-        val module = moduleID.read(unbuilder)
-        val config = configuration.read(unbuilder)
-        result
-          .put(Keys.artifact.key, art)
-          .put(Keys.moduleID.key, module)
-          .put(Keys.configuration.key, config)
+    implicit val mapFormat: JsonFormat[AttributeMap] = new JsonFormat[AttributeMap] {
+      import sbt.librarymanagement.LibraryManagementCodec.{
+        ArtifactFormat,
+        ConfigurationFormat,
+        ModuleIDFormat
       }
-      def write(obj: AttributeMap, builder: JsonBuilder): Unit = {
+      def read[J](jsOpt: Option[J], unbuilder: Unbuilder[J]): AttributeMap = jsOpt match {
+        case o @ Some(j) =>
+          val result = AttributeMap.empty
+          val art = ArtifactFormat.read(Some(unbuilder.nextElement), unbuilder)
+          val module = ModuleIDFormat.read(Some(unbuilder.nextElement), unbuilder)
+          val config = ConfigurationFormat.read(unbuilder)
+          result
+            .put(Keys.artifact.key, art)
+            .put(Keys.moduleID.key, module)
+            .put(Keys.configuration.key, config)
+        case None =>
+      }
+      def write[J](obj: AttributeMap, builder: Builder[J]): Unit = {
+        builder.beginArray()
         obj.get(Keys.artifact.key) match {
-          case Some(a) => artifact.write(a, builder)
-          case _       =>
+          case Some(a) => ArtifactFormat.write(a, builder)
+          case _       => serializationError("no artifact in AttributeMap")
         }
         obj.get(Keys.moduleID.key) match {
           case Some(m) => moduleID.write(m, builder)
-          case _       =>
+          case _       => serializationError("no module id in AttributeMap")
         }
         obj.get(Keys.configuration.key) match {
           case Some(c) => configuration.write(c, builder)
-          case _       =>
+          case _       => serializationError("no configuration id in AttributeMap")
         }
       }
     }
