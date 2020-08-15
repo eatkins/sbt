@@ -1,3 +1,10 @@
+/*
+ * sbt
+ * Copyright 2011 - 2018, Lightbend, Inc.
+ * Copyright 2008 - 2010, Mark Harrah
+ * Licensed under Apache License 2.0 (see LICENSE)
+ */
+
 package sbt
 package internal
 
@@ -5,6 +12,7 @@ import sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError, serializ
 import java.io.File
 import sbt.librarymanagement.Configuration
 import sbt.internal.util.AttributeMap
+import sbt.internal.util.Attributed
 
 private[sbt] object CacheSupport {
   private[sbt] class ScalaInstanceParams(
@@ -85,7 +93,7 @@ private[sbt] object CacheSupport {
               config.withExtendsConfigs(extendsConfigs)
             }
             impl()
-          case _ => deserializationError("Couldn't deserialize ScalaInstanceParams")
+          case _ => deserializationError("couldn't deserialize ScalaInstanceParams")
 
         }
       override def write[J](obj: Configuration, builder: Builder[J]): Unit = {
@@ -103,7 +111,7 @@ private[sbt] object CacheSupport {
         impl(obj)
       }
     }
-    implicit val mapFormat: JsonFormat[AttributeMap] = new JsonFormat[AttributeMap] {
+    private implicit val mapFormat: JsonFormat[AttributeMap] = new JsonFormat[AttributeMap] {
       import sbt.librarymanagement.LibraryManagementCodec.{
         ArtifactFormat,
         ConfigurationFormat,
@@ -111,15 +119,17 @@ private[sbt] object CacheSupport {
       }
       def read[J](jsOpt: Option[J], unbuilder: Unbuilder[J]): AttributeMap = jsOpt match {
         case o @ Some(j) =>
-          val result = AttributeMap.empty
+          unbuilder.beginArray(j)
           val art = ArtifactFormat.read(Some(unbuilder.nextElement), unbuilder)
           val module = ModuleIDFormat.read(Some(unbuilder.nextElement), unbuilder)
-          val config = ConfigurationFormat.read(unbuilder)
-          result
+          val config = ConfigurationFormat.read(Some(unbuilder.nextElement), unbuilder)
+          val result = AttributeMap.empty
             .put(Keys.artifact.key, art)
             .put(Keys.moduleID.key, module)
             .put(Keys.configuration.key, config)
-        case None =>
+          unbuilder.endArray()
+          result
+        case None => deserializationError("couldn't deserialize AttributeMap")
       }
       def write[J](obj: AttributeMap, builder: Builder[J]): Unit = {
         builder.beginArray()
@@ -128,13 +138,37 @@ private[sbt] object CacheSupport {
           case _       => serializationError("no artifact in AttributeMap")
         }
         obj.get(Keys.moduleID.key) match {
-          case Some(m) => moduleID.write(m, builder)
+          case Some(m) => ModuleIDFormat.write(m, builder)
           case _       => serializationError("no module id in AttributeMap")
         }
         obj.get(Keys.configuration.key) match {
-          case Some(c) => configuration.write(c, builder)
+          case Some(c) => ConfigurationFormat.write(c, builder)
           case _       => serializationError("no configuration id in AttributeMap")
         }
+        builder.endArray()
+      }
+    }
+    implicit val classpathFormat: JsonFormat[Def.Classpath] = new JsonFormat[Def.Classpath] {
+      def read[J](jsOpt: Option[J], unbuilder: Unbuilder[J]): Def.Classpath = jsOpt match {
+        case o @ Some(j) =>
+          unbuilder.beginArray(j)
+          val size = unbuilder.readInt(unbuilder.nextElement)
+          val result = (0 until size).map { _ =>
+            val file = new File(unbuilder.readString(unbuilder.nextElement))
+            Attributed(file)(mapFormat.read(Some(unbuilder.nextElement), unbuilder))
+          }
+          unbuilder.endArray()
+          result
+        case None => deserializationError("couldn't deserialize classpath")
+      }
+      def write[J](obj: Def.Classpath, builder: Builder[J]): Unit = {
+        builder.beginArray()
+        builder.writeInt(obj.size)
+        obj.foreach { af =>
+          builder.writeString(af.data.toString)
+          mapFormat.write(af.metadata, builder)
+        }
+        builder.endArray()
       }
     }
   }
