@@ -2935,19 +2935,20 @@ object Classpaths {
       Vector(report.cachedDescriptor.toPath) ++ report.allFiles.map(_.toPath)
     },
     //updateFiles := updateFiles.triggeredBy(update).value,
-    updateKeyHash := LibraryManagement
-      .updateKey(
+    updateKeyHash := {
+      val key = LibraryManagement.updateKey(
         ivyModule.value,
         updateConfigurationTask.value.withLogging(UpdateLogging.Full),
         shouldForceTask("update").value,
         transitiveUpdateIsCached.value
       )
-      .hashCode,
+      key.hashCode -> scalaVersion.value
+    },
     updateHash := Def.taskDyn {
       val key = updateKeyHash.value
       val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
       import FileStamp.Formats.seqPathFileStampJsonFormatter
-      val force = (ThisBuild / turbo).value && ((updateFiles / outputFileStamps).previous match {
+      val force = true && (ThisBuild / turbo).value && ((updateFiles / outputFileStamps).previous match {
         case Some(stamps) =>
           stamps.exists { case (p, s) => FileStamp.lastModified(p) != Some(s) }
         case _ => true
