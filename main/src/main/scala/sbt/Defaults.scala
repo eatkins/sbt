@@ -2390,7 +2390,7 @@ object Classpaths {
 
       classpathConfiguration.previous match {
         case Some(p) if Some(hash) == prevHash =>
-          println("cached classpath configuration")
+          //println("cached classpath configuration")
           Def.task(p)
         case p =>
           Def.task {
@@ -2435,7 +2435,7 @@ object Classpaths {
         val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
         sbt.Keys.managedJars.previous match {
           case Some(j) if Some(hash) == prevHash =>
-            println("cached managed jars")
+            //println("cached managed jars")
             Def.task(j)
           case _ =>
             Def.task(managedJars(classpathConfiguration.value, classpathTypes.value, update.value))
