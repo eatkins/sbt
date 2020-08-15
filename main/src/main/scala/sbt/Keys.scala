@@ -20,7 +20,7 @@ import sbt.BuildSyntax._
 import sbt.Def.ScopedKey
 import sbt.KeyRanks._
 import sbt.internal.InMemoryCacheStore.CacheStoreFactoryFactory
-import sbt.internal.UpdateCache.ScalaInstanceParams
+import sbt.internal.CacheSupport.ScalaInstanceParams
 import sbt.internal._
 import sbt.internal.bsp._
 import sbt.internal.inc.ScalaInstance
