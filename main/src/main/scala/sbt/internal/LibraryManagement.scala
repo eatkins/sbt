@@ -23,7 +23,7 @@ import sjsonnew._
 
 private[sbt] object LibraryManagement {
   implicit val linter: sbt.dsl.LinterLevel.Ignore.type = sbt.dsl.LinterLevel.Ignore
-  private type UpdateInputs = (Long, ModuleSettings, UpdateConfiguration)
+  private type UpdateInputs = (Boolean, Boolean, Long, ModuleSettings, UpdateConfiguration)
 
   def cachedUpdate(
       csrConfig: CoursierConfiguration,
@@ -123,7 +123,7 @@ private[sbt] object LibraryManagement {
     // This is lm-engine specific input hashed into Long
     val outStore = cacheStoreFactory.make("output")
     val handler = if (skip && !force) skipResolve(outStore) else doResolve(outStore)
-    handler(updateKey(module, updateConfig))
+    handler(updateKey(module, updateConfig, force, depsUpdated))
   }
   private case object UnknownLogicalClock extends LogicalClock {
     override def toString: String = "unknown"
@@ -131,13 +131,14 @@ private[sbt] object LibraryManagement {
   private[sbt] def updateKey(
       module: ModuleDescriptor,
       updateConfig: UpdateConfiguration,
-      //csrConfig: CoursierConfiguration
+      force: Boolean,
+      depsUpdated: Boolean
   ) = {
     val extraInputHash = module.extraInputHash
     val settings = module.moduleSettings
     val withoutClock = updateConfig.withLogicalClock(UnknownLogicalClock)
     // Remove clock for caching purpose
-    (extraInputHash, settings, withoutClock)
+    (force, depsUpdated, extraInputHash, settings, withoutClock)
   }
 
   private[this] def fileUptodate(file: File, stamps: Map[File, Long], log: Logger): Boolean = {
