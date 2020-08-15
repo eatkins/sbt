@@ -18,6 +18,7 @@ import sbt.io.IO
 import sbt.io.syntax._
 import sbt.util._
 import sjsonnew.{ IsoString, SupportConverter }
+import java.nio.file.Files
 
 // no longer specific to Tasks, so 'TaskStreams' should be renamed
 /**
@@ -154,7 +155,7 @@ object Streams {
 
       def readText(sid: String): String = {
         import scala.collection.JavaConverters._
-        try IO.read(taskDirectory(a) / sid)
+        try new String(Files.readAllBytes(taskDirectory(a).toPath.resolve(sid)), "UTF-8")
         catch {
           case _: IOException =>
             readText(a, sid).lines.iterator.asScala.mkString(System.lineSeparator)
