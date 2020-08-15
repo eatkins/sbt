@@ -23,7 +23,7 @@ import sjsonnew._
 
 private[sbt] object LibraryManagement {
   implicit val linter: sbt.dsl.LinterLevel.Ignore.type = sbt.dsl.LinterLevel.Ignore
-  private type UpdateInputs = UpdateReportCodecs.UpdateKey
+  private type UpdateInputs = (Long, ModuleSettings, UpdateConfiguration)
 
   def cachedUpdate(
       csrConfig: CoursierConfiguration,
@@ -95,7 +95,7 @@ private[sbt] object LibraryManagement {
       ur.withStats(ur.stats.withCached(true))
 
     def doResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
-      import UpdateReportCodecs._
+      import LibraryManagementCodec._
       val doCachedResolve = { (inChanged: Boolean, updateInputs: UpdateInputs) =>
         val cachedResolve = Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
           case (_, Some(out)) if upToDate(inChanged, out) => markAsCached(out)

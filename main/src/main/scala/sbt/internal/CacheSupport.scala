@@ -25,7 +25,7 @@ private[sbt] object CacheSupport {
       (37 * (37 * (37 * (37 * (17 + version.##) ^ allJars.##) ^ libraryJars.##) ^ compilerJar.##) ^ scalaHome.##)
   }
   private[sbt] object ScalaInstanceParams {
-    private implicit val format: JsonFormat[ScalaInstanceParams] =
+    implicit val format: JsonFormat[ScalaInstanceParams] =
       new JsonFormat[ScalaInstanceParams] {
         override def read[J](jsOpt: Option[J], unbuilder: Unbuilder[J]): ScalaInstanceParams =
           jsOpt match {
