@@ -26,7 +26,8 @@ import lmcoursier.credentials.DirectCredentials
 
 @silent
 object UpdateReportCodecs {
-  private[sbt] type UpdateKey = (Long, ModuleSettings, UpdateConfiguration, CoursierConfiguration)
+  //private[sbt] type UpdateKey = (Long, ModuleSettings, UpdateConfiguration, CoursierConfiguration)
+  private[sbt] type UpdateKey = (Long, ModuleSettings, UpdateConfiguration)
 
   implicit val inclExclRule: AutoJson[InclExclRule] = AutoJson.macroDefault
   implicit val updateLogging: AutoJson[UpdateLogging] = new AutoJson[UpdateLogging] {
@@ -176,8 +177,7 @@ object UpdateReportCodecs {
   }
   implicit val coursierConfigurationFormat: AutoJson[CoursierConfiguration] =
     AutoJson.macroDefault
-  private val updateKeyFormatRaw: AutoJson[UpdateKey] = AutoJson.tuple4
-  assert(updateKeyFormatRaw != null)
+  private val updateKeyFormatRaw: AutoJson[UpdateKey] = AutoJson.tuple3
   implicit val updateKeyFormat: AutoJson[UpdateKey] = new AutoJson[UpdateKey] {
     override def read(unbuilder: JsonUnbuilder): UpdateKey = {
       try updateKeyFormatRaw.read(unbuilder)
