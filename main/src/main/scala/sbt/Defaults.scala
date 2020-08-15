@@ -2391,7 +2391,7 @@ object Classpaths {
 
       classpathConfiguration.previous match {
         case Some(p) if Some(hash) == prevHash =>
-          println("cached classpath configuration")
+          //println("cached classpath configuration")
           Def.task(p)
         case p =>
           Def.task {
