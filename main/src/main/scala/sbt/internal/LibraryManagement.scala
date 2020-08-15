@@ -81,7 +81,7 @@ private[sbt] object LibraryManagement {
 
     /* Skip resolve if last output exists, otherwise error. */
     def skipResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
-      import sbt.librarymanagement.LibraryManagementCodec._
+      import UpdateReportCodecs._
       Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
         case (_, Some(out)) => markAsCached(out)
         case _ =>
@@ -95,7 +95,7 @@ private[sbt] object LibraryManagement {
       ur.withStats(ur.stats.withCached(true))
 
     def doResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
-      import LibraryManagementCodec._
+      import UpdateReportCodecs._
       val doCachedResolve = { (inChanged: Boolean, updateInputs: UpdateInputs) =>
         val cachedResolve = Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
           case (_, Some(out)) if upToDate(inChanged, out) => markAsCached(out)

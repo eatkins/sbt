@@ -184,7 +184,6 @@ object UpdateReportCodecs {
       catch { case t: Throwable => t.printStackTrace(); throw t }
     }
     override def write(obj: UpdateKey, builder: JsonBuilder): Unit = {
-      println(updateKeyFormatRaw)
       try updateKeyFormatRaw.write(obj, builder)
       catch { case t: Throwable => t.printStackTrace(); throw t }
     }
