@@ -20,6 +20,7 @@ import sbt.BuildSyntax._
 import sbt.Def.ScopedKey
 import sbt.KeyRanks._
 import sbt.internal.InMemoryCacheStore.CacheStoreFactoryFactory
+import sbt.internal.UpdateCache.ScalaInstanceParams
 import sbt.internal._
 import sbt.internal.bsp._
 import sbt.internal.inc.ScalaInstance
@@ -181,6 +182,7 @@ object Keys {
   val compileOptions = taskKey[CompileOptions]("Collects basic options to configure compilers").withRank(DTask)
   val compileInputs = taskKey[Inputs]("Collects all inputs needed for compilation.").withRank(DTask)
   val scalaHome = settingKey[Option[File]]("If Some, defines the local Scala installation to use for compilation, running, and testing.").withRank(ASetting)
+  val scalaInstanceParams = taskKey[ScalaInstanceParams]("Defines the parameters to use to build the scalaInstance.").withRank(Invisible)
   val scalaInstance = taskKey[ScalaInstance]("Defines the Scala instance to use for compilation, running, and testing.").withRank(DTask)
   val scalaOrganization = settingKey[String]("Organization/group ID of the Scala used in the project. Default value is 'org.scala-lang'. This is an advanced setting used for clones of the Scala Language. It should be disregarded in standard use cases.").withRank(CSetting)
   val scalaVersion = settingKey[String]("The version of Scala used for building.").withRank(APlusSetting)
@@ -248,6 +250,7 @@ object Keys {
   val rootPaths = settingKey[Map[String, NioPath]]("The root paths used to abstract machine-specific paths.")
   private[sbt] val timeWrappedStamper = settingKey[ReadStamps]("The stamper to create timestamp or hash.")
   private[sbt] val reusableStamper = taskKey[ReadStamps]("The stamper can be reused across subprojects and sessions.")
+  private[sbt] val autoPlugins = taskKey[Seq[String]]("The autoplugins for a project").withRank(Invisible)
 
   // package keys
   val packageBin = taskKey[File]("Produces a main artifact, such as a binary jar.").withRank(ATask)
@@ -349,6 +352,7 @@ object Keys {
   val exportedProductsNoTracking = taskKey[Classpath]("Just the exported classpath without triggering the compilation.").withRank(CTask)
   val unmanagedClasspath = taskKey[Classpath]("Classpath entries (deep) that are manually managed.").withRank(BPlusTask)
   val unmanagedJars = taskKey[Classpath]("Classpath entries for the current project (shallow) that are manually managed.").withRank(BPlusTask)
+  val managedJars = taskKey[Classpath]("Classpath entries for the current project (shallow) that are manually managed.").withRank(BPlusTask)
   val managedClasspath = taskKey[Classpath]("The classpath consisting of external, managed library dependencies.").withRank(BMinusTask)
   val internalDependencyClasspath = taskKey[Classpath]("The internal (inter-project) classpath.").withRank(CTask)
   val externalDependencyClasspath = taskKey[Classpath]("The classpath consisting of library dependencies, both managed and unmanaged.").withRank(BMinusTask)
@@ -425,6 +429,7 @@ object Keys {
   val moduleSettings = taskKey[ModuleSettings]("Module settings, which configure dependency management for a specific module, such as a project.").withRank(DTask)
   val unmanagedBase = settingKey[File]("The default directory for manually managed libraries.").withRank(ASetting)
   val updateConfiguration = settingKey[UpdateConfiguration]("Configuration for resolving and retrieving managed dependencies.").withRank(DSetting)
+  private[sbt] val updateKeyHash = taskKey[Int]("The hash of the update input parameters.")
   val updateOptions = settingKey[UpdateOptions]("Options for resolving managed dependencies.").withRank(DSetting)
   val unresolvedWarningConfiguration = taskKey[UnresolvedWarningConfiguration]("Configuration for unresolved dependency warning.").withRank(DTask)
   val dependencyPositions = taskKey[Map[ModuleID, SourcePosition]]("Source positions where the dependencies are defined.").withRank(DTask)
@@ -433,6 +438,8 @@ object Keys {
   val ivySbt = taskKey[IvySbt]("Provides the sbt interface to Ivy.").withRank(CTask)
   val ivyModule = taskKey[IvySbt#Module]("Provides the sbt interface to a configured Ivy module.").withRank(CTask)
   val updateCacheName = taskKey[String]("Defines the directory name used to store the update cache files (inside the streams cacheDirectory).").withRank(DTask)
+  val updateHash = taskKey[Int]("Gets the potentially cached update report")
+  val updateFiles = taskKey[Seq[java.nio.file.Path]]("All of the files used by the update report")
   val update = taskKey[UpdateReport]("Resolves and optionally retrieves dependencies, producing a report.").withRank(ATask)
   val updateFull = taskKey[UpdateReport]("Resolves and optionally retrieves dependencies, producing a full report with callers.").withRank(CTask)
   val evicted = taskKey[EvictionWarning]("Display detailed eviction warnings.").withRank(CTask)
