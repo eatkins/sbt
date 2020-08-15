@@ -3592,29 +3592,14 @@ object Classpaths {
       )
     }
 
-  private[this] val cache =
-    new java.util.concurrent.ConcurrentHashMap[Seq[ProjectRef], Map[
-      ModuleRevisionId,
-      ModuleDescriptor
-    ]]
   private[sbt] def depMap(
       projects: Seq[ProjectRef],
       data: Settings[Scope],
       log: Logger
   ): Initialize[Task[Map[ModuleRevisionId, ModuleDescriptor]]] =
     Def.value {
-      cache.get(projects) match {
-        case null =>
-          projects
-            .flatMap(ivyModule in _ get data)
-            .join
-            .map { mod =>
-              mod map { _.dependencyMapping(log) } toMap;
-            }
-            .map { m =>
-              cache.put(projects, m); m
-            }
-        case m => Task(Info(), Pure(() => m, inline = true))
+      projects.flatMap(ivyModule in _ get data).join.map { mod =>
+        mod map { _.dependencyMapping(log) } toMap;
       }
     }
 
