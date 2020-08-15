@@ -592,7 +592,14 @@ object Defaults extends BuildCommon {
 
   // This is included into JvmPlugin.projectSettings
   def compileBase = inTask(console)(compilersSetting :: Nil) ++ compileBaseGlobal ++ Seq(
-    scalaInstanceParams := scalaInstanceParamsTask.value,
+    scalaInstanceParams := Def.taskDyn {
+      val prevHash = updateHash.previous
+      val hash = updateHash.value
+      scalaInstanceParams.previous match {
+        case Some(p) if prevHash == Some(hash) => Def.task(p)
+        case _                                 => scalaInstanceParamsTask
+      }
+    }.value,
     scalaInstance := scalaInstanceTask.value,
     crossVersion := (if (crossPaths.value) CrossVersion.binary else CrossVersion.disabled),
     sbtBinaryVersion in pluginCrossBuild := binarySbtVersion(
@@ -905,39 +912,34 @@ object Defaults extends BuildCommon {
     }
 
   def scalaInstanceParamsTask: Initialize[Task[ScalaInstanceParams]] = Def.taskDyn {
-    val home = scalaHome.value
-    scalaInstanceParams.previous match {
-      case Some(p) => Def.task(p)
-      case p =>
-        home match {
-          case Some(h) => scalaInstanceParamsFromHome(h)
-          case None =>
-            val scalaProvider = appConfiguration.value.provider.scalaProvider
-            val version = scalaVersion.value
-            if (version == scalaProvider.version) // use the same class loader as the Scala classes used by sbt
-              Def.task {
-                val allJars = scalaProvider.jars
-                val libraryJars = allJars.filter(_.getName == "scala-library.jar")
-                allJars.filter(_.getName == "scala-compiler.jar") match {
-                  case Array(compilerJar) if libraryJars.nonEmpty =>
-                    new ScalaInstanceParams(
-                      version,
-                      allJars,
-                      libraryJars,
-                      compilerJar,
-                      None
-                    )
-                  case _ =>
-                    new ScalaInstanceParams(
-                      version,
-                      scalaProvider.jars,
-                      scalaProvider.jars,
-                      null,
-                      None
-                    )
-                }
-              } else scalaInstanceParamsFromUpdate
-        }
+    scalaHome.value match {
+      case Some(h) => scalaInstanceParamsFromHome(h)
+      case None =>
+        val scalaProvider = appConfiguration.value.provider.scalaProvider
+        val version = scalaVersion.value
+        if (version == scalaProvider.version) // use the same class loader as the Scala classes used by sbt
+          Def.task {
+            val allJars = scalaProvider.jars
+            val libraryJars = allJars.filter(_.getName == "scala-library.jar")
+            allJars.filter(_.getName == "scala-compiler.jar") match {
+              case Array(compilerJar) if libraryJars.nonEmpty =>
+                new ScalaInstanceParams(
+                  version,
+                  allJars,
+                  libraryJars,
+                  compilerJar,
+                  None
+                )
+              case _ =>
+                new ScalaInstanceParams(
+                  version,
+                  scalaProvider.jars,
+                  scalaProvider.jars,
+                  null,
+                  None
+                )
+            }
+          } else scalaInstanceParamsFromUpdate
     }
   }
   def scalaInstanceTask: Initialize[Task[ScalaInstance]] = Def.task {
@@ -2948,7 +2950,7 @@ object Classpaths {
       val key = updateKeyHash.value
       val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
       import FileStamp.Formats.seqPathFileStampJsonFormatter
-      val force = true && (ThisBuild / turbo).value && ((updateFiles / outputFileStamps).previous match {
+      val force = ((updateFiles / outputFileStamps).previous match {
         case Some(stamps) =>
           stamps.exists { case (p, s) => FileStamp.lastModified(p) != Some(s) }
         case _ => true
