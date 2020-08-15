@@ -868,6 +868,15 @@ object Defaults extends BuildCommon {
     // If I am a "build" (a project inside project/) then I have a globalPluginUpdate.
     Def.task { allUpdates.value.flatten ++ globalPluginUpdate.?.value }
   }
+  def transitiveUpdateIsCachedTask: Initialize[Task[Boolean]] = {
+    import ScopeFilter.Make.{ inDependencies => inDeps, _ }
+    val selectDeps = ScopeFilter(inDeps(ThisProject, includeRoot = false))
+    val allUpdates = updateIsCached.?.all(selectDeps)
+    // If I am a "build" (a project inside project/) then I have a globalPluginUpdate.
+    Def.task {
+      (allUpdates.value.flatten ++ globalPluginUpdate.?.value.map(_.stats.cached)).forall(identity)
+    }
+  }
 
   @deprecated("This is no longer used to implement continuous execution", "1.3.0")
   def watchSetting: Initialize[Watched] =
@@ -2902,6 +2911,7 @@ object Classpaths {
     ivyModule := { val is = ivySbt.value; new is.Module(moduleSettings.value) },
     allCredentials := LMCoursier.allCredentialsTask.value,
     transitiveUpdate := transitiveUpdateTask.value,
+    transitiveUpdateIsCached := transitiveUpdateIsCachedTask.value,
     updateCacheName := {
       val binVersion = scalaBinaryVersion.value
       val suffix = if (crossPaths.value) s"_$binVersion" else ""
@@ -2920,27 +2930,31 @@ object Classpaths {
       ConflictWarning(conflictWarning.value, report, log)
       report
     },
-    /*
-     *updateFiles := {
-     *  println(s"OOPS update files")
-     *  val report = update.value
-     *  Vector(report.cachedDescriptor.toPath) ++ report.allFiles.map(_.toPath)
-     *},
-     *updateFiles := updateFiles.triggeredBy(update).value,
-     */
+    updateFiles := {
+      val report = update.value
+      Vector(report.cachedDescriptor.toPath) ++ report.allFiles.map(_.toPath)
+    },
+    //updateFiles := updateFiles.triggeredBy(update).value,
     updateKeyHash := LibraryManagement
       .updateKey(
         ivyModule.value,
         updateConfigurationTask.value.withLogging(UpdateLogging.Full),
-        true,
-        false,
+        shouldForceTask("update").value,
+        transitiveUpdateIsCached.value
       )
       .hashCode,
     updateHash := Def.taskDyn {
       val key = updateKeyHash.value
       val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
+      import FileStamp.Formats.seqPathFileStampJsonFormatter
+      val force = false && ((updateFiles / outputFileStamps).previous match {
+        case Some(stamps) =>
+          stamps.exists { case (p, s) => FileStamp.lastModified(p) != Some(s) }
+        case _ => true
+      })
+
       updateHash.previous match {
-        case Some(h) if prevKey == Some(key) =>
+        case Some(h) if !force && prevKey == Some(key) =>
           Def.task(h)
         case p =>
           Def.task(update.value.hashCode)
@@ -3353,6 +3367,21 @@ object Classpaths {
       .withLogicalClock(LogicalClock(state0.hashCode))
       .withMetadataDirectory(dependencyCacheDirectory.value)
   }
+  private def shouldForceTask(cacheLabel: String): Def.Initialize[Task[Boolean]] = Def.task {
+    val cacheDirectory = crossTarget.value / cacheLabel / updateCacheName.value
+    val isRoot = executionRoots.value contains resolvedScoped.value
+    isRoot || {
+      forceUpdatePeriod.value match {
+        case None => false
+        case Some(period) =>
+          val fullUpdateOutput = cacheDirectory / "out"
+          val now = System.currentTimeMillis
+          val diff = now - IO.getModifiedTimeOrZero(fullUpdateOutput)
+          val elapsedDuration = new FiniteDuration(diff, TimeUnit.MILLISECONDS)
+          fullUpdateOutput.exists() && elapsedDuration > period
+      }
+    }
+  }
 
   /**
    * cacheLabel - label to identify an update cache
@@ -3374,18 +3403,7 @@ object Classpaths {
       factory(cacheDirectory.toPath, Converter)
     }
 
-    val isRoot = executionRoots.value contains resolvedScoped.value
-    val shouldForce = isRoot || {
-      forceUpdatePeriod.value match {
-        case None => false
-        case Some(period) =>
-          val fullUpdateOutput = cacheDirectory / "out"
-          val now = System.currentTimeMillis
-          val diff = now - IO.getModifiedTimeOrZero(fullUpdateOutput)
-          val elapsedDuration = new FiniteDuration(diff, TimeUnit.MILLISECONDS)
-          fullUpdateOutput.exists() && elapsedDuration > period
-      }
-    }
+    val shouldForce = shouldForceTask(cacheLabel).value
 
     val providedScalaJars: String => Seq[File] = {
       val scalaProvider = appConfiguration.value.provider.scalaProvider
