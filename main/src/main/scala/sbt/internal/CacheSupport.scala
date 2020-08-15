@@ -2,6 +2,7 @@ package sbt.internal
 
 import sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
 import java.io.File
+import sbt.librarymanagement.Configuration
 
 private[sbt] object CacheSupport {
   private[sbt] class ScalaInstanceParams(
@@ -61,5 +62,54 @@ private[sbt] object CacheSupport {
           }
         }
       }
+  }
+  /*
+   *final class Configuration private[sbt] (
+   *    val id: String,
+   *    val name: String,
+   *    val description: String,
+   *    val isPublic: Boolean,
+   *    val extendsConfigs: Vector[Configuration],
+   *    val transitive: Boolean
+   *) extends ConfigurationExtra
+   */
+  object Formats {
+    implicit val configurationFormat: JsonFormat[Configuration] = new JsonFormat[Configuration] {
+      override def read[J](jsOpt: Option[J], unbuilder: Unbuilder[J]): Configuration =
+        jsOpt match {
+          case Some(j) =>
+            def impl(): Configuration = {
+              unbuilder.beginArray(j)
+              val id = unbuilder.readString(j)
+              val name = unbuilder.readString(j)
+              val description = unbuilder.readString(j)
+              val isPublic = unbuilder.readBoolean(j)
+              val transitive = unbuilder.readBoolean(j)
+              val config =
+                Configuration.of(id, name, description, isPublic, Vector.empty, transitive)
+              val extendsConfigsLength = unbuilder.readInt(j)
+              val extendsConfigs = (0 until extendsConfigsLength).map(_ => impl()).toVector
+              unbuilder.endArray()
+              config.withExtendsConfigs(extendsConfigs)
+            }
+            impl()
+          case _ => deserializationError("Couldn't deserialize ScalaInstanceParams")
+
+        }
+      override def write[J](obj: Configuration, builder: Builder[J]): Unit = {
+        def impl(conf: Configuration): Unit = {
+          builder.beginArray()
+          builder.writeString(conf.id)
+          builder.writeString(conf.name)
+          builder.writeString(conf.description)
+          builder.writeBoolean(conf.isPublic)
+          builder.writeBoolean(conf.transitive)
+          builder.writeInt(conf.extendsConfigs.length)
+          conf.extendsConfigs.foreach(impl)
+          builder.endArray()
+        }
+        impl(obj)
+      }
+    }
   }
 }
