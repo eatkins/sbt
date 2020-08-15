@@ -11,6 +11,7 @@ package internal
 import java.io.File
 import java.util.concurrent.Callable
 
+import lmcoursier.CoursierConfiguration
 import sbt.internal.librarymanagement._
 import sbt.librarymanagement._
 import sbt.librarymanagement.syntax._
@@ -18,14 +19,14 @@ import sbt.util.{ CacheStore, CacheStoreFactory, Level, Logger, Tracked }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.Project.richInitializeTask
-import sjsonnew.JsonFormat
+import sjsonnew._
 
 private[sbt] object LibraryManagement {
   implicit val linter: sbt.dsl.LinterLevel.Ignore.type = sbt.dsl.LinterLevel.Ignore
-
-  private type UpdateInputs = (Long, ModuleSettings, UpdateConfiguration)
+  private type UpdateInputs = UpdateReportCodecs.UpdateKey
 
   def cachedUpdate(
+      csrConfig: CoursierConfiguration,
       lm: DependencyResolution,
       module: ModuleDescriptor,
       cacheStoreFactory: CacheStoreFactory,
@@ -41,7 +42,7 @@ private[sbt] object LibraryManagement {
       compatWarning: CompatibilityWarningOptions,
       includeCallers: Boolean,
       includeDetails: Boolean,
-      log: Logger
+      log: Logger,
   ): UpdateReport = {
 
     /* Resolve the module settings from the inputs. */
@@ -94,8 +95,8 @@ private[sbt] object LibraryManagement {
       ur.withStats(ur.stats.withCached(true))
 
     def doResolve(cache: CacheStore): UpdateInputs => UpdateReport = {
+      import UpdateReportCodecs._
       val doCachedResolve = { (inChanged: Boolean, updateInputs: UpdateInputs) =>
-        import sbt.librarymanagement.LibraryManagementCodec._
         val cachedResolve = Tracked.lastOutput[UpdateInputs, UpdateReport](cache) {
           case (_, Some(out)) if upToDate(inChanged, out) => markAsCached(out)
           case pair =>
@@ -115,19 +116,25 @@ private[sbt] object LibraryManagement {
           }
           .apply(cachedResolve(updateInputs))
       }
-      import LibraryManagementCodec._
       Tracked.inputChanged(cacheStoreFactory.make("inputs"))(doCachedResolve)
     }
 
     // Get the handler to use and feed it in the inputs
     // This is lm-engine specific input hashed into Long
-    val extraInputHash = module.extraInputHash
-    val settings = module.moduleSettings
     val outStore = cacheStoreFactory.make("output")
     val handler = if (skip && !force) skipResolve(outStore) else doResolve(outStore)
+    handler(updateKey(module, updateConfig))
+  }
+  private[sbt] def updateKey(
+      module: ModuleDescriptor,
+      updateConfig: UpdateConfiguration,
+      //csrConfig: CoursierConfiguration
+  ) = {
+    val extraInputHash = module.extraInputHash
+    val settings = module.moduleSettings
+    val withoutClock = updateConfig.withLogicalClock(UpdateReportCodecs.NullLogicalClock)
     // Remove clock for caching purpose
-    val withoutClock = updateConfig.withLogicalClock(LogicalClock.unknown)
-    handler((extraInputHash, settings, withoutClock))
+    (extraInputHash, settings, withoutClock)
   }
 
   private[this] def fileUptodate(file: File, stamps: Map[File, Long], log: Logger): Boolean = {
@@ -213,6 +220,7 @@ private[sbt] object LibraryManagement {
       val s = streams.value
       val cacheDirectory = streams.value.cacheDirectory
       val csr = useCoursier.value
+      val csrConfig = csrConfiguration.value
       val lm = dependencyResolution.value
 
       if (csr) {
@@ -251,6 +259,7 @@ private[sbt] object LibraryManagement {
           else Def.task((evictionWarningOptions in update).value)
         }.value
         cachedUpdate(
+          csrConfig.withLog(None).withCredentials(Nil),
           // LM API
           lm = lm,
           // Ivy-free ModuleDescriptor
