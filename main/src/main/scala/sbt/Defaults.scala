@@ -1979,13 +1979,13 @@ object Defaults extends BuildCommon {
     }
 
   private[this] def exported(w: PrintWriter, command: String): Seq[String] => Unit =
-    args => w.println((command +: args).mkString(" "))
+    args => w.print((command +: args).mkString(" "))
 
   private[this] def exported(s: TaskStreams, command: String): Seq[String] => Unit = {
     val prev = s.readText(ExportStream)
     args => {
-      val newExported = (command +: args).mkString(" ")
-      if (newExported != prev) {
+      val current = (command +: args).mkString(" ")
+      if (current != prev) {
         val w = s.text(ExportStream)
         try exported(w, command)(args)
         finally w.close() // workaround for #937
@@ -2513,7 +2513,7 @@ object Classpaths {
     val current = Path.makeString(data(cp))
     if (current != prev) {
       val w = s.text(ExportStream)
-      try w.println(Path.makeString(data(cp)))
+      try w.print(Path.makeString(data(cp)))
       finally w.close() // workaround for #937
     }
     cp
