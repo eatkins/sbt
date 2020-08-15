@@ -60,7 +60,7 @@ object CacheStoreFactory {
 /** A factory that creates new stores persisted in `base`. */
 class DirectoryStoreFactory[J: IsoString](base: File, converter: SupportConverter[J])
     extends CacheStoreFactory {
-  IO.createDirectory(base)
+  if (!base.isDirectory) IO.createDirectory(base)
 
   def make(identifier: String): CacheStore = new FileBasedStore(base / identifier, converter)
 
