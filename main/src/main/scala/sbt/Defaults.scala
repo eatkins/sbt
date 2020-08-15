@@ -2389,12 +2389,9 @@ object Classpaths {
       import CacheSupport.Formats.configurationFormat
 
       classpathConfiguration.previous match {
-        case Some(p) => Def.task(p)
-        /*
-         *case Some(p) if Some(hash) == prevHash =>
-         *  //println("cached classpath configuration")
-         *  Def.task(p)
-         */
+        case Some(p) if Some(hash) == prevHash =>
+          //println("cached classpath configuration")
+          Def.task(p)
         case p =>
           Def.task {
             println(s"aargh classpath config ${p.isDefined} $hash $prevHash")
@@ -2435,12 +2432,10 @@ object Classpaths {
        */
       sbt.Keys.managedJars := Def.taskDyn {
         import CacheSupport.Formats.classpathFormat
-        /*
-         *val hash = updateHash.value
-         *val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
-         */
+        val hash = updateHash.value
+        val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
         sbt.Keys.managedJars.previous match {
-          case Some(j) /*if Some(hash) == prevHash*/ =>
+          case Some(j) if Some(hash) == prevHash =>
             //println("cached managed jars")
             Def.task(j)
           case _ =>
@@ -2930,7 +2925,7 @@ object Classpaths {
     updateFull := (updateTask tag (Tags.Update, Tags.Network)).value,
     update := (updateWithoutDetails("update") tag (Tags.Update, Tags.Network)).value,
     update := {
-      //Def.unit(updateKeyHash.value)
+      Def.unit(updateKeyHash.value)
       val report = update.value
       val log = streams.value.log
       ConflictWarning(conflictWarning.value, report, log)
@@ -2944,31 +2939,25 @@ object Classpaths {
      *},
      *updateFiles := updateFiles.triggeredBy(update).value,
      */
-    /*
-     *updateKeyHash := LibraryManagement
-     *  .updateKey(
-     *    ivyModule.value,
-     *    updateConfigurationTask.value.withLogging(UpdateLogging.Full),
-     *    csrConfiguration.value.withLog(None).withResolvers(Vector.empty),
-     *  )
-     *  .hashCode,
-     */
-    updateHash := 0,
-    /*
-     *updateHash := Def.taskDyn {
-     *  //import UpdateReportCodecs._
-     *  val key = updateKeyHash.value
-     *  val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
-     *  //val files = Previous.runtimeInEnclosingTask(updateFiles)
-     *  updateHash.previous match {
-     *    case Some(h) if prevKey == Some(key) =>
-     *      Def.task(h)
-     *    case p =>
-     *      println(s"run update")
-     *      Def.task(update.value.hashCode)
-     *  }
-     *}.value,
-     */
+    updateKeyHash := LibraryManagement
+      .updateKey(
+        ivyModule.value,
+        updateConfigurationTask.value.withLogging(UpdateLogging.Full),
+        true,
+        false,
+      )
+      .hashCode,
+    updateHash := Def.taskDyn {
+      val key = updateKeyHash.value
+      val prevKey = Previous.runtimeInEnclosingTask(updateKeyHash).value
+      updateHash.previous match {
+        case Some(h) if prevKey == Some(key) =>
+          Def.task(h)
+        case p =>
+          println(s"run update")
+          Def.task(update.value.hashCode)
+      }
+    }.value,
     evictionWarningOptions in update := evictionWarningOptions.value,
     evictionWarningOptions in evicted := EvictionWarningOptions.full,
     evicted := {
@@ -3812,12 +3801,10 @@ object Classpaths {
     autoPlugins(report, internalPluginClasspath, isDotty = false)
 
   def autoPluginsTask: Initialize[Task[Seq[String]]] = Def.taskDyn {
-    /*
-     *val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
-     *val hash = updateHash.value
-     */
+    val prevHash = Previous.runtimeInEnclosingTask(updateHash).value
+    val hash = updateHash.value
     Keys.autoPlugins.previous match {
-      case Some(p) /*if Some(hash) == prevHash*/ =>
+      case Some(p) if Some(hash) == prevHash =>
         //println(s"cached auto")
         Def.task(p)
       case _ =>
