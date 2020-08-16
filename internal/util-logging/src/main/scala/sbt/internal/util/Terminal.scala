@@ -404,6 +404,7 @@ object Terminal {
     private[this] val closed = new AtomicBoolean(false)
     private[this] val readQueue = new LinkedBlockingQueue[Unit]
     private[this] val readThread = new AtomicReference[Thread]
+    private[this] val waiting = new LinkedBlockingQueue[AnyRef]
     /*
      * Starts a loop that fills a buffer with bytes from stdin. We only read from
      * the underlying stream when the buffer is empty and there is an active reader.
@@ -428,17 +429,44 @@ object Terminal {
     }
     executor.submit(runnable)
     def read(result: LinkedBlockingQueue[Integer]): Unit =
-      if (!closed.get)
-        readThread.synchronized {
-          readThread.set(Thread.currentThread)
-          try buffer.poll match {
-            case null =>
-              readQueue.put(())
-              result.put(buffer.take)
-            case b if b == -1 => throw new ClosedChannelException
-            case b            => result.put(b)
-          } finally readThread.set(null)
+      if (!closed.get) {
+        val lock = new AnyRef
+        waiting.add(lock)
+        def setReadThread: Boolean = {
+          readThread.synchronized {
+            readThread.getAndSet(Thread.currentThread) match {
+              case null => true
+              case p =>
+                readThread.set(p)
+                false
+            }
+          }
         }
+        if (!setReadThread) {
+          waiting.add(lock)
+          while (!setReadThread) {
+            try lock.synchronized(lock.wait)
+            catch {
+              case e: InterruptedException =>
+                waiting.remove(lock)
+                throw e
+            }
+          }
+        }
+        try buffer.poll match {
+          case null =>
+            readQueue.put(())
+            result.put(buffer.take)
+          case b if b == -1 => throw new ClosedChannelException
+          case b            => result.put(b)
+        } finally {
+          readThread.set(null)
+          waiting.poll match {
+            case null =>
+            case lock => lock.synchronized(lock.notify)
+          }
+        }
+      }
     override def read(): Int = {
       val result = new LinkedBlockingQueue[Integer]
       read(result)
