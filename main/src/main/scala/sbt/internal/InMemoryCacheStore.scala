@@ -14,30 +14,34 @@ import java.nio.file.{ Files, Path }
 import java.util.concurrent.atomic.AtomicReference
 
 import com.github.benmanes.caffeine.cache.{ Cache, Caffeine, Weigher }
-import sbt.io.IO
 import sbt.util.{ CacheStore, CacheStoreFactory, DirectoryStoreFactory }
 import sjsonnew.{ IsoString, JsonReader, JsonWriter, SupportConverter }
+import sbt.internal.nio.FileTreeRepository
+import sbt.nio.file.Glob
 
 private[sbt] object InMemoryCacheStore {
   private[this] class InMemoryCacheStore(maxSize: Long) extends AutoCloseable {
-    private[this] val weigher: Weigher[Path, (Any, Long, Int)] = { case (_, (_, _, size)) => size }
-    private[this] val files: Cache[Path, (Any, Long, Int)] = Caffeine
+    private[this] val repo = FileTreeRepository.default
+    repo.addObserver { e =>
+      files.invalidate(e.path.toFile)
+    }
+    private[this] val weigher: Weigher[Path, (Any, Int)] = { case (_, (_, size)) => size }
+    private[this] val files: Cache[Path, (Any, Int)] = Caffeine
       .newBuilder()
       .maximumWeight(maxSize)
       .weigher(weigher)
       .build()
-    def get[T](path: Path): Option[(T, Long)] = {
+    def get[T](path: Path): Option[T] = {
       files.getIfPresent(path) match {
-        case null                                   => None
-        case (value: T @unchecked, lastModified, _) => Some((value, lastModified))
+        case null                     => None
+        case (value: T @unchecked, _) => Some(value)
       }
     }
-    def put(path: Path, value: Any, lastModified: Long): Unit = {
+    def put(path: Path, value: Any): Unit = {
       try {
-        if (lastModified > 0) {
-          val attributes = Files.readAttributes(path, classOf[BasicFileAttributes])
-          files.put(path, (value, lastModified, toIntExact(attributes.size)))
-        }
+        repo.register(Glob(path)).foreach(_.close)
+        val attributes = Files.readAttributes(path, classOf[BasicFileAttributes])
+        files.put(path, (value, toIntExact(attributes.size)))
       } catch {
         case _: IOException | _: ArithmeticException => files.invalidate(path)
       }
@@ -45,6 +49,7 @@ private[sbt] object InMemoryCacheStore {
     def remove(path: Path): Unit = files.invalidate(path)
 
     override def close(): Unit = {
+      repo.close()
       files.invalidateAll()
       files.cleanUp()
     }
@@ -54,10 +59,9 @@ private[sbt] object InMemoryCacheStore {
       extends CacheStore {
     override def delete(): Unit = cacheStore.delete()
     override def read[T]()(implicit reader: JsonReader[T]): T = {
-      val lastModified = IO.getModifiedTimeOrZero(path.toFile)
       store.get[T](path) match {
-        case Some((value, `lastModified`)) => value
-        case _                             => cacheStore.read[T]()
+        case Some(value) => value
+        case _           => cacheStore.read[T]()
       }
     }
     override def write[T](value: T)(implicit writer: JsonWriter[T]): Unit = {
@@ -67,15 +71,27 @@ private[sbt] object InMemoryCacheStore {
        * of this cache. If this assumption is invalidated, we may need to do something more
        * complicated.
        */
-      val lastModified = IO.getModifiedTimeOrZero(path.toFile)
       store.get[T](path) match {
-        case Some((v, `lastModified`)) if v == value => // nothing has changed
+        case Some(v) if v == value => // nothing has changed
         case _ =>
           store.remove(path)
           cacheStore.write(value)
-          val newLastModified = System.currentTimeMillis
-          IO.setModifiedTimeOrFalse(path.toFile, newLastModified)
-          store.put(path, value, newLastModified)
+          store.put(path, value)
+      }
+    }
+    def readString: Option[String] = {
+      store.get[String](path) match {
+        case Some(value) => Some(value)
+        case _           => cacheStore.readString
+      }
+    }
+    def writeString(s: String): Unit = {
+      store.get[String](path) match {
+        case Some(v) if v == s => // nothing has changed
+        case _ =>
+          store.remove(path)
+          cacheStore.writeString(s)
+          store.put(path, (s, s.length))
       }
     }
     override def close(): Unit = {

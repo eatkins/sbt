@@ -22,6 +22,7 @@ import sbt.internal.util.Attributed.data
 import sbt.util.Logger
 import sjsonnew.SupportConverter
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import java.util.concurrent.ConcurrentHashMap
 
 final class BuildStructure(
     val units: Map[URI, LoadedBuildUnit],
@@ -387,20 +388,29 @@ object BuildStreams {
       }
       .mkString(" ")
 
+  val cache = new ConcurrentHashMap[ScopeAxis[Reference], File]
   def projectPath(
       units: Map[URI, LoadedBuildUnit],
       root: URI,
       scoped: ScopedKey[_],
       data: Settings[Scope]
-  ): File =
-    scoped.scope.project match {
-      case Zero                             => refTarget(GlobalScope, units(root).localBase, data) / GlobalPath
-      case Select(br @ BuildRef(uri))       => refTarget(br, units(uri).localBase, data) / BuildUnitPath
-      case Select(pr @ ProjectRef(uri, id)) => refTarget(pr, units(uri).defined(id).base, data)
-      case Select(pr) =>
-        sys.error("Unresolved project reference (" + pr + ") in " + displayFull(scoped))
-      case This => sys.error("Unresolved project reference (This) in " + displayFull(scoped))
+  ): File = {
+    cache.get(scoped.scope.project) match {
+      case null =>
+        val f = scoped.scope.project match {
+          case Zero => refTarget(GlobalScope, units(root).localBase, data) / GlobalPath
+          case Select(br @ BuildRef(uri)) =>
+            refTarget(br, units(uri).localBase, data) / BuildUnitPath
+          case Select(pr @ ProjectRef(uri, id)) => refTarget(pr, units(uri).defined(id).base, data)
+          case Select(pr) =>
+            sys.error("Unresolved project reference (" + pr + ") in " + displayFull(scoped))
+          case This => sys.error("Unresolved project reference (This) in " + displayFull(scoped))
+        }
+        cache.put(scoped.scope.project, f)
+        f
+      case f => f
     }
+  }
 
   def refTarget(ref: ResolvedReference, fallbackBase: File, data: Settings[Scope]): File =
     refTarget(GlobalScope.copy(project = Select(ref)), fallbackBase, data)

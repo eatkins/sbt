@@ -7,19 +7,23 @@
 
 package sbt.util
 
-import java.io.{ File, InputStream, OutputStream }
+import java.io.{ File, InputStream, IOException, OutputStream }
 import sbt.io.syntax.fileToRichFile
 import sbt.io.{ IO, Using }
 import sjsonnew.{ IsoString, JsonReader, JsonWriter, SupportConverter }
 import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter, Parser }
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import java.io.FileNotFoundException
+import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 
 /** A `CacheStore` is used by the caching infrastructure to persist cached information. */
 abstract class CacheStore extends Input with Output {
 
   /** Delete the persisted information. */
   def delete(): Unit
-
+  def readString: Option[String]
+  def writeString(s: String): Unit
 }
 
 object CacheStore {
@@ -60,7 +64,7 @@ object CacheStoreFactory {
 /** A factory that creates new stores persisted in `base`. */
 class DirectoryStoreFactory[J: IsoString](base: File, converter: SupportConverter[J])
     extends CacheStoreFactory {
-  if (!base.isDirectory) IO.createDirectory(base)
+  //if (!base.isDirectory) IO.createDirectory(base)
 
   def make(identifier: String): CacheStore = new FileBasedStore(base / identifier, converter)
 
@@ -70,14 +74,35 @@ class DirectoryStoreFactory[J: IsoString](base: File, converter: SupportConverte
 
 /** A `CacheStore` that persists information in `file`. */
 class FileBasedStore[J: IsoString](file: File, converter: SupportConverter[J]) extends CacheStore {
-  if (!file.exists) IO.touch(file, setModified = false)
-
   def read[T: JsonReader]() =
     Using.fileInputStream(file)(stream => new PlainInput(stream, converter).read())
 
-  def write[T: JsonWriter](value: T) =
-    Using.fileOutputStream(append = false)(file) { stream =>
-      new PlainOutput(stream, converter).write(value)
+  def write[T: JsonWriter](value: T) = {
+    try {
+      Using.fileOutputStream(append = false)(file) { stream =>
+        new PlainOutput(stream, converter).write(value)
+      }
+    } catch {
+      case _: FileNotFoundException =>
+        Files.createDirectories(file.getParentFile.toPath)
+        Using.fileOutputStream(append = false)(file) { stream =>
+          new PlainOutput(stream, converter).write(value)
+        }
+    }
+  }
+
+  def readString: Option[String] =
+    try Some(IO.read(file))
+    catch { case _: IOException => None }
+  def writeString(s: String): Unit =
+    try {
+      Files.write(file.toPath, s.getBytes("UTF-8"))
+      ()
+    } catch {
+      case _: NoSuchFileException =>
+        Files.createDirectories(file.getParentFile.toPath)
+        Files.write(file.toPath, s.getBytes("UTF-8"))
+        ()
     }
 
   def delete() = IO.delete(file)
@@ -92,6 +117,11 @@ class StreamBasedStore[J: IsoString](
 ) extends CacheStore {
   def read[T: JsonReader]() = new PlainInput(inputStream, converter).read()
   def write[T: JsonWriter](value: T) = new PlainOutput(outputStream, converter).write(value)
+  def readString: Option[String] = None
+  def writeString(s: String): Unit = {
+    outputStream.write(s.getBytes("UTF-8"))
+    outputStream.flush()
+  }
   def delete() = ()
   def close() = { inputStream.close(); outputStream.close() }
 }

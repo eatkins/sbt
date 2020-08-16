@@ -155,6 +155,7 @@ object Streams {
 
       def readText(sid: String): String = {
         import scala.collection.JavaConverters._
+        println(taskDirectory(a))
         try new String(Files.readAllBytes(taskDirectory(a).toPath.resolve(sid)), "UTF-8")
         catch {
           case _: IOException =>
@@ -184,11 +185,7 @@ object Streams {
       def binary(sid: String = default): BufferedOutputStream =
         make(a, sid)(f => new BufferedOutputStream(new FileOutputStream(f)))
 
-      lazy val cacheDirectory: File = {
-        val dir = taskDirectory(a)
-        IO.createDirectory(dir)
-        dir
-      }
+      lazy val cacheDirectory: File = taskDirectory(a)
 
       lazy val cacheStoreFactory: CacheStoreFactory = mkFactory(cacheDirectory, converter)
 

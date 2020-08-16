@@ -2511,12 +2511,12 @@ object Classpaths {
   private[this] def exportClasspath(s: Setting[Task[Classpath]]): Setting[Task[Classpath]] =
     s.mapInitialize(init => Def.task { exportClasspath(streams.value, init.value) })
   private[this] def exportClasspath(s: TaskStreams, cp: Classpath): Classpath = {
-    val prev = s.readText(ExportStream)
+    import sjsonnew.BasicJsonProtocol._
+    val factory = s.cacheStoreFactory.make(ExportStream)
+    val prev = factory.readString
     val current = Path.makeString(data(cp))
-    if (current != prev) {
-      val w = s.text(ExportStream)
-      try w.print(Path.makeString(data(cp)))
-      finally w.close() // workaround for #937
+    if (Some(current) != prev) {
+      factory.write(current)
     }
     cp
   }
