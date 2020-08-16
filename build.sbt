@@ -573,6 +573,7 @@ lazy val stdTaskProj = (project in file("tasks-standard"))
     mimaBinaryIssueFilters ++= Seq(
       // unused private[sbt]
       exclude[DirectMissingMethodProblem]("sbt.Task.mapTask"),
+      exclude[ReversedMissingMethodProblem]("sbt.std.TaskStreams.readText"),
     ),
   )
   .configure(addSbtIO)
