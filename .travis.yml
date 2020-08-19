@@ -9,6 +9,7 @@ env:
     - SCALA_213=2.13.1
     - UTIL_TESTS="utilCache/test;utilControl/test;utilInterface/test;utilLogging/test;utilPosition/test;utilRelation/test;utilScripted/test;utilTracking/test"
     # WHITESOURCE_PASSWORD=
+    - SBT_VERSION=1.4.0-M2
     - secure: d3bu2KNwsVHwfhbGgO+gmRfDKBJhfICdCJFGWKf2w3Gv86AJZX9nuTYRxz0KtdvEHO5Xw8WTBZLPb2thSJqhw9OCm4J8TBAVqCP0ruUj4+aqBUFy4bVexQ6WKE6nWHs4JPzPk8c6uC1LG3hMuzlC8RGETXtL/n81Ef1u7NjyXjs=
   matrix:
     - SBT_CMD="mimaReportBinaryIssues ; javafmtCheck ; Test / javafmtCheck; scalafmtCheckAll ; scalafmtSbtCheck; serverTestProj/scalafmtCheckAll; headerCheck ;test:headerCheck ;whitesourceOnPush ;test:compile; publishLocal; test; serverTestProj/test; doc; $UTIL_TESTS; ++$SCALA_213; $UTIL_TESTS"
@@ -19,8 +20,12 @@ env:
 matrix:
   fast_finish: true
   include:
+    before_install:
+      - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
+      - sbt publishLocalBin
     - env:
         - TRAVIS_JDK=adopt@1.8.0-222
+        - SBT_VERSION=1.4.0-SNAPSHOT
         - SBT_CMD="++$SCALA_213; $UTIL_TESTS; ++$SCALA_212; $UTIL_TESTS; scripted actions/* source-dependencies/*1of3 dependency-management/*1of4 java/*"
 
 before_install:
@@ -34,7 +39,7 @@ install:
 
 script:
   # It doesn't need that much memory because compile and run are forked
-  - sbt -Dsbt.io.virtual=false -Dsbt.ci=true -J-XX:ReservedCodeCacheSize=128m -J-Xmx800M -J-Xms800M -J-server "$SBT_CMD"
+  - sbt -Dsbt.io.virtual=false -Dsbt.version=$SBT_VERSION -Dsbt.ci=true -J-XX:ReservedCodeCacheSize=128m -J-Xmx800M -J-Xms800M -J-server "$SBT_CMD"
 
 before_cache:
   - find $HOME/.cache/coursier/v1 -name "ivydata-*.properties" -delete
