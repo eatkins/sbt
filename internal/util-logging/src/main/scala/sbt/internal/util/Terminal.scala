@@ -171,6 +171,7 @@ object Terminal {
   // Disable noisy jline log spam
   if (System.getProperty("sbt.jline.verbose", "false") != "true")
     jline.internal.Log.setOutput(new PrintStream(_ => {}, false))
+  private[this] val isCI = sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")
   def consoleLog(string: String): Unit = {
     try Terminal.console.printStream.println(s"[info] $string")
     catch { case _: IOException => }
@@ -281,7 +282,8 @@ object Terminal {
    * @return the result of the thunk
    */
   private[sbt] def withStreams[T](isServer: Boolean)(f: => T): T =
-    if (System.getProperty("sbt.io.virtual", "true") == "true") {
+    if (isCI || System.getProperty("sbt.io.virtual", "") == "false") f
+    else {
       hasProgress.set(isServer)
       consoleTerminalHolder.set(wrap(jline.TerminalFactory.get))
       activeTerminal.set(consoleTerminalHolder.get)
@@ -313,7 +315,7 @@ object Terminal {
           console.close()
         }
       }
-    } else f
+    }
 
   private[this] object ProxyTerminal extends Terminal {
     private def t: Terminal = activeTerminal.get
@@ -775,7 +777,6 @@ object Terminal {
       val size = system.getSize
       (size.getColumns, size.getRows)
     }
-    private[this] val isCI = sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")
     override lazy val isAnsiSupported: Boolean = term.isAnsiSupported && !isCI
     override private[sbt] def progressState: ProgressState = consoleProgressState.get
     override def isEchoEnabled: Boolean = system.echo()
