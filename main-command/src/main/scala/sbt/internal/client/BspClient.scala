@@ -10,12 +10,12 @@ package sbt.internal.client
 import java.io.{ File, InputStream, OutputStream }
 import java.net.Socket
 
+import scala.sys.process.Process
+import scala.util.control.NonFatal
+
 import sbt.Exit
 import sbt.io.syntax._
 import sbt.protocol.ClientSocket
-
-import scala.sys.process.Process
-import scala.util.control.NonFatal
 
 class BspClient private (sbtServer: Socket) {
   private val lock = new AnyRef

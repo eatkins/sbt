@@ -10,6 +10,7 @@ package internal
 
 import java.io.File
 import java.net.URI
+
 import sbt.internal.BuildLoader.ResolveInfo
 
 object RetrieveUnit {
@@ -26,12 +27,12 @@ object RetrieveUnit {
   }
 
   object Scheme {
-    def unapply(uri: URI) = Option(uri.getScheme)
+    def unapply(uri: URI): Option[String] = Option(uri.getScheme)
   }
 
   object Path {
     import RichURI.fromURI
 
-    def unapply(uri: URI) = Option(uri.withoutMarkerScheme.getPath)
+    def unapply(uri: URI): Option[String] = Option(uri.withoutMarkerScheme.getPath)
   }
 }

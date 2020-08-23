@@ -8,17 +8,17 @@
 package sbt
 package std
 
-import sbt.internal.util.Types._
-import TaskExtra._
-import TaskTest.tryRun
-import TaskGen.MaxWorkers
-
-import org.scalacheck._
-import Prop.forAll
-import Transform.taskToNode
-import ConcurrentRestrictions.{ completionService, limitTotal, tagged => tagged0, TagMap }
-
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
+
+import sbt.ConcurrentRestrictions.{ TagMap, completionService, limitTotal, tagged => tagged0 }
+import sbt.TaskGen.MaxWorkers
+import sbt.internal.util.Types._
+import sbt.std.TaskExtra._
+import sbt.std.TaskTest.tryRun
+import sbt.std.Transform.taskToNode
+
+import org.scalacheck.Prop.forAll
+import org.scalacheck._
 
 object TaskSerial extends Properties("task serial") {
   val checkCycles = true

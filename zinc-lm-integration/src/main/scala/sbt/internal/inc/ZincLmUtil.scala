@@ -11,6 +11,7 @@ import java.io.File
 
 import sbt.internal.inc.classpath.ClassLoaderCache
 import sbt.librarymanagement.{ DependencyResolution, ModuleID }
+
 import xsbti._
 import xsbti.compile._
 

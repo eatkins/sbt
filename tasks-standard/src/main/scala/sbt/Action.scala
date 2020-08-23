@@ -7,9 +7,9 @@
 
 package sbt
 
+import sbt.ConcurrentRestrictions.{ Tag, TagMap, tagsKey }
 import sbt.internal.util.Types._
-import sbt.internal.util.{ ~>, AList, AttributeKey, AttributeMap }
-import ConcurrentRestrictions.{ Tag, TagMap, tagsKey }
+import sbt.internal.util.{ AList, AttributeKey, AttributeMap, ~> }
 
 // Action, Task, and Info are intentionally invariant in their type parameter.
 //  Various natural transformations used, such as PMap, require invariant type constructors for correctness

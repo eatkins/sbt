@@ -5,12 +5,13 @@
  * Licensed under Apache License 2.0 (see LICENSE)
  */
 
+import scala.math.abs
+
+import sbt.TaskGen._
 import sbt._
 
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
-import TaskGen._
-import math.abs
 
 object TaskRunnerForkTest extends Properties("TaskRunner Fork") {
   property("fork m tasks and wait for all to complete") = forAll(MaxTasksGen, MaxWorkersGen) {

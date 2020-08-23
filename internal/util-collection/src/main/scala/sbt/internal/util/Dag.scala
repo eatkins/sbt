@@ -10,7 +10,7 @@ package sbt.internal.util
 trait Dag[Node <: Dag[Node]] { self: Node =>
 
   def dependencies: Iterable[Node]
-  def topologicalSort = Dag.topologicalSort(self)(_.dependencies)
+  def topologicalSort: List[Node] = Dag.topologicalSort(self)(_.dependencies)
 }
 object Dag {
   import scala.collection.{ mutable, JavaConverters }

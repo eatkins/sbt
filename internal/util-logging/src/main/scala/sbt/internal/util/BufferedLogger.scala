@@ -7,13 +7,15 @@
 
 package sbt.internal.util
 
-import sbt.util._
+import java.util.concurrent.atomic.{ AtomicInteger, AtomicReference }
+
 import scala.collection.mutable.ListBuffer
-import org.apache.logging.log4j.core.{ LogEvent => XLogEvent }
+
+import sbt.util._
+
 import org.apache.logging.log4j.core.appender.AbstractAppender
 import org.apache.logging.log4j.core.layout.PatternLayout
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import org.apache.logging.log4j.core.{ LogEvent => XLogEvent }
 
 object BufferedAppender {
   def generateName: String =
@@ -84,7 +86,7 @@ class BufferedAppender(override val name: String, delegate: Appender) extends Ap
   }
 
   /** Enables buffering. */
-  def record() = synchronized { recording = true }
+  def record(): Unit = synchronized { recording = true }
   def buffer[T](f: => T): T = {
     record()
     try {
@@ -101,7 +103,7 @@ class BufferedAppender(override val name: String, delegate: Appender) extends Ap
       result
     } catch { case e: Throwable => stopQuietly(); throw e }
   }
-  def stopQuietly() = synchronized {
+  def stopQuietly(): Unit = synchronized {
     try {
       stopBuffer()
     } catch { case _: Exception => () }
@@ -144,7 +146,7 @@ class BufferedLogger(delegate: AbstractLogger) extends BasicLogger {
   private[this] var recording = false
 
   /** Enables buffering. */
-  def record() = synchronized { recording = true }
+  def record(): Unit = synchronized { recording = true }
   def buffer[T](f: => T): T = {
     record()
     try {
@@ -161,7 +163,7 @@ class BufferedLogger(delegate: AbstractLogger) extends BasicLogger {
       result
     } catch { case e: Throwable => stopQuietly(); throw e }
   }
-  def stopQuietly() = synchronized {
+  def stopQuietly(): Unit = synchronized {
     try {
       stop()
     } catch { case _: Exception => () }

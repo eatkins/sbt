@@ -80,34 +80,35 @@ object ExecuteProgress {
     override def stop(): Unit = ()
   }
 
-  def aggregate[F[_]](reporters: Seq[ExecuteProgress[F]]) = new ExecuteProgress[F] {
-    override def initial(): Unit = {
-      reporters foreach { _.initial() }
+  def aggregate[F[_]](reporters: Seq[ExecuteProgress[F]]): ExecuteProgress[F] =
+    new ExecuteProgress[F] {
+      override def initial(): Unit = {
+        reporters foreach { _.initial() }
+      }
+      override def afterRegistered(
+          task: F[_],
+          allDeps: Iterable[F[_]],
+          pendingDeps: Iterable[F[_]]
+      ): Unit = {
+        reporters foreach { _.afterRegistered(task, allDeps, pendingDeps) }
+      }
+      override def afterReady(task: F[_]): Unit = {
+        reporters foreach { _.afterReady(task) }
+      }
+      override def beforeWork(task: F[_]): Unit = {
+        reporters foreach { _.beforeWork(task) }
+      }
+      override def afterWork[A](task: F[A], result: Either[F[A], Result[A]]): Unit = {
+        reporters foreach { _.afterWork(task, result) }
+      }
+      override def afterCompleted[A](task: F[A], result: Result[A]): Unit = {
+        reporters foreach { _.afterCompleted(task, result) }
+      }
+      override def afterAllCompleted(results: RMap[F, Result]): Unit = {
+        reporters foreach { _.afterAllCompleted(results) }
+      }
+      override def stop(): Unit = {
+        reporters foreach { _.stop() }
+      }
     }
-    override def afterRegistered(
-        task: F[_],
-        allDeps: Iterable[F[_]],
-        pendingDeps: Iterable[F[_]]
-    ): Unit = {
-      reporters foreach { _.afterRegistered(task, allDeps, pendingDeps) }
-    }
-    override def afterReady(task: F[_]): Unit = {
-      reporters foreach { _.afterReady(task) }
-    }
-    override def beforeWork(task: F[_]): Unit = {
-      reporters foreach { _.beforeWork(task) }
-    }
-    override def afterWork[A](task: F[A], result: Either[F[A], Result[A]]): Unit = {
-      reporters foreach { _.afterWork(task, result) }
-    }
-    override def afterCompleted[A](task: F[A], result: Result[A]): Unit = {
-      reporters foreach { _.afterCompleted(task, result) }
-    }
-    override def afterAllCompleted(results: RMap[F, Result]): Unit = {
-      reporters foreach { _.afterAllCompleted(results) }
-    }
-    override def stop(): Unit = {
-      reporters foreach { _.stop() }
-    }
-  }
 }

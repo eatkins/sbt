@@ -10,9 +10,11 @@ package internal
 
 import java.io.File
 import java.nio.file.Files
-import sbt.internal.util.{ RMap, ConsoleOut }
+
+import sbt.internal.util.{ ConsoleOut, RMap }
 import sbt.io.IO
 import sbt.io.syntax._
+
 import sjsonnew.shaded.scalajson.ast.unsafe.JString
 import sjsonnew.support.scalajson.unsafe.CompactPrinter
 

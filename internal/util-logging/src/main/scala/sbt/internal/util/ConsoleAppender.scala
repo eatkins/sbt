@@ -10,17 +10,24 @@ package sbt.internal.util
 import java.io.{ PrintStream, PrintWriter }
 import java.lang.StringBuilder
 import java.nio.channels.ClosedChannelException
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger, AtomicReference }
 
-import org.apache.logging.log4j.core.appender.AbstractAppender
-import org.apache.logging.log4j.core.{ Appender => XAppender, LogEvent => XLogEvent }
-import org.apache.logging.log4j.message.{ Message, ObjectMessage, ReusableObjectMessage }
-import org.apache.logging.log4j.{ Level => XLevel }
 import sbt.internal.util.ConsoleAppender._
 import sbt.util._
-import org.apache.logging.log4j.core.AbstractLogEvent
-import org.apache.logging.log4j.message.StringFormatterMessageFactory
-import java.util.concurrent.atomic.AtomicReference
+
+import org.apache.logging.log4j.core.appender.AbstractAppender
+import org.apache.logging.log4j.core.{
+  AbstractLogEvent,
+  Appender => XAppender,
+  LogEvent => XLogEvent
+}
+import org.apache.logging.log4j.message.{
+  Message,
+  ObjectMessage,
+  ReusableObjectMessage,
+  StringFormatterMessageFactory
+}
+import org.apache.logging.log4j.{ Level => XLevel }
 
 object ConsoleLogger {
   // These are provided so other modules do not break immediately.
@@ -102,7 +109,7 @@ class ConsoleLogger private[ConsoleLogger] (
   override def trace(t: => Throwable): Unit =
     appender.trace(t, getTrace)
 
-  override def logAll(events: Seq[LogEvent]) = events.foreach(log)
+  override def logAll(events: Seq[LogEvent]): Unit = events.foreach(log)
 }
 
 object ConsoleAppender {
@@ -139,7 +146,7 @@ object ConsoleAppender {
   }
 
   /** Hide stack trace altogether. */
-  val noSuppressedMessage = (_: SuppressedTraceContext) => None
+  val noSuppressedMessage: SuppressedTraceContext => None.type = (_: SuppressedTraceContext) => None
 
   /**
    * Indicates whether formatting has been disabled in environment variables.

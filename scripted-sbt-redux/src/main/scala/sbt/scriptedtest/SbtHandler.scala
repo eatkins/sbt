@@ -54,7 +54,7 @@ final class SbtHandler(remoteSbtCreator: RemoteSbtCreator) extends StatementHand
     i
   }
 
-  def finish(state: State) = state match {
+  def finish(state: State): Unit = state match {
     case None =>
     case Some(SbtInstance(process, server)) =>
       try {
@@ -66,9 +66,9 @@ final class SbtHandler(remoteSbtCreator: RemoteSbtCreator) extends StatementHand
       }
   }
 
-  def send(message: String, server: IPC.Server) = server.connection(_.send(message))
+  def send(message: String, server: IPC.Server): Unit = server.connection(_.send(message))
 
-  def receive(errorMessage: String, server: IPC.Server) =
+  def receive(errorMessage: String, server: IPC.Server): Unit =
     server.connection { ipc =>
       val resultMessage = ipc.receive
       if (!resultMessage.toBoolean) throw new TestFailed(errorMessage)

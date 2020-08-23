@@ -10,8 +10,10 @@ package internal
 package parser
 
 import java.io.File
-import sbt.internal.util.MessageOnlyException
+
 import scala.io.Source
+
+import sbt.internal.util.MessageOnlyException
 
 class ErrorSpec extends AbstractSpec {
   implicit val splitter: SplitExpressions.SplitExpression = EvaluateConfigurations.splitExpressions

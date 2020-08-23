@@ -8,10 +8,17 @@
 package sbt
 package internal
 
-import java.io.{ ByteArrayInputStream, IOException, InputStream, File => _ }
+import java.io.{ ByteArrayInputStream, File => _, IOException, InputStream }
 import java.nio.file.Path
-import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
+import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue }
+
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.concurrent.duration.FiniteDuration.FiniteDurationIsOrdered
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.util.{ Failure, Success, Try }
 
 import sbt.BasicCommandStrings._
 import sbt.Def._
@@ -22,22 +29,15 @@ import sbt.internal.io.WatchState
 import sbt.internal.nio._
 import sbt.internal.ui.UITask
 import sbt.internal.util.JoinThread._
+import sbt.internal.util._
 import sbt.internal.util.complete.DefaultParsers.{ Space, matched }
 import sbt.internal.util.complete.Parser._
 import sbt.internal.util.complete.{ Parser, Parsers }
-import sbt.internal.util._
 import sbt.nio.Keys.{ fileInputs, _ }
 import sbt.nio.Watch.{ Creation, Deletion, ShowOptions, Update }
 import sbt.nio.file.{ FileAttributes, Glob }
 import sbt.nio.{ FileStamp, FileStamper, Watch }
 import sbt.util.{ Level, _ }
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.concurrent.duration.FiniteDuration.FiniteDurationIsOrdered
-import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
-import scala.util.control.NonFatal
 
 /**
  * Provides the implementation of the `~` command and `watch` task. The implementation is quite

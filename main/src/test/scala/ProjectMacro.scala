@@ -7,11 +7,14 @@
 
 package sbt
 
-import scala.util.control.NonFatal
-import org.scalacheck._
-import Prop._
-import Project.project
 import java.io.File
+
+import scala.util.control.NonFatal
+
+import sbt.Project.project
+
+import org.scalacheck.Prop._
+import org.scalacheck._
 
 class ProjectDefs {
   lazy val p = project
@@ -21,7 +24,7 @@ class ProjectDefs {
   // should not compile
   // def y = project
 
-  val z = project in new File("dir")
+  val z: Project = project in new File("dir")
 
   val a: Project = project
 

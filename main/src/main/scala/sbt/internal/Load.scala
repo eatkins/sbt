@@ -11,6 +11,10 @@ package internal
 import java.io.File
 import java.net.URI
 
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.tools.nsc.reporters.ConsoleReporter
+
 import sbt.BuildPaths._
 import sbt.Def.{ ScopeLocal, ScopedKey, Setting, isDummy }
 import sbt.Keys._
@@ -28,11 +32,8 @@ import sbt.librarymanagement.ivy.{ InlineIvyConfiguration, IvyDependencyResoluti
 import sbt.librarymanagement.{ Configuration, Configurations, Resolver }
 import sbt.nio.Settings
 import sbt.util.{ Logger, Show }
-import xsbti.compile.{ ClasspathOptionsUtil, Compilers }
 
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.tools.nsc.reporters.ConsoleReporter
+import xsbti.compile.{ ClasspathOptionsUtil, Compilers }
 
 private[sbt] object Load {
   // note that there is State passed in but not pulled out
@@ -576,7 +577,7 @@ private[sbt] object Load {
     )
   }
 
-  def checkBuildBase(base: File) = checkDirectory(base)
+  def checkBuildBase(base: File): Unit = checkDirectory(base)
 
   def checkDirectory(base: File): Unit = {
     assert(base.isAbsolute, "Not absolute: " + base)
@@ -676,11 +677,11 @@ private[sbt] object Load {
 
   def getBuild[T](map: Map[URI, T], uri: URI): T = map.getOrElse(uri, noBuild(uri))
 
-  def emptyBuild(uri: URI) = sys.error(s"no root project defined for build unit '$uri'")
-  def noBuild(uri: URI) = sys.error(s"build unit '$uri' not defined.")
-  def noProject(uri: URI, id: String) = sys.error(s"no project '$id' defined in '$uri'.")
+  def emptyBuild(uri: URI): Nothing = sys.error(s"no root project defined for build unit '$uri'")
+  def noBuild(uri: URI): Nothing = sys.error(s"build unit '$uri' not defined.")
+  def noProject(uri: URI, id: String): Nothing = sys.error(s"no project '$id' defined in '$uri'.")
 
-  def noConfiguration(uri: URI, id: String, conf: String) =
+  def noConfiguration(uri: URI, id: String, conf: String): Nothing =
     sys.error(s"no configuration '$conf' defined in project '$id' in '$uri'")
 
   // Called from builtinLoader

@@ -9,22 +9,25 @@ package sbt
 package internal
 
 import java.io.File
-import scala.collection.immutable.ListMap
+
 import scala.annotation.tailrec
-import scala.util.{ Try, Success, Failure }
-import sbt.io.Path
-import sbt.io.syntax._
+import scala.collection.immutable.ListMap
+import scala.util.matching.Regex
+import scala.util.{ Failure, Success, Try }
+
 import sbt.Cross._
 import sbt.Def.{ ScopedKey, Setting }
-import sbt.internal.util.complete.DefaultParsers._
-import sbt.internal.util.AttributeKey
-import sbt.internal.util.complete.{ DefaultParsers, Parser }
 import sbt.internal.CommandStrings.{
   JavaCrossCommand,
   JavaSwitchCommand,
   javaCrossHelp,
   javaSwitchHelp
 }
+import sbt.internal.util.AttributeKey
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.{ DefaultParsers, Parser }
+import sbt.io.Path
+import sbt.io.syntax._
 
 private[sbt] object CrossJava {
   // parses jabba style version number adopt@1.8
@@ -398,7 +401,7 @@ private[sbt] object CrossJava {
     }
 
     class LinuxDiscoverConfig(base: File) extends JavaDiscoverConf {
-      def candidates() = wrapNull(base.list())
+      def candidates(): Vector[String] = wrapNull(base.list())
 
       def javaHomes: Vector[(String, File)] =
         candidates()
@@ -421,7 +424,7 @@ private[sbt] object CrossJava {
 
     class JabbaDiscoverConfig extends JavaDiscoverConf {
       val base: File = Path.userHome / ".jabba" / "jdk"
-      val JabbaJavaHomeDir = """([\w\-]+)\@(1\.)?([0-9]+).*""".r
+      val JabbaJavaHomeDir: Regex = """([\w\-]+)\@(1\.)?([0-9]+).*""".r
 
       def javaHomes: Vector[(String, File)] =
         wrapNull(base.list())
@@ -448,7 +451,7 @@ private[sbt] object CrossJava {
 
     class WindowsDiscoverConfig(base: File) extends JavaDiscoverConf {
 
-      def candidates() = wrapNull(base.list())
+      def candidates(): Vector[String] = wrapNull(base.list())
 
       def javaHomes: Vector[(String, File)] =
         candidates()
@@ -459,7 +462,7 @@ private[sbt] object CrossJava {
     }
 
     class JavaHomeDiscoverConfig extends JavaDiscoverConf {
-      def home() = sys.env.get("JAVA_HOME")
+      def home(): Option[String] = sys.env.get("JAVA_HOME")
 
       def javaHomes: Vector[(String, File)] =
         home()
@@ -475,7 +478,7 @@ private[sbt] object CrossJava {
           .toVector
     }
 
-    val configs = Vector(
+    val configs: Vector[JavaDiscoverConf] = Vector(
       new JabbaDiscoverConfig,
       new SdkmanDiscoverConfig,
       new LinuxDiscoverConfig(file("/usr") / "java"),

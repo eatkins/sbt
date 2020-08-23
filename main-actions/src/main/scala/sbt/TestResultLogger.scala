@@ -7,11 +7,9 @@
 
 package sbt
 
-import sbt.Tests.Output
-import sbt.Tests.Summary
+import sbt.Tests.{ Output, Summary }
 import sbt.protocol.testing.TestResult
-import sbt.util.Level
-import sbt.util.Logger
+import sbt.util.{ Level, Logger }
 
 /**
  * Logs information about tests after they finish.

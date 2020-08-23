@@ -9,36 +9,36 @@ package sbt
 
 import java.io.File
 import java.util.Locale
-import KeyRanks.DSetting
 
-import sbt.io.{ GlobFilter, Path }
+import sbt.KeyRanks.DSetting
 import sbt.internal.util.AttributeKey
+import sbt.io.{ GlobFilter, Path }
 
 object BuildPaths {
-  val globalBaseDirectory = AttributeKey[File](
+  val globalBaseDirectory: AttributeKey[File] = AttributeKey[File](
     "global-base-directory",
     "The base directory for global sbt configuration and staging.",
     DSetting
   )
-  val globalPluginsDirectory = AttributeKey[File](
+  val globalPluginsDirectory: AttributeKey[File] = AttributeKey[File](
     "global-plugins-directory",
     "The base directory for global sbt plugins.",
     DSetting
   )
-  val globalSettingsDirectory = AttributeKey[File](
+  val globalSettingsDirectory: AttributeKey[File] = AttributeKey[File](
     "global-settings-directory",
     "The base directory for global sbt settings.",
     DSetting
   )
-  val stagingDirectory =
+  val stagingDirectory: AttributeKey[File] =
     AttributeKey[File]("staging-directory", "The directory for staging remote projects.", DSetting)
-  val dependencyBaseDirectory = AttributeKey[File](
+  val dependencyBaseDirectory: AttributeKey[File] = AttributeKey[File](
     "dependency-base-directory",
     "The base directory for caching dependency resolution.",
     DSetting
   )
 
-  val globalZincDirectory =
+  val globalZincDirectory: AttributeKey[File] =
     AttributeKey[File]("global-zinc-directory", "The base directory for Zinc internals.", DSetting)
 
   import sbt.io.syntax._
@@ -105,7 +105,7 @@ object BuildPaths {
   }
 
   def defaultVersionedGlobalBase(sbtVersion: String): File = defaultGlobalBase / sbtVersion
-  def defaultGlobalBase = Path.userHome / ConfigDirectoryName
+  def defaultGlobalBase: File = Path.userHome / ConfigDirectoryName
 
   private[this] def binarySbtVersion(state: State): String =
     sbt.internal.librarymanagement.cross.CrossVersionUtil
@@ -118,12 +118,12 @@ object BuildPaths {
   def configurationSources(base: File): Seq[File] =
     (base * (GlobFilter("*.sbt") - ".sbt")).get
       .sortBy(_.getName.toLowerCase(Locale.ENGLISH))
-  def pluginDirectory(definitionBase: File) = definitionBase / PluginsDirectoryName
+  def pluginDirectory(definitionBase: File): File = definitionBase / PluginsDirectoryName
 
-  def evalOutputDirectory(base: File) = outputDirectory(base) / "config-classes"
-  def outputDirectory(base: File) = base / DefaultTargetName
+  def evalOutputDirectory(base: File): File = outputDirectory(base) / "config-classes"
+  def outputDirectory(base: File): File = base / DefaultTargetName
 
-  def projectStandard(base: File) = base / "project"
+  def projectStandard(base: File): File = base / "project"
   def globalLoggingStandard(base: File): File =
     base.getCanonicalFile / DefaultTargetName / GlobalLogging
   def globalTaskDirectoryStandard(base: File): File =

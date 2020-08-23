@@ -8,9 +8,8 @@
 package sbt.internal.util
 package appmacro
 
+import scala.reflect.macros._
 import scala.tools.nsc.Global
-import scala.reflect._
-import macros._
 
 /**
  * A builder that uses a TupleN as the tuple representation.

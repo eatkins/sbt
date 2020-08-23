@@ -11,8 +11,10 @@ import sbt.Def.{ ScopedKey, displayFull, displayMasked }
 import sbt.internal.TestBuild._
 import sbt.internal.util.complete.Parser
 import sbt.internal.{ Resolve, TestBuild }
+
 import hedgehog._
 import hedgehog.core.{ ShrinkLimit, SuccessCount }
+import hedgehog.core.{ Result => HResult }
 import hedgehog.runner._
 
 /**
@@ -49,7 +51,7 @@ object ParseKey extends Properties {
     Test(name, result)
       .config(_.copy(testLimit = SuccessCount(n), shrinkLimit = ShrinkLimit(n * 10)))
 
-  def roundtrip(skm: StructureKeyMask) = {
+  def roundtrip(skm: StructureKeyMask): HResult = {
     import skm.{ structure, key }
 
     // if the configuration axis == Zero
@@ -71,7 +73,7 @@ object ParseKey extends Properties {
     ).log(s"Expected: ${displayFull(expected)}")
   }
 
-  def noProject(skm: StructureKeyMask) = {
+  def noProject(skm: StructureKeyMask): HResult = {
     import skm.{ structure, key }
     val mask = skm.mask.copy(project = false)
     // skip when config axis is set to Zero
@@ -85,13 +87,13 @@ object ParseKey extends Properties {
     )
   }
 
-  def noTask(skm: StructureKeyMask) = {
+  def noTask(skm: StructureKeyMask): HResult = {
     import skm.{ structure, key }
     val mask = skm.mask.copy(task = false)
     parseCheck(structure, key, mask)(_.scope.task ==== Zero)
   }
 
-  def noConfig(skm: StructureKeyMask) = {
+  def noConfig(skm: StructureKeyMask): HResult = {
     import skm.{ structure, key }
     val mask = ScopeMask(config = false)
     val resolvedConfig = Resolve.resolveConfig(structure.extra, key.key, mask)(key.scope).config

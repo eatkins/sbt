@@ -7,9 +7,9 @@
 
 package sbt.test
 
-import sbt._
 import sbt.Classpaths._
 import sbt.Def.Initialize
+import sbt._
 
 class ClasspathsTest[T](
     settKey: SettingKey[Seq[T]],
@@ -18,7 +18,7 @@ class ClasspathsTest[T](
     taskVal: Initialize[Task[Seq[T]]],
 ) {
 
-  def testConcat() = {
+  def testConcat(): Initialize[Task[Seq[T]]] = {
     concat(settKey, settKey)
     concat(settKey, taskKey)
     concat(settKey, initVal)
@@ -37,7 +37,7 @@ class ClasspathsTest[T](
     concat(taskVal, taskVal)
   }
 
-  def testConcatSettings() = {
+  def testConcatSettings(): Initialize[Seq[T]] = {
     concatSettings(settKey, settKey)
     concatSettings(settKey, initVal)
     concatSettings(initVal, settKey)

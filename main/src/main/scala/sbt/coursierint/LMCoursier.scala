@@ -10,18 +10,10 @@ package coursierint
 
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import lmcoursier.definitions.{
-  Classifier,
-  Configuration => CConfiguration,
-  CacheLogger,
-  Project => CProject,
-  ModuleMatchers,
-  Reconciliation,
-  Strict => CStrict,
-}
-import lmcoursier._
-import lmcoursier.credentials.Credentials
-import Keys._
+
+import sbt.Keys._
+import sbt.SlashSyntax0._
+import sbt.io.syntax._
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy.{
   Credentials => IvyCredentials,
@@ -29,9 +21,19 @@ import sbt.librarymanagement.ivy.{
   FileCredentials
 }
 import sbt.util.Logger
-import sbt.io.syntax._
+
+import lmcoursier._
+import lmcoursier.credentials.Credentials
+import lmcoursier.definitions.{
+  CacheLogger,
+  Classifier,
+  Configuration => CConfiguration,
+  ModuleMatchers,
+  Project => CProject,
+  Reconciliation,
+  Strict => CStrict
+}
 import xsbti.AppConfiguration
-import sbt.SlashSyntax0._
 
 object LMCoursier {
   private[this] val credentialRegistry: ConcurrentHashMap[(String, String), IvyCredentials] =

@@ -11,15 +11,15 @@ import java.io.File
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier.{ isPublic, isStatic }
 
+import scala.sys.process.Process
+import scala.util.control.NonFatal
+import scala.util.{ Failure, Success, Try }
+
 import sbt.internal.inc.ScalaInstance
 import sbt.internal.inc.classpath.{ ClasspathFilter, ClasspathUtil }
 import sbt.internal.util.MessageOnlyException
 import sbt.io.Path
 import sbt.util.Logger
-
-import scala.sys.process.Process
-import scala.util.control.NonFatal
-import scala.util.{ Failure, Success, Try }
 
 sealed trait ScalaRun {
   def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger): Try[Unit]
@@ -146,7 +146,7 @@ class Run(private[sbt] val newLoader: Seq[File] => ClassLoader, trapExit: Boolea
       currentThread.setContextClassLoader(oldLoader)
     }
   }
-  def getMainMethod(mainClassName: String, loader: ClassLoader) = {
+  def getMainMethod(mainClassName: String, loader: ClassLoader): Method = {
     val mainClass = Class.forName(mainClassName, true, loader)
     val method = mainClass.getMethod("main", classOf[Array[String]])
     // jvm allows the actual main class to be non-public and to run a method in the non-public class,
@@ -165,7 +165,7 @@ class Run(private[sbt] val newLoader: Seq[File] => ClassLoader, trapExit: Boolea
 object Run {
   def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger)(
       implicit runner: ScalaRun
-  ) =
+  ): Try[Unit] =
     runner.run(mainClass, classpath, options, log)
 
   /** Executes the given function, trapping calls to System.exit. */

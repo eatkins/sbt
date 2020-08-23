@@ -7,9 +7,11 @@
 
 package sbt.internal.util
 
+import scala.reflect.runtime.universe.TypeTag
+
 import sbt.internal.util.codec.JsonProtocol._
 import sbt.util._
-import scala.reflect.runtime.universe.TypeTag
+
 import sjsonnew.JsonFormat
 
 private[sbt] trait MiniLogger {

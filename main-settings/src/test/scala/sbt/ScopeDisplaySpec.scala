@@ -7,16 +7,21 @@
 
 package sbt
 
-import org.scalatest.FlatSpec
+import java.net.URI
+
 import sbt.internal.util.{ AttributeKey, AttributeMap }
 import sbt.io.syntax.file
 
+import org.scalatest.FlatSpec
+
 class ScopeDisplaySpec extends FlatSpec {
-  val project = ProjectRef(file("foo/bar"), "bar")
+  val project: ProjectRef = ProjectRef(file("foo/bar"), "bar")
   val mangledName = "bar_slash_blah_blah_blah"
-  val scopedKey = Def.ScopedKey(Scope.Global in project, AttributeKey[Task[String]](mangledName))
-  val am = AttributeMap.empty.put(Scope.customShowString, "blah")
-  val sanitizedKey = scopedKey.copy(scope = scopedKey.scope.copy(extra = Select(am)))
+  val scopedKey: Def.ScopedKey[Task[String]] =
+    Def.ScopedKey(Scope.Global in project, AttributeKey[Task[String]](mangledName))
+  val am: AttributeMap = AttributeMap.empty.put(Scope.customShowString, "blah")
+  val sanitizedKey: Def.ScopedKey[Task[String]] =
+    scopedKey.copy(scope = scopedKey.scope.copy(extra = Select(am)))
   "Def.displayRelative2" should "display mangled name" in {
     assert(Def.showRelativeKey2(project, None).show(scopedKey) == mangledName)
   }
@@ -51,11 +56,11 @@ class ScopeDisplaySpec extends FlatSpec {
   behavior of "Def.displayRelative2"
 
   val b1 = project.build
-  val b2 = sbt.io.IO.toURI(file("other"))
+  val b2: URI = sbt.io.IO.toURI(file("other"))
 
   val p1 = project
-  val p2 = ProjectRef(b1, "baz")
-  val p3 = ProjectRef(b2, "qux")
+  val p2: ProjectRef = ProjectRef(b1, "baz")
+  val p3: ProjectRef = ProjectRef(b2, "qux")
 
   private def disp(r: Reference) = Def.displayRelative2(current = p1, r)
 

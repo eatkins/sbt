@@ -10,7 +10,7 @@ package sbt.internal.util
 import java.io.IOException
 
 object ErrorHandling {
-  def translate[T](msg: => String)(f: => T) =
+  def translate[T](msg: => String)(f: => T): T =
     try {
       f
     } catch {

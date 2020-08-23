@@ -9,14 +9,12 @@ package sbt.util
 
 import sbt.io.IO
 import sbt.io.syntax._
+import sbt.util.CacheImplicits._
 
-import CacheImplicits._
-
-import sjsonnew.{ Builder, deserializationError, IsoString, JsonFormat, Unbuilder }
-import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter, Parser }
-
-import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 import org.scalatest.FlatSpec
+import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter, Parser }
+import sjsonnew.{ Builder, IsoString, JsonFormat, Unbuilder, deserializationError }
 
 class SingletonCacheSpec extends FlatSpec {
 

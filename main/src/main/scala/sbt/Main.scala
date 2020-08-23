@@ -15,6 +15,11 @@ import java.util.Properties
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicBoolean
 
+import scala.annotation.tailrec
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.Duration
+import scala.util.control.NonFatal
+
 import sbt.BasicCommandStrings.{ Shell, Shutdown, TemplateCommand }
 import sbt.Project.LoadAction
 import sbt.compiler.EvalImports
@@ -32,14 +37,9 @@ import sbt.internal.util.complete.{ Parser, SizeParser }
 import sbt.io._
 import sbt.io.syntax._
 import sbt.util.{ Level, Logger, Show }
-import xsbti.compile.CompilerCache
 
-import scala.annotation.tailrec
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.Duration
-import scala.util.control.NonFatal
-import sbt.internal.io.Retry
 import xsbti.AppProvider
+import xsbti.compile.CompilerCache
 
 /** This class is the entry point for sbt. */
 final class xMain extends xsbti.AppMain {
@@ -318,18 +318,19 @@ object BuiltinCommands {
   def DefaultBootCommands: Seq[String] =
     WriteSbtVersion :: LoadProject :: NotifyUsersAboutShell :: s"$IfLast $Shell" :: Nil
 
-  def boot = Command.make(BootCommand)(bootParser)
+  def boot: Command = Command.make(BootCommand)(bootParser)
 
-  def about = Command.command(AboutCommand, aboutBrief, aboutDetailed) { s =>
+  def about: Command = Command.command(AboutCommand, aboutBrief, aboutDetailed) { s =>
     s.log.info(aboutString(s)); s
   }
 
-  def setLogLevel = Command.arb(const(logLevelParser), logLevelHelp)(LogManager.setGlobalLogLevel)
+  def setLogLevel: Command =
+    Command.arb(const(logLevelParser), logLevelHelp)(LogManager.setGlobalLogLevel)
   private[this] def logLevelParser: Parser[Level.Value] =
     oneOf(Level.values.toSeq.map(v => v.toString ^^^ v))
 
   // This parser schedules the default boot commands unless overridden by an alias
-  def bootParser(s: State) = {
+  def bootParser(s: State): Parser[() => State] = {
     val orElse = () => DefaultBootCommands.toList ::: s
     delegateToAlias(BootCommand, success(orElse))(s)
   }
@@ -479,8 +480,9 @@ object BuiltinCommands {
       mf: Manifest[_]
   )(implicit taskMF: Manifest[Task[_]], inputMF: Manifest[InputTask[_]]): Boolean =
     mf.runtimeClass == taskMF.runtimeClass || mf.runtimeClass == inputMF.runtimeClass
-  def topNRanked(n: Int) = (keys: Seq[AttributeKey[_]]) => sortByRank(keys).take(n)
-  def highPass(rankCutoff: Int) =
+  def topNRanked(n: Int): Seq[AttributeKey[_]] => Seq[AttributeKey[_]] =
+    (keys: Seq[AttributeKey[_]]) => sortByRank(keys).take(n)
+  def highPass(rankCutoff: Int): Seq[AttributeKey[_]] => Seq[AttributeKey[_]] =
     (keys: Seq[AttributeKey[_]]) => sortByRank(keys).takeWhile(_.rank <= rankCutoff)
 
   def tasksHelp(
@@ -502,7 +504,7 @@ object BuiltinCommands {
 
   def taskStrings(key: AttributeKey[_]): Option[(String, String)] = taskStrings(key, false)
 
-  def defaults = Command.command(DefaultsCommand) { s =>
+  def defaults: Command = Command.command(DefaultsCommand) { s =>
     s.copy(definedCommands = DefaultCommands)
   }
 
@@ -633,7 +635,7 @@ object BuiltinCommands {
     (ext.structure, Select(ext.currentRef), ext.showKey)
   }
 
-  def setParser = (s: State) => {
+  def setParser: State => Parser[(Boolean, String)] = (s: State) => {
     val extracted = Project.extract(s)
     import extracted._
     token(Space ~> flag("every" ~ Space)) ~

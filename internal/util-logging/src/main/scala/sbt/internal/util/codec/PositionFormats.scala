@@ -6,9 +6,10 @@
  */
 
 package sbt.internal.util.codec
-import _root_.sjsonnew.{ deserializationError, Builder, JsonFormat, Unbuilder }
-import xsbti.Position
 import java.util.Optional
+
+import _root_.sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
+import xsbti.Position
 
 trait PositionFormats { self: sjsonnew.BasicJsonProtocol =>
   implicit lazy val PositionFormat: JsonFormat[Position] = new JsonFormat[Position] {

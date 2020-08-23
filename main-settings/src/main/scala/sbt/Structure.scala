@@ -9,12 +9,12 @@ package sbt
 
 import scala.language.experimental.macros
 
-import sbt.internal.util.Types._
-import sbt.internal.util.{ ~>, AList, AttributeKey, Settings, SourcePosition }
-import sbt.util.OptJsonWriter
 import sbt.ConcurrentRestrictions.Tag
 import sbt.Def.{ Initialize, KeyedInitialize, ScopedKey, Setting, setting }
-import std.TaskExtra.{ task => mktask, _ }
+import sbt.internal.util.Types._
+import sbt.internal.util.{ AList, AttributeKey, Settings, SourcePosition, ~> }
+import sbt.std.TaskExtra.{ task => mktask, _ }
+import sbt.util.OptJsonWriter
 
 /** An abstraction on top of Settings for build configuration and task definition. */
 sealed trait Scoped extends Equals {

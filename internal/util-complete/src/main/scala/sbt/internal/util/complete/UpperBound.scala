@@ -38,7 +38,7 @@ case object Infinite extends UpperBound {
 
   def isOne = false
   def isZero = false
-  def decrement = this
+  def decrement: Infinite.type = this
   def isInfinite = true
 
   override def toString = "Infinity"
@@ -52,9 +52,9 @@ final case class Finite(value: Int) extends UpperBound {
   assume(value >= 0, "Maximum occurrences must be nonnegative.")
 
   def >=(min: Int) = value >= min
-  def isOne = value == 1
-  def isZero = value == 0
-  def decrement = Finite(scala.math.max(0, value - 1))
+  def isOne: Boolean = value == 1
+  def isZero: Boolean = value == 0
+  def decrement: Finite = Finite(scala.math.max(0, value - 1))
   def isInfinite = false
   override def toString = value.toString
 }

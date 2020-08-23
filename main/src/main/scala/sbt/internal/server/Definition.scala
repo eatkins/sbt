@@ -14,27 +14,26 @@ import java.nio.file._
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.reflect.NameTransformer
 import scala.tools.reflect.{ ToolBox, ToolBoxError }
 import scala.util.matching.Regex
 
+import sbt.Keys._
+import sbt.internal.inc.JavaInterfaceUtil._
+import sbt.internal.inc.{ Analysis, MixedAnalyzingCompiler }
+import sbt.internal.langserver
+import sbt.internal.langserver.{ ErrorCodes, Location, Position, Range, TextDocumentPositionParams }
+import sbt.internal.protocol.JsonRpcResponseError
+import sbt.internal.protocol.codec.JsonRPCProtocol
+import sbt.util.Logger
+import sbt.{ Def, Task }
+
+import com.github.benmanes.caffeine.cache.{ Cache, Caffeine }
 import sjsonnew.JsonFormat
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
-
-import sbt.internal.inc.{ Analysis, MixedAnalyzingCompiler }
-import sbt.internal.inc.JavaInterfaceUtil._
-import sbt.internal.protocol.JsonRpcResponseError
-import sbt.internal.protocol.codec.JsonRPCProtocol
-import sbt.internal.langserver
-import sbt.internal.langserver.{ ErrorCodes, Location, Position, Range, TextDocumentPositionParams }
-import sbt.util.Logger
-import sbt.Keys._
 import xsbti.{ FileConverter, VirtualFileRef }
-import com.github.benmanes.caffeine.cache.Cache
-import scala.concurrent.Promise
-import com.github.benmanes.caffeine.cache.Caffeine
 
 private[sbt] object Definition {
   def send[A: JsonFormat](source: CommandSource, execId: String)(params: A): Unit = {
@@ -218,7 +217,7 @@ private[sbt] object Definition {
     }
   }
 
-  def collectAnalysesTask = Def.task {
+  def collectAnalysesTask: Def.Initialize[Task[Any]] = Def.task {
     val cacheFile: String = compileIncSetup.value.cacheFile.getAbsolutePath
     val useBinary = enableBinaryCompileAnalysis.value
     val s = state.value

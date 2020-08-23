@@ -8,7 +8,7 @@
 package sbt
 package plugins
 
-import Def.Setting
+import sbt.Def.Setting
 
 /**
  * Plugin for core sbt-isms.

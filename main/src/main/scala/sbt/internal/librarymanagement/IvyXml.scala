@@ -12,19 +12,21 @@ package librarymanagement
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 
-import lmcoursier.definitions.{ Configuration, Project }
-import org.apache.ivy.core.module.id.ModuleRevisionId
-import Def.Setting
+import scala.collection.JavaConverters._
+import scala.xml.{ Node, PrefixedAttribute }
+
+import sbt.Def.Setting
 import sbt.Keys.{
   csrProject,
   csrPublications,
-  publishLocalConfiguration,
   publishConfiguration,
+  publishLocalConfiguration,
   useCoursier
 }
 import sbt.librarymanagement.PublishConfiguration
-import scala.collection.JavaConverters._
-import scala.xml.{ Node, PrefixedAttribute }
+
+import lmcoursier.definitions.{ Configuration, Project }
+import org.apache.ivy.core.module.id.ModuleRevisionId
 
 object IvyXml {
   import sbt.Project._

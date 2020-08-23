@@ -8,9 +8,9 @@
 package sbt
 package plugins
 
-import Def.Setting
-import Keys._
-import librarymanagement._
+import sbt.Def.Setting
+import sbt.Keys._
+import sbt.librarymanagement._
 
 /**
  * An experimental plugin that adds the ability for Giter8 templates to be resolved

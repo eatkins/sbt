@@ -8,21 +8,25 @@
 package sbt.internal.util
 package complete
 
+import org.scalacheck.Prop
 object JLineTest {
   import DefaultParsers._
 
-  val one = "blue" | "green" | "black"
-  val two = token("color" ~> Space) ~> token(one)
-  val three = token("color" ~> Space) ~> token(ID.examples("blue", "green", "black"))
-  val four = token("color" ~> Space) ~> token(ID, "<color name>")
+  val one: Parser[String] = "blue" | "green" | "black"
+  val two: Parser[String] = token("color" ~> Space) ~> token(one)
+  val three: Parser[String] = token("color" ~> Space) ~> token(
+    ID.examples("blue", "green", "black")
+  )
+  val four: Parser[String] = token("color" ~> Space) ~> token(ID, "<color name>")
 
-  val num = token(NatBasic)
-  val five = (num ~ token("+" | "-") ~ num) <~ token('=') flatMap {
+  val num: Parser[Int] = token(NatBasic)
+  val five: Parser[String] = (num ~ token("+" | "-") ~ num) <~ token('=') flatMap {
     case a ~ "+" ~ b => token((a + b).toString)
     case a ~ "-" ~ b => token((a - b).toString)
   }
 
-  val parsers = Map("1" -> one, "2" -> two, "3" -> three, "4" -> four, "5" -> five)
+  val parsers: Map[String, Parser[String]] =
+    Map("1" -> one, "2" -> two, "3" -> three, "4" -> four, "5" -> five)
   def main(args: Array[String]): Unit = {
     import jline.TerminalFactory
     import jline.console.ConsoleReader
@@ -49,14 +53,17 @@ object ParserTest extends Properties("Completing Parser") {
   import Parsers._
   import DefaultParsers.matches
 
-  val nested = (token("a1") ~ token("b2")) ~ "c3"
-  val nestedDisplay = (token("a1", "<a1>") ~ token("b2", "<b2>")) ~ "c3"
+  val nested: Parser[((String, String), String)] = (token("a1") ~ token("b2")) ~ "c3"
+  val nestedDisplay: Parser[((String, String), String)] = (token("a1", "<a1>") ~ token(
+    "b2",
+    "<b2>"
+  )) ~ "c3"
 
-  val spacePort = token(Space) ~> Port
+  val spacePort: Parser[Int] = token(Space) ~> Port
 
   def p[T](f: T): T = { println(f); f }
 
-  def checkSingle(in: String, expect: Completion)(expectDisplay: Completion = expect) =
+  def checkSingle(in: String, expect: Completion)(expectDisplay: Completion = expect): Prop =
     (("token '" + in + "'") |: checkOne(in, nested, expect)) &&
       (("display '" + in + "'") |: checkOne(in, nestedDisplay, expectDisplay))
 
@@ -68,7 +75,7 @@ object ParserTest extends Properties("Completing Parser") {
     ("completions: " + cs) |: ("Expected: " + expect) |: (cs == expect: Prop)
   }
 
-  def checkInvalid(in: String) =
+  def checkInvalid(in: String): Prop =
     (("token '" + in + "'") |: checkInv(in, nested)) &&
       (("display '" + in + "'") |: checkInv(in, nestedDisplay))
 
@@ -100,11 +107,13 @@ object ParserTest extends Properties("Completing Parser") {
   property("empty suggest for examples token") =
     checkOne("asdf", token(any.+.examples("asdf", "qwer")), Completion.suggestion(""))
 
-  val colors = Set("blue", "green", "red")
-  val base = (seen: Seq[String]) => token(ID examples (colors -- seen))
-  val sep = token(Space)
-  val repeat = repeatDep(base, sep)
-  def completionStrings(ss: Set[String]) = Completions(ss map (Completion.token("", _)))
+  val colors: Set[String] = Set("blue", "green", "red")
+  val base: Seq[String] => Parser[String] = (seen: Seq[String]) =>
+    token(ID examples (colors -- seen))
+  val sep: Parser[Seq[Char]] = token(Space)
+  val repeat: Parser[Seq[String]] = repeatDep(base, sep)
+  def completionStrings(ss: Set[String]): Completions =
+    Completions(ss map (Completion.token("", _)))
 
   property("repeatDep no suggestions for bad input") = checkInv(".", repeat)
   property("repeatDep suggest all") = checkAll("", repeat, completionStrings(colors))
@@ -121,17 +130,17 @@ object ParserTest extends Properties("Completing Parser") {
   property("repeatDep accepts two tokens") = matches(repeat, colors.toSeq.take(2).mkString(" "))
 }
 object ParserExample {
-  val ws = charClass(_.isWhitespace, "whitespace").+
-  val notws = charClass(!_.isWhitespace, "not whitespace").+
+  val ws: Parser[Seq[Char]] = charClass(_.isWhitespace, "whitespace").+
+  val notws: Parser[Seq[Char]] = charClass(!_.isWhitespace, "not whitespace").+
 
-  val name = token("test")
-  val options = (ws ~> token("quick" | "failed" | "new")).*
-  val exampleSet = Set("am", "is", "are", "was", "were")
-  val include = (ws ~> token(
+  val name: Parser[String] = token("test")
+  val options: Parser[Seq[String]] = (ws ~> token("quick" | "failed" | "new")).*
+  val exampleSet: Set[String] = Set("am", "is", "are", "was", "were")
+  val include: Parser[Seq[String]] = (ws ~> token(
     examples(notws.string, new FixedSetExamples(exampleSet), exampleSet.size, false)
   )).*
 
-  val t = name ~ options ~ include
+  val t: Parser[((String, Seq[String]), Seq[String])] = name ~ options ~ include
 
   // Get completions for some different inputs
   println(completions(t, "te", 1))

@@ -15,7 +15,7 @@ private[sbt] object SbtRefactorings {
   import sbt.internal.SessionSettings.{ SessionSetting, SbtConfigFile }
 
   val emptyString = ""
-  val reverseOrderingInt = Ordering[Int].reverse
+  val reverseOrderingInt: Ordering[Int] = Ordering[Int].reverse
 
   /**
    * Refactoring a `.sbt` file so that the new settings are used instead of any existing settings.

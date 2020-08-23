@@ -11,12 +11,13 @@ import java.io.File
 
 import sbt.internal.bsp
 import sbt.io.IO
+
 import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
 
 object BuildServerConnection {
   final val name = "sbt"
   final val bspVersion = "2.0.0-M5"
-  final val languages = Vector("scala")
+  final val languages: Vector[String] = Vector("scala")
 
   private[sbt] def writeConnectionFile(sbtVersion: String, baseDir: File): Unit = {
     import bsp.codec.JsonProtocol._

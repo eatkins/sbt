@@ -10,7 +10,7 @@ package sbt.internal
 import org.specs2.mutable.Specification
 
 class AggregationSpec extends Specification {
-  val timing = Aggregation.timing(Aggregation.defaultFormat, 0, _: Long)
+  val timing: Long => String = Aggregation.timing(Aggregation.defaultFormat, 0, _: Long)
 
   "timing" should {
     "format total time properly" in {

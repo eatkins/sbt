@@ -8,10 +8,10 @@
 package sbt
 
 import sbt.internal.inc.ReflectUtilities
-import sbt.internal.util.complete.{ DefaultParsers, EditDistance, Parser }
 import sbt.internal.util.Types.const
-import sbt.internal.util.{ AttributeKey, AttributeMap, Util }
 import sbt.internal.util.Util.{ nilSeq }
+import sbt.internal.util.complete.{ DefaultParsers, EditDistance, Parser }
+import sbt.internal.util.{ AttributeKey, AttributeMap, Util }
 
 /**
  * An operation that can be executed from the sbt console.
@@ -42,12 +42,12 @@ private[sbt] final class SimpleCommand(
 
   assert(Command validID name, s"'$name' is not a valid command name.")
 
-  def help = const(help0)
+  def help: State => Help = const(help0)
 
   def tag[T](key: AttributeKey[T], value: T): SimpleCommand =
     new SimpleCommand(name, help0, parser, tags.put(key, value))
 
-  override def toString = s"SimpleCommand($name)"
+  override def toString: String = s"SimpleCommand($name)"
 }
 
 private[sbt] final class ArbitraryCommand(

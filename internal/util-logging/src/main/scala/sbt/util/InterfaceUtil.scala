@@ -7,10 +7,11 @@
 
 package sbt.util
 
-import xsbti.{ Position, Problem, Severity, T2 }
 import java.io.File
 import java.util.Optional
 import java.util.function.Supplier
+
+import xsbti.{ Position, Problem, Severity, T2 }
 
 object InterfaceUtil {
   def toSupplier[A](a: => A): Supplier[A] = new Supplier[A] {
@@ -146,19 +147,19 @@ object InterfaceUtil {
       endLine0: Option[Integer],
       endColumn0: Option[Integer]
   ) extends Position {
-    val line = o2jo(line0)
+    val line: Optional[Integer] = o2jo(line0)
     val lineContent = content
-    val offset = o2jo(offset0)
-    val pointer = o2jo(pointer0)
-    val pointerSpace = o2jo(pointerSpace0)
-    val sourcePath = o2jo(sourcePath0)
-    val sourceFile = o2jo(sourceFile0)
-    override val startOffset = o2jo(startOffset0)
-    override val endOffset = o2jo(endOffset0)
-    override val startLine = o2jo(startLine0)
-    override val startColumn = o2jo(startColumn0)
-    override val endLine = o2jo(endLine0)
-    override val endColumn = o2jo(endColumn0)
+    val offset: Optional[Integer] = o2jo(offset0)
+    val pointer: Optional[Integer] = o2jo(pointer0)
+    val pointerSpace: Optional[String] = o2jo(pointerSpace0)
+    val sourcePath: Optional[String] = o2jo(sourcePath0)
+    val sourceFile: Optional[File] = o2jo(sourceFile0)
+    override val startOffset: Optional[Integer] = o2jo(startOffset0)
+    override val endOffset: Optional[Integer] = o2jo(endOffset0)
+    override val startLine: Optional[Integer] = o2jo(startLine0)
+    override val startColumn: Optional[Integer] = o2jo(startColumn0)
+    override val endLine: Optional[Integer] = o2jo(endLine0)
+    override val endColumn: Optional[Integer] = o2jo(endColumn0)
   }
 
   private final class ConcreteProblem(
@@ -172,7 +173,7 @@ object InterfaceUtil {
     val position = pos
     val message = msg
     val severity = sev
-    override val rendered = o2jo(rendered0)
-    override def toString = s"[$severity] $pos: $message"
+    override val rendered: Optional[String] = o2jo(rendered0)
+    override def toString: String = s"[$severity] $pos: $message"
   }
 }

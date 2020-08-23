@@ -64,7 +64,7 @@ object IPC {
 
   final class Server private[IPC] (s: ServerSocket) {
     def port = s.getLocalPort
-    def close() = s.close()
+    def close(): Unit = s.close()
     def isClosed: Boolean = s.isClosed
     def connection[T](f: IPC => T): T = IPC.ipc(s.accept())(f)
   }
@@ -75,6 +75,6 @@ final class IPC private (s: Socket) {
   private val in = new BufferedReader(new InputStreamReader(s.getInputStream))
   private val out = new BufferedWriter(new OutputStreamWriter(s.getOutputStream))
 
-  def send(s: String) = { out.write(s); out.newLine(); out.flush() }
+  def send(s: String): Unit = { out.write(s); out.newLine(); out.flush() }
   def receive: String = in.readLine()
 }

@@ -7,18 +7,19 @@
 
 package sbt.internal.util
 
-import java.io.{ InputStream, InterruptedIOException, IOException, OutputStream, PrintStream }
+import java.io.{ IOException, InputStream, InterruptedIOException, OutputStream, PrintStream }
 import java.nio.channels.ClosedChannelException
-import java.util.{ Arrays, Locale }
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.{ Executors, LinkedBlockingQueue, TimeUnit }
+import java.util.{ Arrays, Locale }
 
-import jline.DefaultTerminal2
-import jline.console.ConsoleReader
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
+
+import jline.DefaultTerminal2
+import jline.console.ConsoleReader
 
 trait Terminal extends AutoCloseable {
 
@@ -428,7 +429,7 @@ object Terminal {
     }
   }
 
-  val sepBytes = System.lineSeparator.getBytes("UTF-8")
+  val sepBytes: Array[Byte] = System.lineSeparator.getBytes("UTF-8")
   private class LinePrintStream(outputStream: OutputStream)
       extends PrintStream(outputStream, true) {
     override def println(s: String): Unit = synchronized {
@@ -913,7 +914,7 @@ object Terminal {
       }
     }
 
-    override val outputStream = new OutputStream {
+    override val outputStream: OutputStream = new OutputStream {
       override def write(b: Int): Unit = throwIfClosed {
         write(Array((b & 0xFF).toByte))
       }

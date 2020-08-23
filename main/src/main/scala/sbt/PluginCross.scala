@@ -7,16 +7,16 @@
 
 package sbt
 
-import sbt.internal.util.complete.{ Parser, DefaultParsers }
-import DefaultParsers._
+import sbt.Cross.{ requireSession, spacedFirst }
+import sbt.Def.ScopedKey
 import sbt.Keys._
-import Scope.GlobalScope
-import Def.ScopedKey
-import sbt.internal.Load
+import sbt.Project.inScope
+import sbt.Scope.GlobalScope
 import sbt.internal.CommandStrings._
-import Cross.{ spacedFirst, requireSession }
+import sbt.internal.Load
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.{ Parser }
 import sbt.librarymanagement.VersionNumber
-import Project.inScope
 
 /**
  * Module responsible for plugin cross building.

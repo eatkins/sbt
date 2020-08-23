@@ -12,10 +12,10 @@ import java.net.URLClassLoader
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
+import scala.collection.JavaConverters._
+
 import sbt.io.IO
 import sbt.util.Logger
-
-import scala.collection.JavaConverters._
 
 /**
  * This classloader doesn't load any classes. It is able to create a two layer bundled ClassLoader

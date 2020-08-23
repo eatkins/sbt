@@ -7,7 +7,7 @@
 
 package sbt.internal.util
 
-import collection.mutable
+import scala.collection.mutable
 
 trait RMap[K[_], V[_]] {
   def apply[T](k: K[T]): V[T]

@@ -10,6 +10,11 @@ package internal.nio
 
 import java.nio.file.Path
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+
+import scala.annotation.tailrec
+import scala.concurrent.duration.{ Deadline => SDeadline, _ }
+import scala.io.AnsiColor
+
 import sbt.BasicCommandStrings.{ RebootCommand, Shutdown, TerminateAction }
 import sbt.Keys.{ baseDirectory, pollInterval, state }
 import sbt.Scope.Global
@@ -18,17 +23,11 @@ import sbt.internal.CommandStrings.LoadProject
 import sbt.internal.SysProp
 import sbt.internal.util.{ AttributeKey, Terminal }
 import sbt.io.syntax._
-import sbt.nio.FileChanges
-import sbt.nio.FileStamp
 import sbt.nio.Keys._
-import sbt.nio.file.{ FileAttributes, FileTreeView, Glob, ** }
 import sbt.nio.file.syntax._
-import sbt.nio.Settings
+import sbt.nio.file.{ **, FileAttributes, FileTreeView, Glob }
+import sbt.nio.{ FileChanges, FileStamp, Settings }
 import sbt.util.Logger
-
-import scala.annotation.tailrec
-import scala.concurrent.duration.{ Deadline => SDeadline, _ }
-import scala.io.AnsiColor
 
 /**
  * This class is used to determine whether sbt needs to automatically reload

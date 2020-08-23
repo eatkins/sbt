@@ -7,14 +7,15 @@
 
 package sbt
 
-import sbt.internal.{ Load, BuildStructure, Act, Aggregation, SessionSettings }
-import Scope.GlobalScope
-import Def.{ ScopedKey, Setting }
-import sbt.internal.util.complete.Parser
-import sbt.internal.util.AttributeKey
-import sbt.util.Show
-import std.Transform.DummyTaskMap
+import sbt.Def.{ ScopedKey, Setting }
 import sbt.EvaluateTask.extractedTaskConfig
+import sbt.Scope.GlobalScope
+import sbt.internal.LoadedBuildUnit
+import sbt.internal.util.AttributeKey
+import sbt.internal.util.complete.Parser
+import sbt.internal.{ Act, Aggregation, BuildStructure, Load, SessionSettings }
+import sbt.std.Transform.DummyTaskMap
+import sbt.util.Show
 
 final case class Extracted(
     structure: BuildStructure,
@@ -22,8 +23,8 @@ final case class Extracted(
     currentRef: ProjectRef
 )(implicit val showKey: Show[ScopedKey[_]]) {
   def rootProject = structure.rootProject
-  lazy val currentUnit = structure units currentRef.build
-  lazy val currentProject = currentUnit defined currentRef.project
+  lazy val currentUnit: LoadedBuildUnit = structure units currentRef.build
+  lazy val currentProject: ResolvedProject = currentUnit defined currentRef.project
   lazy val currentLoader: ClassLoader = currentUnit.loader
 
   /**

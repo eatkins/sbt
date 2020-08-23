@@ -8,9 +8,9 @@
 package sbt
 package scriptedtest
 
-import xsbt.IPC
-
 import scala.sys.process.{ BasicIO, Process }
+
+import xsbt.IPC
 
 private[sbt] sealed trait RemoteSbtCreatorProp
 private[sbt] object RemoteSbtCreatorProp {
@@ -29,7 +29,7 @@ final class LauncherBasedRemoteSbtCreator(
     log: Logger,
     launchOpts: Seq[String] = Nil,
 ) extends RemoteSbtCreator {
-  def newRemote(server: IPC.Server) = {
+  def newRemote(server: IPC.Server): Process = {
     val launcherJar = launcher.getAbsolutePath
     val globalBase = "-Dsbt.global.base=" + (new File(directory, "global")).getAbsolutePath
     val scripted = "-Dsbt.scripted=true"

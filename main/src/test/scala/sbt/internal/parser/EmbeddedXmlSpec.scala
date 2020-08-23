@@ -49,7 +49,7 @@ class EmbeddedXmlSpec extends CheckIfParsedSpec {
 
   }
 
-  protected val files = Seq(
+  protected val files: Seq[(String, String, Boolean, Boolean)] = Seq(
     ("""
         |val p = <a/>
       """.stripMargin, "Xml modified closing tag at end of file", false, true),

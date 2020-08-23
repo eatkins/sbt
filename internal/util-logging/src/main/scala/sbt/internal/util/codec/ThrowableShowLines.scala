@@ -8,8 +8,8 @@
 package sbt
 package internal.util.codec
 
-import sbt.util.ShowLines
 import sbt.internal.util.{ StackTrace, TraceEvent }
+import sbt.util.ShowLines
 
 trait ThrowableShowLines {
   implicit val sbtThrowableShowLines: ShowLines[Throwable] =

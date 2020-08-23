@@ -14,21 +14,22 @@ import java.nio.file.{ Files, Path }
 import java.util.concurrent.Callable
 
 import sbt.internal.inc.classpath.ClasspathUtil
-import sbt.io.IO
 import sbt.internal.librarymanagement._
 import sbt.internal.util.{ BufferedLogger, FullLogger }
+import sbt.io.IO
 import sbt.librarymanagement._
 import sbt.librarymanagement.syntax._
 import sbt.util.InterfaceUtil.{ toSupplier => f0 }
+
 import xsbti.ArtifactInfo._
-import xsbti.{ ComponentProvider, GlobalLock, Logger }
 import xsbti.compile.{ ClasspathOptionsUtil, CompilerBridgeProvider }
+import xsbti.{ ComponentProvider, GlobalLock, Logger }
 
 private[sbt] object ZincComponentCompiler {
   import xsbti.compile.ScalaInstance
 
   final val binSeparator = "-bin_"
-  final val javaClassVersion = System.getProperty("java.class.version")
+  final val javaClassVersion: String = System.getProperty("java.class.version")
 
   private[inc] final val sbtOrgTemp = JsonUtil.sbtOrgTemp
   private[inc] final val modulePrefixTemp = "temp-module-"

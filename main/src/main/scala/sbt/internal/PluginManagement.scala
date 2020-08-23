@@ -8,12 +8,12 @@
 package sbt
 package internal
 
-import Keys.Classpath
-import Def.Setting
-import PluginManagement._
-import sbt.librarymanagement.ModuleID
-
 import java.net.{ URI, URL, URLClassLoader }
+
+import sbt.Def.Setting
+import sbt.Keys.Classpath
+import sbt.internal.PluginManagement._
+import sbt.librarymanagement.ModuleID
 
 final case class PluginManagement(
     overrides: Set[ModuleID],

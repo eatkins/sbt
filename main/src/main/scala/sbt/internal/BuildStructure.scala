@@ -11,15 +11,16 @@ package internal
 import java.io.File
 import java.net.URI
 
-import Def.{ ScopeLocal, ScopedKey, Setting, displayFull }
-import BuildPaths.outputDirectory
-import Scope.GlobalScope
-import BuildStreams.Streams
+import sbt.BuildPaths.outputDirectory
+import sbt.Def.{ ScopeLocal, ScopedKey, Setting, displayFull }
 import sbt.LocalRootProject
-import sbt.io.syntax._
-import sbt.internal.util.{ AttributeEntry, AttributeKey, AttributeMap, Attributed, Settings }
+import sbt.Scope.GlobalScope
+import sbt.internal.BuildStreams.Streams
 import sbt.internal.util.Attributed.data
+import sbt.internal.util.{ AttributeEntry, AttributeKey, AttributeMap, Attributed, Settings }
+import sbt.io.syntax._
 import sbt.util.Logger
+
 import sjsonnew.SupportConverter
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 
@@ -105,7 +106,7 @@ final class LoadedBuildUnit(
    * The project to use as the default when one is not otherwise selected.
    * `LocalRootProject` resolves to this from within the same build.
    */
-  val root = rootProjects.headOption.getOrElse(
+  val root: String = rootProjects.headOption.getOrElse(
     throw new java.lang.AssertionError(
       s"assertion failed: No root projects defined for build unit $unit"
     )
@@ -125,10 +126,10 @@ final class LoadedBuildUnit(
    * The class loader to use for this build unit's publicly visible code.
    * It includes build definition and plugin classes and classes for .sbt file statements and expressions.
    */
-  def loader = unit.definitions.dslDefinitions.classloader(unit.definitions.loader)
+  def loader: ClassLoader = unit.definitions.dslDefinitions.classloader(unit.definitions.loader)
 
   /** The imports to use for .sbt files, `consoleProject` and other contexts that use code from the build definition. */
-  def imports = BuildUtil.getImports(unit)
+  def imports: Seq[String] = BuildUtil.getImports(unit)
 
   def projects: Iterable[ResolvedProject] = defined.values
 
@@ -248,7 +249,7 @@ final class LoadedPlugins(
     val detected: DetectedPlugins
 ) {
   def fullClasspath: Seq[Attributed[File]] = pluginData.classpath
-  def classpath = data(fullClasspath)
+  def classpath: Seq[File] = data(fullClasspath)
 }
 
 /**
@@ -263,7 +264,7 @@ final class BuildUnit(
     val definitions: LoadedDefinitions,
     val plugins: LoadedPlugins
 ) {
-  override def toString =
+  override def toString: String =
     if (uri.getScheme == "file") localBase.toString else (uri + " (locally: " + localBase + ")")
 }
 

@@ -12,6 +12,7 @@ import sbt.internal.classpath.AlternativeZincUtil
 import sbt.internal.inc.{ ScalaInstance, ZincLmUtil }
 import sbt.internal.util.Terminal
 import sbt.util.Logger
+
 import xsbti.compile.ClasspathOptionsUtil
 
 object ConsoleProject {

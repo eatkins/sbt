@@ -8,11 +8,10 @@
 package sbt
 package internal
 
-import BasicCommandStrings._
-import BasicCommands._
-import BuiltinCommands.{ shell, waitCmd }
-import ContinuousCommands._
-
+import sbt.BasicCommandStrings._
+import sbt.BasicCommands._
+import sbt.BuiltinCommands.{ shell, waitCmd }
+import sbt.internal.ContinuousCommands._
 import sbt.internal.util.complete.Parser
 
 /** This is used to speed up command parsing. */

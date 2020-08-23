@@ -9,16 +9,15 @@ package sbt
 
 import java.util.concurrent.ExecutionException
 
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
+import scala.collection.mutable.Map
+
+import sbt.Execute._
 import sbt.internal.util.ErrorHandling.wideConvert
-import sbt.internal.util.{ DelegatingPMap, IDSet, PMap, RMap, ~> }
 import sbt.internal.util.Types._
 import sbt.internal.util.Util.nilSeq
-import Execute._
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.JavaConverters._
-import mutable.Map
+import sbt.internal.util.{ DelegatingPMap, IDSet, PMap, RMap, ~> }
 
 private[sbt] object Execute {
   def idMap[A1, A2]: Map[A1, A2] = (new java.util.IdentityHashMap[A1, A2]).asScala
@@ -35,7 +34,7 @@ private[sbt] object Execute {
       val overwriteNode: Incomplete => Boolean
   )
 
-  final val checkPreAndPostConditions =
+  final val checkPreAndPostConditions: Boolean =
     sys.props.get("sbt.execute.extrachecks").exists(java.lang.Boolean.parseBoolean)
 }
 sealed trait Completed {
@@ -78,7 +77,7 @@ private[sbt] final class Execute[F[_] <: AnyRef](
   }
   import State.{ Pending, Running, Calling, Done }
 
-  val init = progress.initial()
+  val init: Unit = progress.initial()
 
   def dump: String =
     "State: " + state.toString + "\n\nResults: " + results + "\n\nCalls: " + callers + "\n\n"
@@ -396,7 +395,7 @@ private[sbt] final class Execute[F[_] <: AnyRef](
     allCallers(node)
     if (all contains target) cyclic(node, target, "Cyclic reference")
   }
-  def cyclic[A](caller: F[A], target: F[A], msg: String) =
+  def cyclic[A](caller: F[A], target: F[A], msg: String): Nothing =
     throw new Incomplete(
       Some(caller),
       message = Some(msg),
@@ -407,16 +406,16 @@ private[sbt] final class Execute[F[_] <: AnyRef](
 
   // state testing
 
-  def pending(d: F[_]) = atState(d, Pending)
-  def running(d: F[_]) = atState(d, Running)
-  def calling(d: F[_]) = atState(d, Calling)
-  def done(d: F[_]) = atState(d, Done)
-  def notDone(d: F[_]) = !done(d)
-  def atState(d: F[_], s: State) = state.get(d) == Some(s)
-  def isNew(d: F[_]) = !added(d)
-  def added(d: F[_]) = state contains d
-  def complete = state.values.forall(_ == Done)
+  def pending(d: F[_]): Boolean = atState(d, Pending)
+  def running(d: F[_]): Boolean = atState(d, Running)
+  def calling(d: F[_]): Boolean = atState(d, Calling)
+  def done(d: F[_]): Boolean = atState(d, Done)
+  def notDone(d: F[_]): Boolean = !done(d)
+  def atState(d: F[_], s: State): Boolean = state.get(d) == Some(s)
+  def isNew(d: F[_]): Boolean = !added(d)
+  def added(d: F[_]): Boolean = state contains d
+  def complete: Boolean = state.values.forall(_ == Done)
 
-  def pre(f: => Unit) = if (checkPreAndPostConditions) f
-  def post(f: => Unit) = if (checkPreAndPostConditions) f
+  def pre(f: => Unit): Unit = if (checkPreAndPostConditions) f
+  def post(f: => Unit): Unit = if (checkPreAndPostConditions) f
 }

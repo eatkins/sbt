@@ -7,15 +7,16 @@
 
 package sbt
 
+import scala.util.control.NonFatal
+
 import sbt.Def.{ Initialize, ScopedKey }
 import sbt.Previous._
 import sbt.Scope.Global
 import sbt.internal.util._
 import sbt.std.TaskExtra._
 import sbt.util.StampedFormat
-import sjsonnew.JsonFormat
 
-import scala.util.control.NonFatal
+import sjsonnew.JsonFormat
 
 /**
  * Reads the previous value of tasks on-demand.  The read values are cached so that they are only read once per task execution.

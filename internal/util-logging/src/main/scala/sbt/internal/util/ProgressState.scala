@@ -11,6 +11,9 @@ import java.io.PrintStream
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.atomic.{ AtomicInteger, AtomicReference }
 
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
+
 import sbt.internal.util.ConsoleAppender.{
   ClearScreenAfterCursor,
   CursorLeft1000,
@@ -18,9 +21,6 @@ import sbt.internal.util.ConsoleAppender.{
   cursorUp,
   setShowProgress,
 }
-
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.JavaConverters._
 
 private[sbt] final class ProgressState(
     val progressLines: AtomicReference[Seq[String]],

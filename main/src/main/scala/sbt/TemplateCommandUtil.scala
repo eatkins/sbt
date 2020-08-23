@@ -7,19 +7,22 @@
 
 package sbt
 
+import java.io.File
 import java.lang.reflect.InvocationTargetException
 import java.nio.file.Path
-import java.io.File
 
-import sbt.BasicCommandStrings.TerminateAction
-import sbt.io._, syntax._
-import sbt.util._
-import sbt.internal.util.complete.{ DefaultParsers, Parser }, DefaultParsers._
-import xsbti.AppConfiguration
+import sbt.BasicCommandStrings.{ TerminateAction, _ }
+import sbt.BasicKeys._
+import sbt.internal.inc.classpath.ClasspathUtil
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.Parser
+import sbt.io._
+import sbt.io.syntax._
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy.{ IvyConfiguration, IvyDependencyResolution }
-import sbt.internal.inc.classpath.ClasspathUtil
-import BasicCommandStrings._, BasicKeys._
+import sbt.util._
+
+import xsbti.AppConfiguration
 
 private[sbt] object TemplateCommandUtil {
   def templateCommand: Command =

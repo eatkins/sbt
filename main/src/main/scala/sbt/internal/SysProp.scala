@@ -10,8 +10,9 @@ package internal
 
 import java.util.Locale
 
-import scala.util.control.NonFatal
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
+
 import sbt.internal.util.ConsoleAppender
 import sbt.internal.util.complete.SizeParser
 

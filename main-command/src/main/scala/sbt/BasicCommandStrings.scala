@@ -7,8 +7,8 @@
 
 package sbt
 
-import sbt.util.Level
 import sbt.internal.util.complete.HistoryCommands
+import sbt.util.Level
 
 object BasicCommandStrings {
   val HelpCommand: String = "help"
@@ -56,7 +56,7 @@ $HelpCommand <regular expression>
 
   def HistoryHelpBrief: (String, String) =
     (HistoryCommands.Start, "History command help.  Lists and describes all history commands.")
-  def historyHelp =
+  def historyHelp: Help =
     Help(Nil, (HistoryHelpBrief +: HistoryCommands.descriptions).toMap, Set(HistoryCommands.Start))
 
   def exitBrief: String = "Terminates the remote client or the build when called from the console."
@@ -235,7 +235,7 @@ $AliasCommand name=
 
   def IfLast = "iflast"
   def IfLastCommon = "If there are no more commands after this one, 'command' is run."
-  def IfLastDetailed =
+  def IfLastDetailed: String =
     s"""$IfLast <command>
 
 	$IfLastCommon"""

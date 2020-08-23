@@ -10,11 +10,13 @@ package sbt.util
 import java.io.File
 
 import scala.util.control.NonFatal
+
 import sbt.io.{ Hash, IO }
-import sjsonnew.{ Builder, DeserializationException, JsonFormat, Unbuilder, deserializationError }
-import CacheImplicits.{ arrayFormat => _, _ }
 import sbt.nio.file._
 import sbt.nio.file.syntax._
+import sbt.util.CacheImplicits.{ arrayFormat => _, _ }
+
+import sjsonnew.{ Builder, DeserializationException, JsonFormat, Unbuilder, deserializationError }
 
 sealed trait FileInfo { def file: File }
 sealed trait HashFileInfo extends FileInfo {

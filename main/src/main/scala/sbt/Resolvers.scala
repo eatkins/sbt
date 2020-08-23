@@ -7,20 +7,18 @@
 
 package sbt
 
-import sbt.internal.BuildLoader
-
-import sbt.io.{ Hash, IO }
-
 import java.io.File
 import java.net.URI
-
-import BuildLoader.ResolveInfo
-import RichURI.fromURI
 import java.util.Locale
 
 import scala.sys.process.Process
 import scala.util.control.NonFatal
+
+import sbt.RichURI.fromURI
+import sbt.internal.BuildLoader
+import sbt.internal.BuildLoader.ResolveInfo
 import sbt.internal.util.Util
+import sbt.io.{ Hash, IO }
 
 object Resolvers {
   type Resolver = BuildLoader.Resolver
@@ -142,7 +140,7 @@ object Resolvers {
       sys.error("Nonzero exit code (" + result + "): " + command.mkString(" "))
   }
 
-  def creates(file: File)(f: => Unit) = {
+  def creates(file: File)(f: => Unit): File = {
     if (!file.exists)
       try {
         f
@@ -154,7 +152,7 @@ object Resolvers {
     file
   }
 
-  def uniqueSubdirectoryFor(uri: URI, in: File) = {
+  def uniqueSubdirectoryFor(uri: URI, in: File): File = {
     in.mkdirs()
     val base = new File(in, Hash.halfHashString(uri.normalize.toASCIIString))
     val last = shortName(uri) match {

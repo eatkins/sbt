@@ -7,8 +7,9 @@
 
 package sbt.internal.util
 
-import sbt.util._
 import java.io.PrintWriter
+
+import sbt.util._
 
 object MainAppender {
   import java.util.concurrent.atomic.AtomicInteger

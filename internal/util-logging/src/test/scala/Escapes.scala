@@ -7,11 +7,16 @@
 
 package sbt.internal.util
 
-import org.scalacheck._
-import Prop._
-import Gen.{ listOf, oneOf }
+import sbt.internal.util.EscHelpers.{
+  ESC,
+  hasEscapeSequence,
+  isEscapeTerminator,
+  removeEscapeSequences
+}
 
-import EscHelpers.{ ESC, hasEscapeSequence, isEscapeTerminator, removeEscapeSequences }
+import org.scalacheck.Gen.{ listOf, oneOf }
+import org.scalacheck.Prop._
+import org.scalacheck._
 
 object Escapes extends Properties("Escapes") {
   property("genTerminator only generates terminators") =
@@ -79,7 +84,7 @@ object Escapes extends Properties("Escapes") {
   }
 
   final case class EscapeAndNot(escape: EscapeSequence, notEscape: String) {
-    override def toString =
+    override def toString: String =
       s"EscapeAntNot(escape = [$escape], notEscape = [${notEscape.map(_.toInt)}])"
   }
 
@@ -98,7 +103,7 @@ object Escapes extends Properties("Escapes") {
     assert(isEscapeTerminator(terminator))
     def makeString: String = ESC + content + terminator
 
-    override def toString =
+    override def toString: String =
       if (content.isEmpty) s"ESC (${terminator.toInt})"
       else s"ESC ($content) (${terminator.toInt})"
   }
@@ -122,20 +127,20 @@ object Escapes extends Properties("Escapes") {
 
   def toEscapeSequence(s: String): EscapeSequence = EscapeSequence(s.init, s.last)
 
-  lazy val misc = Seq("14;23H", "5;3f", "2A", "94B", "19C", "85D", "s", "u", "2J", "K")
+  lazy val misc: Seq[String] = Seq("14;23H", "5;3f", "2A", "94B", "19C", "85D", "s", "u", "2J", "K")
 
   lazy val setGraphicsMode: Seq[String] =
     for (txt <- 0 to 8; fg <- 30 to 37; bg <- 40 to 47)
       yield txt.toString + ";" + fg.toString + ";" + bg.toString + "m"
 
-  lazy val resetMode = setModeLike('I')
-  lazy val setMode = setModeLike('h')
+  lazy val resetMode: Seq[String] = setModeLike('I')
+  lazy val setMode: Seq[String] = setModeLike('h')
   def setModeLike(term: Char): Seq[String] = (0 to 19).map(i => "=" + i.toString + term)
 
-  lazy val genWithoutTerminator =
+  lazy val genWithoutTerminator: Gen[String] =
     genRawString.map(_.filter(c => !isEscapeTerminator(c) && (c != '[')))
 
-  lazy val genTwoCharacterSequence =
+  lazy val genTwoCharacterSequence: Gen[EscapeSequence] =
     // 91 == [ which is the CSI escape sequence.
     oneOf((64 to 95)) filter (_ != 91) map (c => new EscapeSequence("", c.toChar))
 

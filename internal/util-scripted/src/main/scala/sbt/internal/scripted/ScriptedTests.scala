@@ -10,13 +10,15 @@ package internal
 package scripted
 
 import java.io.File
-import sbt.util.{ Logger, LoggerContext, Level }
-import sbt.internal.util.{ Appender, ManagedLogger, ConsoleAppender, BufferedAppender }
-import sbt.io.IO.wrapNull
-import sbt.io.{ DirectoryFilter, HiddenFileFilter }
-import sbt.io.syntax._
-import sbt.internal.io.Resources
 import java.util.concurrent.atomic.AtomicInteger
+
+import sbt.internal.io.Resources
+import sbt.internal.util.{ Appender, BufferedAppender, ConsoleAppender, ManagedLogger }
+import sbt.io.FileFilter
+import sbt.io.IO.wrapNull
+import sbt.io.syntax._
+import sbt.io.{ DirectoryFilter, HiddenFileFilter }
+import sbt.util.{ Level, Logger, LoggerContext }
 
 object ScriptedRunnerImpl {
   def run(
@@ -194,15 +196,16 @@ final class ScriptedTests(
 // }
 
 final case class ScriptedTest(group: String, name: String) {
-  override def toString = group + "/" + name
+  override def toString: String = group + "/" + name
 }
 
 object ListTests {
-  def list(directory: File, filter: java.io.FileFilter) = wrapNull(directory.listFiles(filter))
+  def list(directory: File, filter: java.io.FileFilter): Array[File] =
+    wrapNull(directory.listFiles(filter))
 }
 import ListTests._
 final class ListTests(baseDirectory: File, accept: ScriptedTest => Boolean, log: Logger) {
-  def filter = DirectoryFilter -- HiddenFileFilter
+  def filter: FileFilter = DirectoryFilter -- HiddenFileFilter
   def listTests: Seq[ScriptedTest] = {
     list(baseDirectory, filter) flatMap { group =>
       val groupName = group.getName

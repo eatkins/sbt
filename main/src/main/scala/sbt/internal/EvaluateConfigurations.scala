@@ -8,6 +8,15 @@
 package sbt
 package internal
 
+import java.io.File
+
+import scala.collection.JavaConverters._
+
+import sbt.Def.{ ScopedKey, Setting }
+import sbt.Scope.GlobalScope
+import sbt.compiler.{ Eval, EvalImports }
+import sbt.internal.parser.SbtParser
+import sbt.internal.util.complete.DefaultParsers.validID
 import sbt.internal.util.{
   AttributeEntry,
   AttributeKey,
@@ -16,16 +25,7 @@ import sbt.internal.util.{
   RangePosition,
   Settings
 }
-
-import java.io.File
-import compiler.{ Eval, EvalImports }
-import sbt.internal.util.complete.DefaultParsers.validID
-import Def.{ ScopedKey, Setting }
-import Scope.GlobalScope
-import sbt.internal.parser.SbtParser
-
 import sbt.io.IO
-import scala.collection.JavaConverters._
 
 /**
  *  This file is responsible for compiling the .sbt files used to configure sbt builds.
@@ -203,7 +203,7 @@ private[sbt] object EvaluateConfigurations {
   /**
    * The name of the class we cast DSL "setting" (vs. definition) lines to.
    */
-  val SettingsDefinitionName = {
+  val SettingsDefinitionName: String = {
     val _ = classOf[DslEntry] // this line exists to try to provide a compile-time error when the following line needs to be changed
     "sbt.internal.DslEntry"
   }

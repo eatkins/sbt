@@ -10,19 +10,22 @@ package internal
 
 import java.io.File
 import java.util.LinkedHashSet
-import sbt.SlashSyntax0._
-import sbt.Keys._
-import sbt.nio.Keys._
-import sbt.nio.file.{ Glob, RecursiveGlob }
+
+import scala.collection.JavaConverters._
+
 import sbt.Def.Initialize
+import sbt.Keys._
+import sbt.SlashSyntax0._
 import sbt.internal.inc.Analysis
 import sbt.internal.inc.JavaInterfaceUtil._
 import sbt.internal.util.{ Attributed, Dag, Settings }
-import sbt.librarymanagement.{ Configuration, TrackLevel }
 import sbt.librarymanagement.Configurations.names
+import sbt.librarymanagement.{ Configuration, TrackLevel }
+import sbt.nio.Keys._
+import sbt.nio.file.{ Glob, RecursiveGlob }
 import sbt.std.TaskExtra._
 import sbt.util._
-import scala.collection.JavaConverters._
+
 import xsbti.compile.CompileAnalysis
 
 private[sbt] object ClasspathImpl {

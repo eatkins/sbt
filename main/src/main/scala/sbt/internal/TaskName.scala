@@ -8,8 +8,8 @@
 package sbt
 package internal
 
-import Def.{ displayFull, ScopedKey }
-import Keys.taskDefinitionKey
+import sbt.Def.{ ScopedKey, displayFull }
+import sbt.Keys.taskDefinitionKey
 
 private[sbt] object TaskName {
   def name(node: Task[_]): String = definedName(node) getOrElse anonymousName(node)

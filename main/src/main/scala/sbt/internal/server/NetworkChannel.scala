@@ -12,6 +12,7 @@ package server
 import java.io.{ IOException, InputStream, OutputStream }
 import java.net.{ Socket, SocketTimeoutException }
 import java.nio.channels.ClosedChannelException
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.{
   ConcurrentHashMap,
   Executors,
@@ -19,11 +20,15 @@ import java.util.concurrent.{
   RejectedExecutionException,
   TimeUnit
 }
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.concurrent.duration._
+import scala.util.Try
+import scala.util.control.NonFatal
 
 import sbt.BasicCommandStrings.{ Shutdown, TerminateAction }
 import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes, LogMessageParams, MessageType }
-import sbt.internal.langserver.{ CancelRequestParams, ErrorCodes }
 import sbt.internal.protocol.{
   JsonRpcNotificationMessage,
   JsonRpcRequestMessage,
@@ -31,25 +36,16 @@ import sbt.internal.protocol.{
   JsonRpcResponseMessage
 }
 import sbt.internal.ui.{ UITask, UserThread }
-import sbt.internal.util.{ Prompt, ReadJsonFromInputStream, Terminal, Util }
 import sbt.internal.util.Terminal.TerminalImpl
 import sbt.internal.util.complete.{ Parser, Parsers }
+import sbt.internal.util.{ ProgressState, Prompt, ReadJsonFromInputStream, Terminal, Util }
+import sbt.protocol.Serialization.{ attach, promptChannel }
 import sbt.protocol._
 import sbt.util.Logger
 
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.concurrent.duration._
-import scala.util.Try
-import scala.util.control.NonFatal
-import Serialization.attach
-
+import sjsonnew.BasicJsonProtocol._
 import sjsonnew._
 import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
-
-import BasicJsonProtocol._
-import Serialization.{ attach, promptChannel }
-import sbt.internal.util.ProgressState
 
 final class NetworkChannel(
     val name: String,
@@ -167,7 +163,7 @@ final class NetworkChannel(
       }
   }
 
-  val thread = new Thread(s"sbt-networkchannel-${connection.getPort}") {
+  val thread: Thread = new Thread(s"sbt-networkchannel-${connection.getPort}") {
     private val ct = "Content-Type: "
     private val x1 = "application/sbt-x1"
     override def run(): Unit = {
@@ -408,7 +404,7 @@ final class NetworkChannel(
     }
   }
 
-  protected def onSettingQuery(execId: Option[String], req: SettingQuery) = {
+  protected def onSettingQuery(execId: Option[String], req: SettingQuery): Unit = {
     if (initialized) {
       import sbt.protocol.codec.JsonProtocol._
       SettingQuery.handleSettingQueryEither(req, structure) match {
@@ -420,7 +416,7 @@ final class NetworkChannel(
     }
   }
 
-  protected def onCompletionRequest(execId: Option[String], cp: CompletionParams) = {
+  protected def onCompletionRequest(execId: Option[String], cp: CompletionParams): Unit = {
     if (initialized) {
       try {
         Option(EvaluateTask.lastEvaluatedState.get) match {
@@ -489,7 +485,7 @@ final class NetworkChannel(
     }
   }
 
-  protected def onCancellationRequest(execId: Option[String], crp: CancelRequestParams) = {
+  protected def onCancellationRequest(execId: Option[String], crp: CancelRequestParams): Unit = {
     if (initialized) {
 
       def errorRespond(msg: String) = respondError(

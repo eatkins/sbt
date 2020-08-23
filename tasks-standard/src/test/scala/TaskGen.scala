@@ -7,8 +7,8 @@
 
 package sbt
 
+import org.scalacheck.Gen.choose
 import org.scalacheck._
-import Gen.choose
 
 object TaskGen extends std.TaskExtra {
   // upper bounds to make the tests finish in reasonable time
@@ -16,10 +16,11 @@ object TaskGen extends std.TaskExtra {
   val MaxWorkers = 29
   val MaxJoin = 20
 
-  val MaxTasksGen = choose(0, MaxTasks)
-  val MaxWorkersGen = choose(1, MaxWorkers)
-  val MaxJoinGen = choose(0, MaxJoin)
-  val TaskListGen = MaxTasksGen.flatMap(size => Gen.listOfN(size, Arbitrary.arbInt.arbitrary))
+  val MaxTasksGen: Gen[Int] = choose(0, MaxTasks)
+  val MaxWorkersGen: Gen[Int] = choose(1, MaxWorkers)
+  val MaxJoinGen: Gen[Int] = choose(0, MaxJoin)
+  val TaskListGen: Gen[List[Int]] =
+    MaxTasksGen.flatMap(size => Gen.listOfN(size, Arbitrary.arbInt.arbitrary))
 
   def run[T](root: Task[T], checkCycles: Boolean, maxWorkers: Int): Result[T] = {
     val (service, shutdown) = CompletionService[Task[_], Completed](maxWorkers)

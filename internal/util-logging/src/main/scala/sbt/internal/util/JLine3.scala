@@ -9,18 +9,20 @@ package sbt.internal.util
 
 import java.io.{ InputStream, OutputStream, PrintWriter }
 import java.nio.charset.Charset
-import java.util.{ Arrays, EnumSet }
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
-import org.jline.utils.InfoCmp.Capability
-import org.jline.utils.{ ClosedException, NonBlockingReader, OSUtils }
-import org.jline.terminal.{ Attributes, Size, Terminal => JTerminal }
+import java.util.{ Arrays, EnumSet }
+
+import scala.collection.JavaConverters._
+import scala.util.Try
+
 import org.jline.terminal.Terminal.SignalHandler
 import org.jline.terminal.impl.AbstractTerminal
 import org.jline.terminal.impl.jansi.JansiSupportImpl
 import org.jline.terminal.impl.jansi.win.JansiWinSysTerminal
-import scala.collection.JavaConverters._
-import scala.util.Try
-import java.util.concurrent.LinkedBlockingQueue
+import org.jline.terminal.{ Attributes, Size, Terminal => JTerminal }
+import org.jline.utils.InfoCmp.Capability
+import org.jline.utils.{ ClosedException, NonBlockingReader, OSUtils }
 
 private[sbt] object JLine3 {
   private val capabilityMap = Capability

@@ -7,7 +7,7 @@
 
 package sbt.internal.util
 
-import Relation._
+import sbt.internal.util.Relation._
 
 object Relation {
 
@@ -142,13 +142,13 @@ private final class MRelation[A, B](fwd: Map[A, Set[B]], rev: Map[B, Set[A]])
   def forwardMap = fwd
   def reverseMap = rev
 
-  def forward(t: A) = get(fwd, t)
-  def reverse(t: B) = get(rev, t)
+  def forward(t: A): Set[B] = get(fwd, t)
+  def reverse(t: B): Set[A] = get(rev, t)
 
   def _1s = fwd.keySet
   def _2s = rev.keySet
 
-  def size = (fwd.valuesIterator map (_.size)).sum
+  def size: Int = (fwd.valuesIterator map (_.size)).sum
 
   def all: Traversable[(A, B)] =
     fwd.iterator.flatMap { case (a, bs) => bs.iterator.map(b => (a, b)) }.toTraversable
@@ -191,7 +191,7 @@ private final class MRelation[A, B](fwd: Map[A, Set[B]], rev: Map[B, Set[A]])
 
   def contains(a: A, b: B): Boolean = forward(a)(b)
 
-  override def equals(other: Any) = other match {
+  override def equals(other: Any): Boolean = other match {
     // We assume that the forward and reverse maps are consistent, so we only use the forward map
     // for equality. Note that key -> Empty is semantically the same as key not existing.
     case o: MRelation[A, B] =>
@@ -199,8 +199,8 @@ private final class MRelation[A, B](fwd: Map[A, Set[B]], rev: Map[B, Set[A]])
     case _ => false
   }
 
-  override def hashCode = fwd.filterNot(_._2.isEmpty).hashCode()
+  override def hashCode: Int = fwd.filterNot(_._2.isEmpty).hashCode()
 
-  override def toString =
+  override def toString: String =
     all.map { case (a, b) => a + " -> " + b }.mkString("Relation [", ", ", "]")
 }

@@ -8,9 +8,9 @@
 package sbt
 package internal
 
-import sbt.internal.util.Types.idFun
+import sbt.internal.BuildDependencies._
 import sbt.internal.util.Dag
-import BuildDependencies._
+import sbt.internal.util.Types.idFun
 
 final class BuildDependencies private (
     val classpath: DependencyMap[ClasspathDep[ProjectRef]],

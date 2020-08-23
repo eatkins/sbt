@@ -10,50 +10,53 @@ package sbt
 import java.io.File
 import java.net.URI
 import java.util.Locale
-import Project._
-import BasicKeys.serverLogLevel
-import Keys.{
-  stateBuildStructure,
+
+import scala.concurrent.duration.FiniteDuration
+import scala.language.experimental.macros
+
+import sbt.BasicKeys.serverLogLevel
+import sbt.Def.{ Flattened, Initialize, ScopedKey, Setting }
+import sbt.Keys.{
+  autoStartServer,
   commands,
   configuration,
+  fullServerHandlers,
   historyPath,
+  logLevel,
   projectCommand,
-  sessionSettings,
-  terminalShellPrompt,
-  shellPrompt,
-  templateResolverInfos,
-  autoStartServer,
+  serverAuthentication,
+  serverConnectionType,
   serverHost,
   serverIdleTimeout,
   serverLog,
   serverPort,
-  serverAuthentication,
-  serverConnectionType,
-  fullServerHandlers,
-  logLevel,
-  windowsServerSecurityLevel,
+  sessionSettings,
+  shellPrompt,
+  stateBuildStructure,
+  templateResolverInfos,
+  terminalShellPrompt,
+  windowsServerSecurityLevel
 }
-import Scope.{ Global, ThisScope }
-import Def.{ Flattened, Initialize, ScopedKey, Setting }
-import sbt.internal.{
-  Load,
-  BuildStructure,
-  LoadedBuild,
-  LoadedBuildUnit,
-  SettingGraph,
-  SettingCompletions,
-  SessionSettings
-}
-import sbt.internal.util.{ AttributeKey, AttributeMap, Dag, Relation, Settings, ~> }
+import sbt.Project._
+import sbt.Scope.{ Global, ThisScope }
+import sbt.internal.server.ServerHandler
 import sbt.internal.util.Types.{ const, idFun }
 import sbt.internal.util.complete.DefaultParsers
-import sbt.internal.server.ServerHandler
+import sbt.internal.util.complete.Parser
+import sbt.internal.util.{ AttributeKey, AttributeMap, Dag, Relation, Settings, ~> }
+import sbt.internal.{
+  BuildStructure,
+  Load,
+  LoadedBuild,
+  LoadedBuildUnit,
+  SessionSettings,
+  SettingCompletions,
+  SettingGraph
+}
 import sbt.librarymanagement.Configuration
-import sbt.util.{ Show, Level }
-import sjsonnew.JsonFormat
+import sbt.util.{ Level, Show }
 
-import language.experimental.macros
-import scala.concurrent.duration.FiniteDuration
+import sjsonnew.JsonFormat
 
 sealed trait ProjectDefinition[PR <: ProjectReference] {
 
@@ -106,12 +109,12 @@ sealed trait ProjectDefinition[PR <: ProjectReference] {
 
   override final def hashCode: Int = id.hashCode ^ base.hashCode ^ getClass.hashCode
 
-  override final def equals(o: Any) = o match {
+  override final def equals(o: Any): Boolean = o match {
     case p: ProjectDefinition[_] => p.getClass == this.getClass && p.id == id && p.base == base
     case _                       => false
   }
 
-  override def toString = {
+  override def toString: String = {
     val agg = ifNonEmpty("aggregate", aggregate)
     val dep = ifNonEmpty("dependencies", dependencies)
     val conf = ifNonEmpty("configurations", configurations)
@@ -229,7 +232,7 @@ sealed trait Project extends ProjectDefinition[ProjectReference] with CompositeP
    */
   def configure(transforms: (Project => Project)*): Project = Function.chain(transforms)(this)
 
-  def withId(id: String) = copy(id = id)
+  def withId(id: String): Project = copy(id = id)
 
   /** Sets the base directory for this project.*/
   def in(dir: File): Project = copy(base = dir)
@@ -586,7 +589,8 @@ object Project extends ProjectExtra {
   def fillTaskAxis(scoped: ScopedKey[_]): ScopedKey[_] =
     ScopedKey(Scope.fillTaskAxis(scoped.scope, scoped.key), scoped.key)
 
-  def mapScope(f: Scope => Scope) = λ[ScopedKey ~> ScopedKey](k => ScopedKey(f(k.scope), k.key))
+  def mapScope(f: Scope => Scope): ScopedKey ~> ScopedKey =
+    λ[ScopedKey ~> ScopedKey](k => ScopedKey(f(k.scope), k.key))
 
   def transform(g: Scope => Scope, ss: Seq[Def.Setting[_]]): Seq[Def.Setting[_]] = {
     val f = mapScope(g)
@@ -752,7 +756,7 @@ object Project extends ProjectExtra {
   def setAll(extracted: Extracted, settings: Seq[Def.Setting[_]]): SessionSettings =
     SettingCompletions.setAll(extracted, settings).session
 
-  val ExtraBuilds = AttributeKey[List[URI]](
+  val ExtraBuilds: AttributeKey[List[URI]] = AttributeKey[List[URI]](
     "extra-builds",
     "Extra build URIs to load in addition to the ones defined by the project."
   )
@@ -794,9 +798,11 @@ object Project extends ProjectExtra {
   import LoadAction._
   import DefaultParsers._
 
-  val loadActionParser = token(Space ~> ("plugins" ^^^ Plugins | "return" ^^^ Return)) ?? Current
+  val loadActionParser: Parser[Value] = token(
+    Space ~> ("plugins" ^^^ Plugins | "return" ^^^ Return)
+  ) ?? Current
 
-  val ProjectReturn =
+  val ProjectReturn: AttributeKey[List[File]] =
     AttributeKey[List[File]]("project-return", "Maintains a stack of builds visited using reload.")
   def projectReturn(s: State): List[File] = getOrNil(s, ProjectReturn)
   def inPluginProject(s: State): Boolean = projectReturn(s).length > 1

@@ -16,14 +16,15 @@ import java.util.concurrent._
 
 import scala.collection.mutable
 
-import xsbti.{ Logger => _, _ }
-import sbt.io.IO
-import sbt.internal.BuildStreams.{ Streams => _, _ }
-import sbt.internal.Load._
-import sbt.util._
 import sbt.BuildPaths._
 import sbt.Def.{ ScopeLocal, ScopedKey, Setting }
 import sbt.Keys._
+import sbt.internal.BuildStreams.{ Streams => _, _ }
+import sbt.internal.Load._
+import sbt.io.IO
+import sbt.util._
+
+import xsbti.{ Logger => _, _ }
 
 object SettingQueryTest extends org.specs2.mutable.Specification {
   implicit class PathOps(val path: Path) extends AnyVal {
@@ -47,7 +48,7 @@ object SettingQueryTest extends org.specs2.mutable.Specification {
   val noopLoader: ClassLoader = new URLClassLoader(Array(), null)
 
   object NoGlobalLock extends GlobalLock {
-    def apply[T](lockFile: File, run: Callable[T]) = run.call()
+    def apply[T](lockFile: File, run: Callable[T]): T = run.call()
   }
 
   lazy val buildStructure: BuildStructure = {

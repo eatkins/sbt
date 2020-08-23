@@ -10,9 +10,10 @@ package sbt.internal
 import java.io.File
 import java.nio.file.Files
 
-import org.scalatest.{ FlatSpec, Matchers }
 import sbt.internal.classpath.ClassLoaderCache
 import sbt.io.IO
+
+import org.scalatest.{ FlatSpec, Matchers }
 
 object ClassLoaderCacheTest {
   implicit class CacheOps(val c: ClassLoaderCache) {

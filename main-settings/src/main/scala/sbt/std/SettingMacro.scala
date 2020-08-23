@@ -8,9 +8,9 @@
 package sbt
 package std
 
-import Def.Initialize
-import sbt.internal.util.Types.{ Id, idFun }
+import sbt.Def.Initialize
 import sbt.internal.util.AList
+import sbt.internal.util.Types.{ Id, idFun }
 import sbt.internal.util.appmacro.{
   Convert,
   Converted,

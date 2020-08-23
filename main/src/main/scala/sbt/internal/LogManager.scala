@@ -16,6 +16,7 @@ import sbt.Scope.GlobalScope
 import sbt.internal.util.MainAppender._
 import sbt.internal.util._
 import sbt.util.{ Level, LogExchange, Logger, LoggerContext }
+
 import org.apache.logging.log4j.core.{ Appender => XAppender }
 
 sealed abstract class LogManager {

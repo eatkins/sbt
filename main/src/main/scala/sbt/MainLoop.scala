@@ -10,22 +10,19 @@ package sbt
 import java.io.PrintWriter
 import java.util.Properties
 
-import sbt.BasicCommandStrings.{ StashOnFailure, networkExecPrefix }
-import sbt.internal.ShutdownHooks
-import sbt.internal.langserver.ErrorCodes
-import sbt.internal.protocol.JsonRpcResponseError
-import sbt.internal.nio.CheckBuildSources.CheckBuildSourcesKey
-import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Prompt, Terminal }
-import sbt.internal.{ ShutdownHooks, TaskProgress }
-import sbt.io.{ IO, Using }
-import sbt.protocol._
-import sbt.util.{ Logger, LoggerContext }
-
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-import sbt.internal.FastTrackCommands
-import sbt.internal.SysProp
+
+import sbt.BasicCommandStrings.{ StashOnFailure, networkExecPrefix }
+import sbt.internal.langserver.ErrorCodes
+import sbt.internal.nio.CheckBuildSources.CheckBuildSourcesKey
+import sbt.internal.protocol.JsonRpcResponseError
+import sbt.internal.util.{ ErrorHandling, GlobalLogBacking, Prompt, Terminal }
+import sbt.internal.{ FastTrackCommands, ShutdownHooks, SysProp, TaskProgress }
+import sbt.io.{ IO, Using }
+import sbt.protocol._
+import sbt.util.{ Logger, LoggerContext }
 
 object MainLoop {
 

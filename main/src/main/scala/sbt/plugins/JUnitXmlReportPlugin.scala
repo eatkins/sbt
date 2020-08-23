@@ -8,8 +8,8 @@
 package sbt
 package plugins
 
-import Def.Setting
-import Keys._
+import sbt.Def.Setting
+import sbt.Keys._
 import sbt.internal.SysProp
 
 /**

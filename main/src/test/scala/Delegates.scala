@@ -7,10 +7,11 @@
 
 package sbt
 
-import sbt.internal.util.Types.idFun
 import sbt.internal.TestBuild._
-import hedgehog._
+import sbt.internal.util.Types.idFun
+
 import hedgehog.Result.{ all, assert, failure, success }
+import hedgehog._
 import hedgehog.runner._
 
 object Delegates extends Properties {

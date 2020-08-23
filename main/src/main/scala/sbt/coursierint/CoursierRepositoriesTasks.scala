@@ -8,10 +8,10 @@
 package sbt
 package coursierint
 
-import sbt.librarymanagement._
 import sbt.Keys._
 import sbt.ScopeFilter.Make._
 import sbt.io.IO
+import sbt.librarymanagement._
 
 object CoursierRepositoriesTasks {
   private object CResolvers {

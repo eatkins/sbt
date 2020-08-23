@@ -7,13 +7,14 @@
 
 package sbt.internal.util
 
-import sbt.util._
-import org.scalacheck._
-import Arbitrary._
-import Gen.{ listOfN, oneOf }
-import Prop._
-
 import java.io.Writer
+
+import sbt.util._
+
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Gen.{ listOfN, oneOf }
+import org.scalacheck.Prop._
+import org.scalacheck._
 
 object LogWriterTest extends Properties("Log Writer") {
   final val MaxLines = 100
@@ -100,7 +101,7 @@ object LogWriterTest extends Properties("Log Writer") {
   implicit lazy val genOutput: Gen[Output] =
     for (ls <- listOf[List[ToLog]](MaxLines); lv <- genLevel) yield new Output(ls, lv)
 
-  def removeNewlines(s: String) = s.replaceAll("""[\n\r]+""", "")
+  def removeNewlines(s: String): String = s.replaceAll("""[\n\r]+""", "")
   def addNewline(l: ToLog): ToLog =
     new ToLog(l.content + "\n", l.byCharacter) // \n will be replaced by a random line terminator for all lines
 
@@ -111,18 +112,18 @@ object LogWriterTest extends Properties("Log Writer") {
 /* Helper classes*/
 
 final class Output(val lines: List[List[ToLog]], val level: Level.Value) {
-  override def toString =
+  override def toString: String =
     "Level: " + level + "\n" + lines.map(_.mkString).mkString("\n")
 }
 
 final class NewLine(val str: String) {
-  override def toString = Escape(str)
+  override def toString: String = Escape(str)
 }
 
 final class ToLog(val content: String, val byCharacter: Boolean) {
-  def contentOnly = Escape.newline(content, "")
+  def contentOnly: String = Escape.newline(content, "")
 
-  override def toString =
+  override def toString: String =
     if (content.isEmpty) "" else "ToLog('" + Escape(contentOnly) + "', " + byCharacter + ")"
 }
 
@@ -140,7 +141,7 @@ object Escape {
     builder.toString
   }
 
-  def pad(s: String, minLength: Int, extra: Char) = {
+  def pad(s: String, minLength: Int, extra: Char): String = {
     val diff = minLength - s.length
     if (diff <= 0) s else List.fill(diff)(extra).mkString("", "", s)
   }

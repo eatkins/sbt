@@ -7,8 +7,8 @@
 
 package sbt.internal.util
 
-import Classes.Applicative
-import Types._
+import sbt.internal.util.Classes.Applicative
+import sbt.internal.util.Types._
 
 /**
  * An abstraction over a higher-order type constructor `K[x[y]]` with the purpose of abstracting

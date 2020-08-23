@@ -10,9 +10,10 @@ package internal
 package util
 
 import sbt.util.Level
+
 import sjsonnew.JsonFormat
-import sjsonnew.support.scalajson.unsafe.Converter
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import sjsonnew.support.scalajson.unsafe.Converter
 
 final class ObjectEvent[A](
     val level: Level.Value,

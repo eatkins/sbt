@@ -7,38 +7,34 @@
 
 package sbt
 
-import java.nio.file.Paths
-import sbt.util.Level
-import sbt.internal.util.{ AttributeKey, FullReader, LineReader, Terminal }
-import sbt.internal.util.complete.{
-  Completion,
-  Completions,
-  DefaultParsers,
-  HistoryCommands,
-  Parser,
-  TokenCompletions,
-  History => CHistory
-}
-import sbt.internal.util.Types.{ const, idFun }
-import sbt.internal.util.Util.{ AnyOps, nil, nilSeq, none }
-import sbt.internal.inc.classpath.ClasspathUtil.toLoader
-import sbt.internal.inc.ModuleUtilities
-import sbt.internal.client.NetworkClient
-import DefaultParsers._
-
-import Function.tupled
-import Command.applyEffect
-import BasicCommandStrings._
-import CommandUtil._
-import BasicKeys._
 import java.io.File
-
-import sbt.io.IO
-import sbt.util.Level
+import java.nio.file.Paths
 
 import scala.Function.tupled
 import scala.collection.mutable.ListBuffer
 import scala.util.control.NonFatal
+
+import sbt.BasicCommandStrings._
+import sbt.BasicKeys._
+import sbt.Command.applyEffect
+import sbt.CommandUtil._
+import sbt.internal.client.NetworkClient
+import sbt.internal.inc.ModuleUtilities
+import sbt.internal.inc.classpath.ClasspathUtil.toLoader
+import sbt.internal.util.Types.{ const, idFun }
+import sbt.internal.util.Util.{ AnyOps, nil, nilSeq, none }
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.{
+  Completion,
+  Completions,
+  History => CHistory,
+  HistoryCommands,
+  Parser,
+  TokenCompletions
+}
+import sbt.internal.util.{ AttributeKey, FullReader, LineReader, Terminal }
+import sbt.io.IO
+import sbt.util.Level
 
 object BasicCommands {
   lazy val allBasicCommands: Seq[Command] = Seq(
@@ -566,7 +562,7 @@ object BasicCommands {
 
   private[sbt] def reportParser(key: String) =
     (key: Parser[String]).examples() ~> " ".examples() ~> matched(any.*).examples()
-  def reportResultsCommand =
+  def reportResultsCommand: Command =
     Command.arb(_ => reportParser(ReportResult)) { (state, id) =>
       val newState = state.get(execMap) match {
         case Some(m) => state.put(execMap, m - id)
@@ -577,7 +573,7 @@ object BasicCommands {
         case _                         => state.fail
       }
     }
-  def mapExecCommand =
+  def mapExecCommand: Command =
     Command.arb(_ => reportParser(MapExec)) { (state, mapping) =>
       mapping.split(" ") match {
         case Array(key, value) =>
@@ -588,7 +584,7 @@ object BasicCommands {
         case _ => state
       }
     }
-  def completeExecCommand =
+  def completeExecCommand: Command =
     Command.arb(_ => reportParser(CompleteExec)) { (state, id) =>
       val newState = state.get(execResults) match {
         case Some(m) => state.put(execResults, m + (id -> true))

@@ -9,6 +9,7 @@ package sbt.internal.util
 package complete
 
 import java.io.File
+
 import sbt.io.IO
 
 /**

@@ -9,19 +9,20 @@ package sbt
 package internal
 
 import java.io.File
-import Keys._
-import SlashSyntax0._
-import Project._ // for tag and inTask()
-import std.TaskExtra._ // for join
+
+import sbt.Keys._
+import sbt.Project._
+import sbt.SlashSyntax0._
 import sbt.coursierint.LMCoursier
+import sbt.internal.inc.JarUtils
+import sbt.internal.librarymanagement._
+import sbt.internal.remotecache._
+import sbt.io.IO
+import sbt.io.syntax._
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy.Credentials
 import sbt.librarymanagement.syntax._
-import sbt.internal.librarymanagement._
-import sbt.io.IO
-import sbt.io.syntax._
-import sbt.internal.remotecache._
-import sbt.internal.inc.JarUtils
+import sbt.std.TaskExtra._
 import sbt.util.Logger
 
 object RemoteCache {

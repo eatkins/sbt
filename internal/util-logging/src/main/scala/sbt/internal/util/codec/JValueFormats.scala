@@ -9,8 +9,8 @@ package sbt
 package internal
 package util.codec
 
-import sjsonnew.{ JsonWriter => JW, JsonReader => JR, JsonFormat => JF, _ }
 import sjsonnew.shaded.scalajson.ast.unsafe._
+import sjsonnew.{ JsonFormat => JF, JsonReader => JR, JsonWriter => JW, _ }
 
 trait JValueFormats { self: sjsonnew.BasicJsonProtocol =>
   implicit val JNullFormat: JF[JNull.type] = new JF[JNull.type] {

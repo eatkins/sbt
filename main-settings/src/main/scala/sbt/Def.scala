@@ -11,13 +11,15 @@ import java.io.File
 import java.net.URI
 
 import scala.annotation.tailrec
+
 import sbt.KeyRanks.{ DTask, Invisible }
 import sbt.Scope.{ GlobalScope, ThisScope }
 import sbt.internal.util.Types.const
-import sbt.internal.util.complete.Parser
+import sbt.internal.util.Util._
 import sbt.internal.util._
-import Util._
+import sbt.internal.util.complete.Parser
 import sbt.util.Show
+
 import xsbti.VirtualFile
 
 /** A concrete settings system that uses `sbt.Scope` for the scope type. */
@@ -27,9 +29,9 @@ object Def extends Init[Scope] with TaskMacroExtra with InitializeImplicits {
 
   def settings(ss: SettingsDefinition*): Seq[Setting[_]] = ss.flatMap(_.settings)
 
-  val triggeredBy = AttributeKey[Seq[Task[_]]]("triggered-by")
-  val runBefore = AttributeKey[Seq[Task[_]]]("run-before")
-  val resolvedScoped = SettingKey[ScopedKey[_]](
+  val triggeredBy: AttributeKey[Seq[Task[_]]] = AttributeKey[Seq[Task[_]]]("triggered-by")
+  val runBefore: AttributeKey[Seq[Task[_]]] = AttributeKey[Seq[Task[_]]]("run-before")
+  val resolvedScoped: SettingKey[ScopedKey[_]] = SettingKey[ScopedKey[_]](
     "resolved-scoped",
     "The ScopedKey for the referencing setting or task.",
     KeyRanks.DSetting

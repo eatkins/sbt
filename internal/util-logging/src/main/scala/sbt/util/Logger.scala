@@ -7,14 +7,15 @@
 
 package sbt.util
 
-import xsbti.{ Logger => xLogger }
-import xsbti.{ Position, Problem, Severity }
-
-import sys.process.ProcessLogger
-import sbt.internal.util.{ BufferedLogger, FullLogger }
 import java.io.File
 import java.util.Optional
 import java.util.function.Supplier
+
+import scala.sys.process.ProcessLogger
+
+import sbt.internal.util.{ BufferedLogger, FullLogger }
+
+import xsbti.{ Logger => xLogger, Position, Problem, Severity }
 
 /**
  * This is intended to be the simplest logging interface for use by code that wants to log.

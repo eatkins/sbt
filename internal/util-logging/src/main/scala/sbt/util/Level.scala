@@ -12,10 +12,10 @@ package sbt.util
  * with id larger than its own id.  For example, Warn (id=3) includes Error (id=4).
  */
 object Level extends Enumeration {
-  val Debug = Value(1, "debug")
-  val Info = Value(2, "info")
-  val Warn = Value(3, "warn")
-  val Error = Value(4, "error")
+  val Debug: Value = Value(1, "debug")
+  val Info: Value = Value(2, "info")
+  val Warn: Value = Value(3, "warn")
+  val Error: Value = Value(4, "error")
 
   /**
    * Defines the label to use for success messages.
@@ -23,11 +23,11 @@ object Level extends Enumeration {
    */
   val SuccessLabel = "success"
 
-  def union(a: Value, b: Value) = if (a.id < b.id) a else b
-  def unionAll(vs: Seq[Value]) = vs reduceLeft union
+  def union(a: Value, b: Value): Value = if (a.id < b.id) a else b
+  def unionAll(vs: Seq[Value]): Value = vs reduceLeft union
 
   /** Returns the level with the given name wrapped in Some, or None if no level exists for that name. */
-  def apply(s: String) = values.find(s == _.toString)
+  def apply(s: String): Option[Value] = values.find(s == _.toString)
 
   /** Same as apply, defined for use in pattern matching. */
   private[sbt] def unapply(s: String) = apply(s)

@@ -11,12 +11,12 @@ package internal
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicReference
 
+import scala.collection.JavaConverters._
+
 import sbt.internal.ui.{ UITask, UserThread }
 import sbt.internal.util.Terminal
 import sbt.protocol.EventMessage
 import sbt.util.Level
-
-import scala.collection.JavaConverters._
 
 /**
  * A command channel represents an IO device such as network socket or human

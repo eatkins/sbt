@@ -58,7 +58,7 @@ trait ChangeReport[T] {
       override def markAllModified = this
     }
 
-  override def toString = {
+  override def toString: String = {
     val labels = List("Checked", "Modified", "Unmodified", "Added", "Removed")
     val sets = List(checked, modified, unmodified, added, removed)
     val keyValues = labels.zip(sets).map { case (label, set) => label + ": " + set.mkString(", ") }
@@ -68,19 +68,19 @@ trait ChangeReport[T] {
 }
 
 class EmptyChangeReport[T] extends ChangeReport[T] {
-  def checked = Set.empty[T]
-  def unmodified = Set.empty[T]
-  def modified = Set.empty[T]
-  def added = Set.empty[T]
-  def removed = Set.empty[T]
+  def checked: Set[T] = Set.empty[T]
+  def unmodified: Set[T] = Set.empty[T]
+  def modified: Set[T] = Set.empty[T]
+  def added: Set[T] = Set.empty[T]
+  def removed: Set[T] = Set.empty[T]
   override def toString = "No changes"
 }
 
 private class CompoundChangeReport[T](a: ChangeReport[T], b: ChangeReport[T])
     extends ChangeReport[T] {
-  lazy val checked = a.checked ++ b.checked
-  lazy val unmodified = a.unmodified ++ b.unmodified
-  lazy val modified = a.modified ++ b.modified
-  lazy val added = a.added ++ b.added
-  lazy val removed = a.removed ++ b.removed
+  lazy val checked: Set[T] = a.checked ++ b.checked
+  lazy val unmodified: Set[T] = a.unmodified ++ b.unmodified
+  lazy val modified: Set[T] = a.modified ++ b.modified
+  lazy val added: Set[T] = a.added ++ b.added
+  lazy val removed: Set[T] = a.removed ++ b.removed
 }

@@ -9,7 +9,8 @@ package sbt.internal.util
 package logic
 
 import scala.annotation.tailrec
-import Formula.{ And, True }
+
+import sbt.internal.util.logic.Formula.{ And, True }
 
 /*
 Defines a propositional logic with negation as failure and only allows stratified rule sets
@@ -55,7 +56,7 @@ sealed abstract class Literal extends Formula {
 
 /** A variable with name `label`. */
 final case class Atom(label: String) extends Literal {
-  def atom = this
+  def atom: Atom = this
   def unary_! : Negated = Negated(this)
 }
 
@@ -205,7 +206,7 @@ object Logic {
     }
 
     def ordered: List[Atom] = reverseOrdered.reverse
-    override def toString = ordered.map(_.label).mkString("Matched(", ",", ")")
+    override def toString: String = ordered.map(_.label).mkString("Matched(", ",", ")")
   }
 
   object Matched {

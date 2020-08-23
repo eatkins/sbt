@@ -9,7 +9,6 @@ package sbt
 
 import java.io._
 
-import org.specs2.mutable.Specification
 import sbt.internal._
 import sbt.internal.util.{
   AttributeEntry,
@@ -20,6 +19,8 @@ import sbt.internal.util.{
   Settings,
   Terminal
 }
+
+import org.specs2.mutable.Specification
 
 object PluginCommandTestPlugin0 extends AutoPlugin { override def requires = empty }
 
@@ -87,7 +88,7 @@ object FakeState {
     }
   }
 
-  def apply(logFile: File, plugins: AutoPlugin*) = {
+  def apply(logFile: File, plugins: AutoPlugin*): State = {
 
     val base = new File("").getAbsoluteFile
     val testProject = Project("test-project", base).setAutoPlugins(plugins)

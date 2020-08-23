@@ -8,8 +8,14 @@
 package sbt
 package std
 
-import Def.{ Initialize, Setting }
+import scala.annotation.tailrec
+import scala.language.experimental.macros
+import scala.reflect.internal.util.UndefinedPosition
+import scala.reflect.macros._
+
+import sbt.Def.{ Initialize, Setting }
 import sbt.internal.util.Types.{ Id, const, idFun }
+import sbt.internal.util.appmacro.Instance.Transform
 import sbt.internal.util.appmacro.{
   ContextUtil,
   Converted,
@@ -18,14 +24,8 @@ import sbt.internal.util.appmacro.{
   MixedBuilder,
   MonadInstance
 }
-import Instance.Transform
 import sbt.internal.util.complete.{ DefaultParsers, Parser }
 import sbt.internal.util.{ AList, LinePosition, NoPosition, SourcePosition, ~> }
-
-import language.experimental.macros
-import scala.annotation.tailrec
-import reflect.macros._
-import scala.reflect.internal.util.UndefinedPosition
 
 /** Instance for the monad/applicative functor for plain Tasks. */
 object TaskInstance extends MonadInstance {
@@ -56,7 +56,7 @@ object FullInstance
     extends Instance.Composed[Initialize, Task](InitializeInstance, TaskInstance)
     with MonadInstance {
   type SS = sbt.internal.util.Settings[Scope]
-  val settingsData = TaskKey[SS](
+  val settingsData: TaskKey[SS] = TaskKey[SS](
     "settings-data",
     "Provides access to the project data for the build.",
     KeyRanks.DTask
@@ -96,7 +96,7 @@ object TaskMacro {
     "`<+=` operator is removed. Try `lhs += { x.value }`\n  or see https://www.scala-sbt.org/1.x/docs/Migrating-from-sbt-013x.html."
   final val appendNMigration =
     "`<++=` operator is removed. Try `lhs ++= { x.value }`\n  or see https://www.scala-sbt.org/1.x/docs/Migrating-from-sbt-013x.html."
-  final val assignMigration =
+  final val assignMigration: String =
     """`<<=` operator is removed. Use `key := { x.value }` or `key ~= (old => { newValue })`.
       |See https://www.scala-sbt.org/1.x/docs/Migrating-from-sbt-013x.html""".stripMargin
 

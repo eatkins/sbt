@@ -7,7 +7,7 @@
 
 package sbt.internal.util.codec
 
-import _root_.sjsonnew.{ deserializationError, Builder, JsonFormat, Unbuilder }
+import _root_.sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
 import xsbti.Severity;
 
 trait SeverityFormats { self: sjsonnew.BasicJsonProtocol =>

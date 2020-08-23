@@ -7,7 +7,7 @@
 
 package sbt
 
-import Def.ScopedKey
+import sbt.Def.ScopedKey
 
 final case class ScopedKeyData[A](scoped: ScopedKey[A], value: Any) {
   import sbt.internal.util.Types.const

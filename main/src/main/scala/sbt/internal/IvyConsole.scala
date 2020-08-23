@@ -8,29 +8,22 @@
 package sbt
 package internal
 
-import sbt.internal.util.Attributed
-import sbt.util.{ Level, Logger }
-
-import sbt.librarymanagement.{
-  Configurations,
-  CrossVersion,
-  Disabled,
-  MavenRepository,
-  ModuleID,
-  Resolver
-}
-
 import java.io.File
-import Configurations.Compile
-import Def.Setting
-import Keys._
-import Scope.Global
 
+import scala.util.matching.Regex
+
+import sbt.Def.Setting
+import sbt.Keys._
+import sbt.Scope.Global
+import sbt.internal.util.Attributed
 import sbt.io.IO
+import sbt.librarymanagement.Configurations.Compile
+import sbt.librarymanagement.{ CrossVersion, Disabled, MavenRepository, ModuleID, Resolver }
+import sbt.util.{ Level, Logger }
 
 object IvyConsole {
   final val Name = "ivy-console"
-  lazy val command =
+  lazy val command: Command =
     Command.command(Name) { state =>
       val Dependencies(managed, repos, unmanaged) = parseDependencies(state.remainingCommands map {
         _.commandLine
@@ -81,7 +74,7 @@ object IvyConsole {
     MavenRepository(name.trim, url.trim)
   }
 
-  val DepPattern = """([^%]+)%(%?)([^%]+)%([^%]+)""".r
+  val DepPattern: Regex = """([^%]+)%(%?)([^%]+)%([^%]+)""".r
   def parseManaged(arg: String, log: Logger): Seq[ModuleID] =
     arg match {
       case DepPattern(group, cross, name, version) =>

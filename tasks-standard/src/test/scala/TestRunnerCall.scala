@@ -5,11 +5,12 @@
  * Licensed under Apache License 2.0 (see LICENSE)
  */
 
+import sbt.Task
+import sbt.TaskGen._
 import sbt._
 
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
-import TaskGen._
 
 object TaskRunnerCallTest extends Properties("TaskRunner Call") {
   property("calculates fibonacci") = forAll(MaxTasksGen, MaxWorkersGen) { (i: Int, workers: Int) =>
@@ -21,7 +22,7 @@ object TaskRunnerCallTest extends Properties("TaskRunner Call") {
       }
     }
   }
-  final def fibTask(i: Int) = {
+  final def fibTask(i: Int): Task[Int] = {
     require(i > 0)
     lazy val next: (Int, Int, Int) => Task[Int] =
       (index, x1, x2) => {

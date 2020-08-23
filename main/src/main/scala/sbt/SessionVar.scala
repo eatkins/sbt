@@ -9,11 +9,11 @@ package sbt
 
 import scala.util.control.NonFatal
 
-import sbt.internal.util.{ AttributeMap, IMap, Types }
+import sbt.Def.ScopedKey
+import sbt.Keys.sessionVars
+import sbt.internal.util.Types.Id
+import sbt.internal.util.{ AttributeMap, IMap }
 
-import Def.ScopedKey
-import Types.Id
-import Keys.sessionVars
 import sjsonnew.JsonFormat
 
 object SessionVar {
@@ -25,7 +25,7 @@ object SessionVar {
     def get[T](k: ScopedKey[Task[T]]): Option[T] = map get Key(k)
     def put[T](k: ScopedKey[Task[T]], v: T): Map = Map(map put (Key(k), v))
   }
-  def emptyMap = Map(IMap.empty)
+  def emptyMap: Map = Map(IMap.empty)
 
   def persistAndSet[T](key: ScopedKey[Task[T]], state: State, value: T)(
       implicit f: JsonFormat[T]
@@ -45,7 +45,7 @@ object SessionVar {
   def set[T](key: ScopedKey[Task[T]], state: State, value: T): State =
     state.update(sessionVars)(om => orEmpty(om) put (key, value))
 
-  def orEmpty(opt: Option[Map]) = opt getOrElse emptyMap
+  def orEmpty(opt: Option[Map]): Map = opt getOrElse emptyMap
 
   def transform[S](task: Task[S], f: (State, S) => State): Task[S] = {
     val g = (s: S, map: AttributeMap) => map.put(Keys.transformState, (state: State) => f(state, s))

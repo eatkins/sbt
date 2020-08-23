@@ -8,16 +8,15 @@
 package sbt
 package internal
 
-import sbt.internal.util.{ AttributeKey, complete, Relation, Settings, Types, Util }
-import sbt.util.Show
+import sbt.Def.{ ScopedKey, Setting }
+import sbt.Project._
+import sbt.Scope.Global
+import sbt.internal.util.Types.idFun
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete._
+import sbt.internal.util.{ AttributeKey, Relation, Settings, Util, complete }
 import sbt.librarymanagement.Configuration
-
-import Project._
-import Def.{ ScopedKey, Setting }
-import Scope.Global
-import Types.idFun
-import complete._
-import DefaultParsers._
+import sbt.util.Show
 
 /**
  * The resulting `session` and verbose and quiet summaries of the result of a set operation.
@@ -171,7 +170,7 @@ private[sbt] object SettingCompletions {
   }
 
   /** Parser for the `in` method name that slightly augments the naive completion to give a hint of the purpose of `in`.*/
-  val inParser = tokenDisplay(Space ~> InMethod, "%s <scope>".format(InMethod))
+  val inParser: Parser[String] = tokenDisplay(Space ~> InMethod, "%s <scope>".format(InMethod))
 
   /**
    * Parser for the initialization expression for the assignment method `assign` on the key `sk`.
@@ -383,7 +382,7 @@ private[sbt] object SettingCompletions {
   }
 
   /** The simple name of the Global scope, which can be used to reference it in the default setting context. */
-  final val GlobalID = Scope.Global.getClass.getSimpleName.stripSuffix("$")
+  final val GlobalID: String = Scope.Global.getClass.getSimpleName.stripSuffix("$")
 
   /** Character used to quote a Scala identifier that would otherwise be interpreted as a keyword.*/
   final val Backtick = '`'
@@ -393,10 +392,10 @@ private[sbt] object SettingCompletions {
 
   /** Assignment methods that may be called on a setting or task. */
   object Assign extends Enumeration {
-    val AppendValue = Value("+=")
-    val AppendValues = Value("++=")
-    val Define = Value(":=")
-    val Update = Value("~=")
+    val AppendValue: Value = Value("+=")
+    val AppendValues: Value = Value("++=")
+    val Define: Value = Value(":=")
+    val Update: Value = Value("~=")
   }
   import Assign._
 
@@ -412,7 +411,11 @@ private[sbt] object SettingCompletions {
   val assignNoAppend: Set[Assign.Value] = Set(Define, Update)
 
   /** Class values to approximate which types can be appended*/
-  val appendableClasses = Seq(
+  val appendableClasses: Seq[
+    Class[_ >: String with Long with Double with Int with Set[_$41] with Map[_$39, Any] with Seq[
+      Any
+    ] forSome { type _$41; type _$39 }]
+  ] = Seq(
     classOf[Seq[_]],
     classOf[Map[_, _]],
     classOf[Set[_]],

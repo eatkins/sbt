@@ -7,9 +7,10 @@
 
 package sbt
 
+import sbt.TaskGen._
+
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
-import TaskGen._
 
 object TaskRunnerCircularTest extends Properties("TaskRunner Circular") {
   property("Catches circular references") = forAll(MaxTasksGen, MaxWorkersGen) {
@@ -18,7 +19,7 @@ object TaskRunnerCircularTest extends Properties("TaskRunner Circular") {
   property("Allows references to completed tasks") = forAllNoShrink(MaxTasksGen, MaxWorkersGen) {
     allowedReference _
   }
-  final def allowedReference(intermediate: Int, workers: Int) = {
+  final def allowedReference(intermediate: Int, workers: Int): Prop = {
     val top = task(intermediate).named("top")
     def iterate(tk: Task[Int]): Task[Int] =
       tk flatMap { t =>
@@ -33,7 +34,7 @@ object TaskRunnerCircularTest extends Properties("TaskRunner Circular") {
       case i: Incomplete if cyclic(i) => ("Unexpected cyclic exception: " + i) |: false
     }
   }
-  final def checkCircularReferences(intermediate: Int, workers: Int) = {
+  final def checkCircularReferences(intermediate: Int, workers: Int): Boolean = {
     lazy val top = iterate(task(intermediate).named("bottom"), intermediate)
     def iterate(tk: Task[Int], i: Int): Task[Int] =
       tk flatMap { t =>
@@ -47,7 +48,7 @@ object TaskRunnerCircularTest extends Properties("TaskRunner Circular") {
     } catch { case i: Incomplete => cyclic(i) }
   }
 
-  def cyclic(i: Incomplete) =
+  def cyclic(i: Incomplete): Boolean =
     Incomplete
       .allExceptions(i)
       .exists(_.isInstanceOf[Execute[({ type A[_] <: AnyRef })#A @unchecked]#CyclicException[_]])

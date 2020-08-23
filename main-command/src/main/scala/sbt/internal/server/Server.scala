@@ -10,24 +10,26 @@ package internal
 package server
 
 import java.io.{ File, IOException }
+import java.math.BigInteger
 import java.net.{ InetAddress, ServerSocket, Socket, SocketTimeoutException }
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.nio.file.attribute.{ AclEntry, AclEntryPermission, AclEntryType, UserPrincipal }
 import java.security.SecureRandom
-import java.math.BigInteger
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 
 import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
-import sbt.internal.protocol.{ PortFile, TokenFile }
-import sbt.util.Logger
-import sbt.io.IO
-import sbt.io.syntax._
-import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
+
+import sbt.internal.bsp.BuildServerConnection
 import sbt.internal.protocol.codec._
+import sbt.internal.protocol.{ PortFile, TokenFile }
 import sbt.internal.util.ErrorHandling
 import sbt.internal.util.Util.isWindows
+import sbt.io.IO
+import sbt.io.syntax._
+import sbt.util.Logger
+
 import org.scalasbt.ipcsocket._
-import sbt.internal.bsp.BuildServerConnection
+import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter }
 import xsbti.AppConfiguration
 
 private[sbt] sealed trait ServerInstance {

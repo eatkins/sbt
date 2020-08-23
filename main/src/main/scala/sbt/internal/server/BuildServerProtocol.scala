@@ -11,6 +11,8 @@ package server
 
 import java.net.URI
 
+import scala.util.control.NonFatal
+
 import sbt.BasicCommandStrings.Shutdown
 import sbt.BuildSyntax._
 import sbt.Def._
@@ -22,10 +24,9 @@ import sbt.internal.langserver.ErrorCodes
 import sbt.internal.protocol.JsonRpcRequestMessage
 import sbt.librarymanagement.Configuration
 import sbt.util.Logger
+
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 import sjsonnew.support.scalajson.unsafe.Converter
-
-import scala.util.control.NonFatal
 
 object BuildServerProtocol {
   import sbt.internal.bsp.codec.JsonProtocol._

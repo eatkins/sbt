@@ -8,21 +8,18 @@
 package sbt
 package internal
 
-import sbt.librarymanagement.Configurations
-
-import sbt.util.Level
-
 import java.io.File
-import Keys._
-import EvaluateConfigurations.{ evaluateConfiguration => evaluate }
-import Configurations.Compile
-import Scope.Global
 
+import sbt.Keys._
+import sbt.Scope.Global
+import sbt.internal.EvaluateConfigurations.{ evaluateConfiguration => evaluate }
 import sbt.io.{ Hash, IO }
+import sbt.librarymanagement.Configurations.Compile
+import sbt.util.Level
 
 object Script {
   final val Name = "script"
-  lazy val command =
+  lazy val command: Command =
     Command.command(Name) { state =>
       val scriptArg = state.remainingCommands.headOption map { _.commandLine } getOrElse sys.error(
         "No script file specified"

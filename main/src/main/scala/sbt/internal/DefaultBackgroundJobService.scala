@@ -15,17 +15,16 @@ import java.security.{ DigestInputStream, MessageDigest }
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{ AtomicLong, AtomicReference }
 
+import scala.concurrent.ExecutionContext
+import scala.util.Try
+
 import sbt.Def.{ Classpath, ScopedKey, Setting }
 import sbt.Scope.GlobalScope
 import sbt.internal.inc.classpath.ClasspathFilter
 import sbt.internal.util.{ Attributed, ManagedLogger }
 import sbt.io.syntax._
 import sbt.io.{ Hash, IO }
-import sbt.util.Logger
-
-import scala.concurrent.ExecutionContext
-import scala.util.Try
-import sbt.util.LoggerContext
+import sbt.util.{ Logger, LoggerContext }
 
 /**
  * Interface between sbt and a thing running in the background.
@@ -55,7 +54,7 @@ private[sbt] abstract class BackgroundJob {
 }
 
 private[sbt] abstract class AbstractJobHandle extends JobHandle {
-  override def toString =
+  override def toString: String =
     s"JobHandle(${id}, ${humanReadableName}, ${Def.showFullKey.show(spawningTask)})"
 }
 
@@ -335,7 +334,7 @@ private[sbt] class BackgroundThreadPool extends java.io.Closeable {
     private var exitTry: Option[Try[Unit]] = None
 
     // double-finally for extra paranoia that we will finishedLatch.countDown
-    override def run() =
+    override def run(): Unit =
       try {
         val go = synchronized {
           status match {

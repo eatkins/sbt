@@ -7,9 +7,10 @@
 
 package sbt
 
+import scala.annotation.tailrec
+
 import sbt.internal.util.ConsoleAppender.ClearScreenAfterCursor
 import sbt.internal.util.Util.{ AnyOps, none }
-import scala.annotation.tailrec
 
 object SelectMainClass {
   // Some(SimpleReader.readLine _)

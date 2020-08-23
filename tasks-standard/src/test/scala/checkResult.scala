@@ -9,10 +9,11 @@ package sbt
 
 import scala.util.control.NonFatal
 
+import org.scalacheck.Prop
 import org.scalacheck.Prop._
 
 object checkResult {
-  def apply[T](run: => T, expected: T) = {
+  def apply[T](run: => T, expected: T): Prop = {
     ("Expected: " + expected) |:
       (try {
         val actual = run

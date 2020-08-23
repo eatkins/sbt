@@ -7,20 +7,21 @@
 
 package sbt
 
-import scala.annotation.tailrec
 import java.io.File
-import sbt.io.syntax._
-import sbt.io.IO
+
+import scala.annotation.tailrec
+
 import sbt.internal.inc.{ RawCompiler, ScalaInstance }
+import sbt.internal.util.HListFormats._
 import sbt.internal.util.Types.:+:
-import sbt.internal.util.HListFormats._
-import sbt.internal.util.HNil
-import sbt.internal.util.HListFormats._
+import sbt.internal.util.{ HNil, ManagedLogger }
+import sbt.io.IO
+import sbt.io.syntax._
 import sbt.util.CacheImplicits._
+import sbt.util.FileInfo.{ exists, hash, lastModified }
 import sbt.util.Tracked.inputChanged
 import sbt.util.{ CacheStoreFactory, FilesInfo, HashFileInfo, ModifiedFileInfo, PlainFileInfo }
-import sbt.util.FileInfo.{ exists, hash, lastModified }
-import sbt.internal.util.ManagedLogger
+
 import xsbti.compile.ClasspathOptions
 
 object RawCompileLike {

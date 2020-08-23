@@ -9,9 +9,21 @@ package sbt
 package coursierint
 
 import java.net.URL
-import sbt.librarymanagement._
-import sbt.util.Logger
+
+import scala.collection.JavaConverters._
+
 import sbt.Keys._
+import sbt.ScopeFilter.Make._
+import sbt.internal.librarymanagement.mavenint.SbtPomExtraProperties
+import sbt.librarymanagement._
+import sbt.librarymanagement.ivy.{
+  Credentials,
+  DirectCredentials => IvyDirectCredentials,
+  FileCredentials
+}
+import sbt.util.Logger
+
+import lmcoursier.credentials.DirectCredentials
 import lmcoursier.definitions.{
   Classifier => CClassifier,
   Configuration => CConfiguration,
@@ -23,19 +35,10 @@ import lmcoursier.definitions.{
   Organization => COrganization,
   Project => CProject,
   Publication => CPublication,
-  Type => CType,
   Strict => CStrict,
+  Type => CType
 }
-import lmcoursier.credentials.DirectCredentials
 import lmcoursier.{ FallbackDependency, FromSbt, Inputs }
-import sbt.internal.librarymanagement.mavenint.SbtPomExtraProperties
-import sbt.librarymanagement.ivy.{
-  FileCredentials,
-  Credentials,
-  DirectCredentials => IvyDirectCredentials
-}
-import sbt.ScopeFilter.Make._
-import scala.collection.JavaConverters._
 
 object CoursierInputsTasks {
   private def coursierProject0(
@@ -212,7 +215,7 @@ object CoursierInputsTasks {
       }
     }
 
-  val credentialsTask = Def.task {
+  val credentialsTask: Def.Initialize[Task[Seq[lmcoursier.credentials.Credentials]]] = Def.task {
     val log = streams.value.log
     val creds = sbt.Keys.allCredentials.value
       .flatMap {
@@ -237,7 +240,7 @@ object CoursierInputsTasks {
     creds ++ csrExtraCredentials.value
   }
 
-  val strictTask = Def.task {
+  val strictTask: Def.Initialize[Task[Option[CStrict]]] = Def.task {
     val cm = conflictManager.value
     val log = streams.value.log
 

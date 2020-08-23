@@ -9,9 +9,10 @@ package sbt
 package internal
 
 import java.net.URI
-import Def.ScopedKey
-import sbt.internal.util.complete.DefaultParsers.validID
+
+import sbt.Def.ScopedKey
 import sbt.internal.util.Types.some
+import sbt.internal.util.complete.DefaultParsers.validID
 import sbt.internal.util.{ AttributeKey, Relation }
 import sbt.librarymanagement.Configuration
 

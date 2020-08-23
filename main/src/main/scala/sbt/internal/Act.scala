@@ -8,14 +8,15 @@
 package sbt
 package internal
 
-import Def.{ showRelativeKey2, ScopedKey }
-import Keys.sessionSettings
-import sbt.internal.util.complete.{ DefaultParsers, Parser }
-import Aggregation.{ KeyValue, Values }
-import DefaultParsers._
-import sbt.internal.util.Types.idFun
 import java.net.URI
-import sbt.internal.CommandStrings.{ MultiTaskCommand, ShowCommand, PrintCommand }
+
+import sbt.Def.{ ScopedKey, showRelativeKey2 }
+import sbt.Keys.sessionSettings
+import sbt.internal.Aggregation.{ KeyValue, Values }
+import sbt.internal.CommandStrings.{ MultiTaskCommand, PrintCommand, ShowCommand }
+import sbt.internal.util.Types.idFun
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.Parser
 import sbt.internal.util.{ AttributeEntry, AttributeKey, AttributeMap, IMap, Settings, Util }
 import sbt.util.Show
 
@@ -166,7 +167,7 @@ object Act {
     if (zeros.nonEmpty) zeros else selects
   }
 
-  def noValidKeys = failure("No such key.")
+  def noValidKeys: Parser[Nothing] = failure("No such key.")
 
   def showAmbiguous(keys: Seq[ScopedKey[_]])(implicit show: Show[ScopedKey[_]]): String =
     keys.take(3).map(x => show.show(x)).mkString("", ", ", if (keys.size > 3) ", ..." else "")
@@ -274,7 +275,7 @@ object Act {
       case None    => failure(Command.invalidValue("key", keyMap.keys)(keyString))
     }
 
-  val spacedComma = token(OptSpace ~ ',' ~ OptSpace)
+  val spacedComma: Parser[((Seq[Char], Char), Seq[Char])] = token(OptSpace ~ ',' ~ OptSpace)
 
   def extraAxis(
       knownKeys: Map[String, AttributeKey[_]],
@@ -506,7 +507,7 @@ object Act {
     if (s get sessionSettings isEmpty) failure("No project loaded") else p
 
   sealed trait ParsedAxis[+T] {
-    final def isExplicit = this != Omitted
+    final def isExplicit: Boolean = this != Omitted
   }
   final object ParsedGlobal extends ParsedAxis[Nothing]
   final object ParsedZero extends ParsedAxis[Nothing]

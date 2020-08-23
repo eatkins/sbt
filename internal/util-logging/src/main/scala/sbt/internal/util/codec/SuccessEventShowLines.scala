@@ -8,8 +8,8 @@
 package sbt
 package internal.util.codec
 
-import sbt.util.ShowLines
 import sbt.internal.util.SuccessEvent
+import sbt.util.ShowLines
 
 trait SuccessEventShowLines {
   implicit val sbtSuccessEventShowLines: ShowLines[SuccessEvent] =

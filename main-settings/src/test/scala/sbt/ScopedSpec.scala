@@ -7,18 +7,19 @@
 
 package sbt.test
 
-import org.scalacheck._, Prop._, util.Pretty
-
 import sbt.internal.util.AttributeKey
+import sbt.test.BuildSettingsInstances._
 import sbt.util.NoJsonWriter
-import sbt.{ InputTask, Scope, Task }
 import sbt.{ InputKey, Scoped, SettingKey, TaskKey }
+import sbt.{ InputTask, Scope, Task }
 
-import BuildSettingsInstances._
+import org.scalacheck.Prop._
+import org.scalacheck._
+import org.scalacheck.util.Pretty
 
 object ScopedSpec extends Properties("Scoped") {
-  val intManifest = manifest[Int]
-  val stringManifest = manifest[String]
+  val intManifest: Manifest[Int] = manifest[Int]
+  val stringManifest: Manifest[String] = manifest[String]
 
   implicit val arbManifest: Arbitrary[Manifest[_]] =
     Arbitrary(Gen.oneOf(intManifest, stringManifest))
@@ -109,7 +110,7 @@ object ScopedSpec extends Properties("Scoped") {
   def expectNe(k1: Scoped, k2: Scoped): Prop =
     !=(k1, k2) && !=(k2, k1) map eqLabels(k1, k2)
 
-  def expectNeSameManifest(k1: Scoped, k2: Scoped) = {
+  def expectNeSameManifest(k1: Scoped, k2: Scoped): Prop = {
     all(
       ?=(k1.key.manifest, k2.key.manifest), // sanity check the manifests are the same
       expectNe(k1, k2),

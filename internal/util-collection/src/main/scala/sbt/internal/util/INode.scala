@@ -8,13 +8,10 @@
 package sbt.internal.util
 
 import java.lang.Runnable
-import java.util.concurrent.Executor
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
+import java.util.concurrent.{ Executor, LinkedBlockingQueue }
 
-import sbt.internal.util.Types.ConstK
-import sbt.internal.util.Types.Id
+import sbt.internal.util.Types.{ ConstK, Id }
 
 object EvaluationState extends Enumeration {
   val New, Blocked, Ready, Calling, Evaluated = Value

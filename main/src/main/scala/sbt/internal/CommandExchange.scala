@@ -13,6 +13,12 @@ import java.net.Socket
 import java.util.concurrent.atomic._
 import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.{ Failure, Success, Try }
+
 import sbt.BasicCommandStrings.{
   Cancel,
   CompleteExec,
@@ -31,13 +37,8 @@ import sbt.nio.Watch.NullLogger
 import sbt.protocol.Serialization.attach
 import sbt.protocol.{ ExecStatusEvent, LogEvent }
 import sbt.util.Logger
-import sjsonnew.JsonFormat
 
-import scala.annotation.tailrec
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
+import sjsonnew.JsonFormat
 
 /**
  * The command exchange merges multiple command channels (e.g. network and console),

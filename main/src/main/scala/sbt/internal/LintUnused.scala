@@ -8,12 +8,12 @@
 package sbt
 package internal
 
-import Keys._
-import Def.{ Setting, ScopedKey }
-import sbt.internal.util.{ FilePosition, NoPosition, SourcePosition }
 import java.io.File
-import Scope.Global
-import sbt.Def._
+
+import sbt.Def.{ ScopedKey, Setting, _ }
+import sbt.Keys._
+import sbt.Scope.Global
+import sbt.internal.util.{ FilePosition, NoPosition, SourcePosition }
 
 object LintUnused {
   lazy val lintSettings: Seq[Setting[_]] = Seq(

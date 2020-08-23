@@ -29,24 +29,24 @@ class RichURI(uri: URI) {
     new URI(scheme, userInfo, host, port, path, query, fragment)
 
   /** Returns `true` if the fragment of the URI is defined. */
-  def hasFragment = uri.getFragment ne null
+  def hasFragment: Boolean = uri.getFragment ne null
 
   /** Returns a copy of the URI without the fragment. */
-  def withoutFragment =
+  def withoutFragment: URI =
     if (hasFragment)
       new URI(uri.getScheme, uri.getSchemeSpecificPart, null)
     else
       uri
 
   /** Returns `true` if the scheme specific part of the URI is also a valid URI. */
-  def hasMarkerScheme = new URI(uri.getRawSchemeSpecificPart).getScheme ne null
+  def hasMarkerScheme: Boolean = new URI(uri.getRawSchemeSpecificPart).getScheme ne null
 
   /**
    * Strips the wrapper scheme from this URI.
    * If the URI has a fragment, the fragment is transferred to the wrapped URI.
    * If this URI does not have a marker scheme, it is returned unchanged.
    */
-  def withoutMarkerScheme = {
+  def withoutMarkerScheme: URI = {
     if (hasMarkerScheme)
       if (hasFragment)
         new URI(uri.getRawSchemeSpecificPart + "#" + uri.getRawFragment)

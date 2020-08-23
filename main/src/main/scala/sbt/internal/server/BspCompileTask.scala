@@ -7,15 +7,16 @@
 
 package sbt.internal.server
 
+import scala.util.control.NonFatal
+
 import sbt._
 import sbt.internal.bsp._
 import sbt.internal.io.Retry
 import sbt.librarymanagement.Configuration
+
 import sjsonnew.support.scalajson.unsafe.Converter
 import xsbti.compile.CompileResult
 import xsbti.{ CompileFailed, Problem, Severity }
-
-import scala.util.control.NonFatal
 
 object BspCompileTask {
   import sbt.internal.bsp.codec.JsonProtocol._

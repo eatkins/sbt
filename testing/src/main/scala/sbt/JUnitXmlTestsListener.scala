@@ -18,15 +18,16 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 import scala.collection.mutable.ListBuffer
 import scala.util.Properties
 import scala.xml.{ Elem, Node => XNode, XML }
-import testing.{
+
+import sbt.protocol.testing.TestResult
+import sbt.testing.{
   Event => TEvent,
   NestedTestSelector,
-  Status => TStatus,
   OptionalThrowable,
+  Status => TStatus,
   TestSelector
 }
-import util.Logger
-import sbt.protocol.testing.TestResult
+import sbt.util.Logger
 
 /**
  * A tests listener that outputs the results it receives in junit xml
@@ -89,7 +90,7 @@ class JUnitXmlTestsListener(val outputDir: String, legacyTestReport: Boolean, lo
     def addEvent(e: TEvent): ListBuffer[TEvent] = events += e
 
     /** Returns the number of tests of each state for the specified. */
-    def count(status: TStatus) = events.count(_.status == status)
+    def count(status: TStatus): Int = events.count(_.status == status)
 
     /**
      * Stops the time measuring and emits the XML for

@@ -8,9 +8,9 @@
 package sbt
 
 import java.io.File
+
 import sbt.internal.inc.Relations
 import sbt.internal.util.Relation
-
 import sbt.io.IO
 
 object DotGraph {
@@ -52,7 +52,7 @@ object DotGraph {
 
     IO.writeLines(file, lines)
   }
-  def sourceToString(roots: Iterable[File], source: File) =
+  def sourceToString(roots: Iterable[File], source: File): String =
     relativized(roots, source).trim.stripSuffix(".scala").stripSuffix(".java")
 
   private def relativized(roots: Iterable[File], path: File): String = {

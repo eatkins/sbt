@@ -44,15 +44,15 @@ case class SettingsUsage(val settingsExample: SettingsExample) {
   import settingsExample._
 
   // Define some keys
-  val a = AttributeKey[Int]("a")
-  val b = AttributeKey[Int]("b")
+  val a: AttributeKey[Int] = AttributeKey[Int]("a")
+  val b: AttributeKey[Int] = AttributeKey[Int]("b")
 
   // Scope these keys
-  val a3 = ScopedKey(Scope(3), a)
-  val a4 = ScopedKey(Scope(4), a)
-  val a5 = ScopedKey(Scope(5), a)
+  val a3: ScopedKey[Int] = ScopedKey(Scope(3), a)
+  val a4: ScopedKey[Int] = ScopedKey(Scope(4), a)
+  val a5: ScopedKey[Int] = ScopedKey(Scope(5), a)
 
-  val b4 = ScopedKey(Scope(4), b)
+  val b4: ScopedKey[Int] = ScopedKey(Scope(4), b)
 
   // Define some settings
   val mySettings: Seq[Setting[_]] = Seq(

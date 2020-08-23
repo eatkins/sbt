@@ -9,13 +9,12 @@ package sbt
 package internal
 
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger, AtomicReference }
-import java.util.concurrent.TimeUnit
-
-import sbt.internal.util._
+import java.util.concurrent.{ ConcurrentHashMap, Executors, TimeUnit, TimeoutException }
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import java.util.concurrent.{ ConcurrentHashMap, Executors, TimeoutException }
+
+import sbt.internal.util._
 
 /**
  * implements task progress display on the shell.

@@ -7,10 +7,12 @@
 
 package sbt.std
 
-import org.scalatest.{ TestData, fixture }
+import scala.reflect.runtime.universe
+import scala.tools.reflect.{ FrontEnd, ToolBoxError }
+
 import sbt.std.TestUtil._
 
-import scala.tools.reflect.{ FrontEnd, ToolBoxError }
+import org.scalatest.{ TestData, fixture }
 
 class TaskConfigSpec extends fixture.FunSuite with fixture.TestDataFixture {
   private def expectError(
@@ -37,7 +39,8 @@ class TaskConfigSpec extends fixture.FunSuite with fixture.TestDataFixture {
     }
 
     import scala.tools.reflect.ToolBox
-    val toolbox = m.mkToolBox(frontEnd, options = s"-cp ${toolboxClasspath(td)}")
+    val toolbox: ToolBox[universe.type] =
+      m.mkToolBox(frontEnd, options = s"-cp ${toolboxClasspath(td)}")
     def eval(code: String): Any = toolbox.eval(toolbox.parse(code))
     def infos: List[FrontEnd#Info] = _infos
   }

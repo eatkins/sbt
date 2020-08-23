@@ -8,7 +8,13 @@
 package sbt.internal.util
 
 import java.io._
+import java.nio.channels.ClosedByInterruptException
 import java.util.{ List => JList }
+
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+
+import sbt.internal.util.complete.Parser
 
 import jline.console.ConsoleReader
 import jline.console.history.{ FileHistory, MemoryHistory }
@@ -21,11 +27,6 @@ import org.jline.reader.{
   ParsedLine,
   UserInterruptException,
 }
-import sbt.internal.util.complete.Parser
-
-import scala.annotation.tailrec
-import scala.concurrent.duration._
-import java.nio.channels.ClosedByInterruptException
 
 trait LineReader extends AutoCloseable {
   def readLine(prompt: String, mask: Option[Char] = None): Option[String]
@@ -33,7 +34,7 @@ trait LineReader extends AutoCloseable {
 }
 
 object LineReader {
-  val HandleCONT =
+  val HandleCONT: Boolean =
     !java.lang.Boolean.getBoolean("sbt.disable.cont") && Signals.supported(Signals.CONT)
   val MaxHistorySize = 500
 

@@ -10,15 +10,15 @@ package sbt
 import java.io.File
 import java.nio.file.FileSystems
 
+import scala.concurrent.duration._
+import scala.util.Properties
+
 import sbt.internal.LabeledFunctions._
 import sbt.internal.LegacyWatched
 import sbt.internal.io.{ EventMonitor, Source, WatchState }
-import sbt.internal.util.Types.const
 import sbt.internal.util.AttributeKey
+import sbt.internal.util.Types.const
 import sbt.io._
-
-import scala.concurrent.duration._
-import scala.util.Properties
 
 @deprecated("Watched is no longer used to implement continuous execution", "1.3.0")
 trait Watched {
@@ -142,23 +142,23 @@ object Watched {
   def empty: Watched = new AWatched
 
   @deprecated("ContinuousEventMonitor attribute is not used by Watched.command", "1.3.0")
-  val ContinuousEventMonitor =
+  val ContinuousEventMonitor: AttributeKey[EventMonitor] =
     AttributeKey[EventMonitor](
       "watch event monitor",
       "Internal: maintains watch state and monitor threads."
     )
   @deprecated("Superseded by ContinuousEventMonitor", "1.3.0")
-  val ContinuousState =
+  val ContinuousState: AttributeKey[WatchState] =
     AttributeKey[WatchState]("watch state", "Internal: tracks state for continuous execution.")
 
   @deprecated("Superseded by ContinuousEventMonitor", "1.3.0")
-  val ContinuousWatchService =
+  val ContinuousWatchService: AttributeKey[WatchService] =
     AttributeKey[WatchService](
       "watch service",
       "Internal: tracks watch service for continuous execution."
     )
   @deprecated("No longer used for continuous execution", "1.3.0")
-  val Configuration =
+  val Configuration: AttributeKey[Watched] =
     AttributeKey[Watched]("watched-configuration", "Configures continuous execution.")
 
   @deprecated("Use Watch.defaultStartWatch in conjunction with the watchStartMessage key", "1.3.0")

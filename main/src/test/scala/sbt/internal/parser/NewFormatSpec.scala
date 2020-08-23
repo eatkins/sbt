@@ -11,10 +11,10 @@ package parser
 
 import java.io.File
 
+import scala.io.Source
+
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
-
-import scala.io.Source
 
 @RunWith(classOf[JUnitRunner])
 class NewFormatSpec extends AbstractSpec {

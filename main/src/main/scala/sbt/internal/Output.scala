@@ -8,18 +8,18 @@
 package sbt
 package internal
 
-import sbt.internal.util.Types
-import sbt.util.Show
-import java.util.regex.Pattern
 import java.io.File
-import Keys.Streams
-import Def.ScopedKey
-import Aggregation.{ KeyValue, Values }
-import Types.idFun
-import Highlight.{ bold, showMatches }
-import annotation.tailrec
+import java.util.regex.Pattern
 
+import scala.annotation.tailrec
+
+import sbt.Def.ScopedKey
+import sbt.Highlight.{ bold, showMatches }
+import sbt.Keys.Streams
+import sbt.internal.Aggregation.{ KeyValue, Values }
+import sbt.internal.util.Types.idFun
 import sbt.io.IO
+import sbt.util.Show
 
 object Output {
   final val DefaultTail = "> "

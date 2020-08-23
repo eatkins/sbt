@@ -9,8 +9,8 @@ package sbt
 package std
 
 import sbt.internal.util.Types._
-import sbt.internal.util.{ ~>, AList, DelegatingPMap, RMap }
-import TaskExtra.{ all, existToAny }
+import sbt.internal.util.{ AList, DelegatingPMap, RMap, ~> }
+import sbt.std.TaskExtra.{ all, existToAny }
 
 object Transform {
   def fromDummy[T](original: Task[T])(action: => T): Task[T] =
@@ -39,7 +39,7 @@ object Transform {
   implicit def getOrId(map: Task ~>| Task): Task ~> Task =
     λ[Task ~> Task](in => map(in).getOrElse(in))
 
-  def apply(dummies: DummyTaskMap) = taskToNode(getOrId(dummyMap(dummies)))
+  def apply(dummies: DummyTaskMap): NodeView[Task] = taskToNode(getOrId(dummyMap(dummies)))
 
   def taskToNode(pre: Task ~> Task): NodeView[Task] = new NodeView[Task] {
     def apply[T](t: Task[T]): Node[Task, T] = pre(t).work match {

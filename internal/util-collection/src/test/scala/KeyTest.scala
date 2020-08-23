@@ -7,8 +7,9 @@
 
 package sbt.internal.util
 
+import org.scalacheck.Prop
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
 
 object KeyTest extends Properties("AttributeKey") {
   property("equality") = {
@@ -22,7 +23,7 @@ object KeyTest extends Properties("AttributeKey") {
     compare(AttributeKey[Map[Int, String]]("test"), AttributeKey[Map[Int, _]]("test"), false)
   }
 
-  def compare(a: AttributeKey[_], b: AttributeKey[_], same: Boolean) =
+  def compare(a: AttributeKey[_], b: AttributeKey[_], same: Boolean): Prop =
     ("a.label: " + a.label) |:
       ("a.manifest: " + a.manifest) |:
       ("b.label: " + b.label) |:
@@ -30,7 +31,7 @@ object KeyTest extends Properties("AttributeKey") {
       ("expected equal? " + same) |:
       compare0(a, b, same)
 
-  def compare0(a: AttributeKey[_], b: AttributeKey[_], same: Boolean) =
+  def compare0(a: AttributeKey[_], b: AttributeKey[_], same: Boolean): Prop =
     if (same) {
       ("equality" |: (a == b)) &&
       ("hash" |: (a.hashCode == b.hashCode))

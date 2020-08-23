@@ -11,9 +11,10 @@ import java.io.{ File, IOException }
 import java.nio.file.{ Path, Paths }
 import java.util.concurrent.ConcurrentHashMap
 
-import sbt.internal.inc.{ EmptyStamp, Stamper, Hash => IncHash, LastModified => IncLastModified }
+import sbt.internal.inc.{ EmptyStamp, Hash => IncHash, LastModified => IncLastModified, Stamper }
 import sbt.io.IO
 import sbt.nio.file.FileAttributes
+
 import sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
 import xsbti.compile.analysis.{ Stamp => XStamp }
 

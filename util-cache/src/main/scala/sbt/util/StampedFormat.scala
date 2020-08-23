@@ -9,7 +9,7 @@ package sbt.util
 
 import scala.reflect.Manifest
 
-import sjsonnew.{ BasicJsonProtocol, Builder, deserializationError, JsonFormat, Unbuilder }
+import sjsonnew.{ BasicJsonProtocol, Builder, JsonFormat, Unbuilder, deserializationError }
 
 object StampedFormat extends BasicJsonProtocol {
 

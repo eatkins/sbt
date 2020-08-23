@@ -12,9 +12,8 @@ import java.io.File
 import java.net.{ MalformedURLException, URL }
 
 import sbt.internal.librarymanagement.mavenint.SbtPomExtraProperties
-import sbt.librarymanagement.ModuleID
-
 import sbt.internal.util.Attributed
+import sbt.librarymanagement.ModuleID
 import sbt.util.Logger
 
 private[sbt] object APIMappings {

@@ -8,11 +8,12 @@
 package sbt
 package internal.testing
 
-import testing.{ Logger => TLogger }
-import sbt.internal.util.{ BufferedAppender, ConsoleAppender, ManagedLogger }
-import sbt.util.{ Level, ShowLines }
-import sbt.protocol.testing._
 import java.util.concurrent.atomic.AtomicInteger
+
+import sbt.internal.util.{ BufferedAppender, ConsoleAppender, ManagedLogger }
+import sbt.protocol.testing._
+import sbt.testing.{ Logger => TLogger }
+import sbt.util.{ Level, ShowLines }
 
 object TestLogger {
   import sbt.protocol.testing.codec.JsonProtocol._

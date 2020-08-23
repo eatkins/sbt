@@ -10,8 +10,7 @@ package appmacro
 
 import scala.reflect.macros._
 
-import sbt.internal.util.appmacro.ContextUtil.DynamicDependencyError
-import sbt.internal.util.appmacro.ContextUtil.DynamicReferenceError
+import sbt.internal.util.appmacro.ContextUtil.{ DynamicDependencyError, DynamicReferenceError }
 
 object ContextUtil {
   final val DynamicDependencyError = "Illegal dynamic dependency"

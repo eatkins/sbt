@@ -9,13 +9,15 @@ package sbt.util
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import org.apache.logging.log4j.{ Level => XLevel }
-import org.apache.logging.log4j.core.{ Appender => XAppender, LoggerContext => XLoggerContext }
-import org.apache.logging.log4j.core.config.{ AppenderRef, LoggerConfig }
-import sbt.internal.util._
+
 import scala.collection.JavaConverters._
-import org.apache.logging.log4j.core.config.AbstractConfiguration
+
+import sbt.internal.util._
+
+import org.apache.logging.log4j.core.config.{ AbstractConfiguration, AppenderRef, LoggerConfig }
+import org.apache.logging.log4j.core.{ Appender => XAppender, LoggerContext => XLoggerContext }
 import org.apache.logging.log4j.message.ObjectMessage
+import org.apache.logging.log4j.{ Level => XLevel }
 
 /**
  * Provides a context for generating loggers during task evaluation. The logger context

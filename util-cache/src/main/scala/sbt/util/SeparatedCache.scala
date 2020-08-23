@@ -9,10 +9,10 @@ package sbt.util
 
 import scala.util.Try
 
+import sbt.util.CacheImplicits._
+
 import sjsonnew.JsonFormat
 import sjsonnew.support.murmurhash.Hasher
-
-import CacheImplicits._
 
 /**
  * A cache that stores a single value.

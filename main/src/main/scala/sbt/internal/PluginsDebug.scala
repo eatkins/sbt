@@ -8,13 +8,13 @@
 package sbt
 package internal
 
+import java.net.URI
+
+import sbt.Def.Setting
+import sbt.Plugins._
+import sbt.internal.PluginsDebug._
 import sbt.internal.util.{ AttributeKey, Dag, Relation, Util }
 import sbt.util.Logger
-
-import Def.Setting
-import Plugins._
-import PluginsDebug._
-import java.net.URI
 
 private[sbt] class PluginsDebug(
     val available: List[AutoPlugin],

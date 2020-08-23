@@ -12,24 +12,24 @@ import scala.runtime.AbstractFunction3
 
 import sbt.ConcurrentRestrictions.Tag
 import sbt.internal.inc.Analysis
-import sbt.internal.util.FeedbackProvidedException
-import sbt.internal.util.ManagedLogger
+import sbt.internal.util.{ FeedbackProvidedException, ManagedLogger }
 import sbt.protocol.testing.TestResult
 import sbt.std.TaskExtra._
-import sbt.testing.AnnotatedFingerprint
-import sbt.testing.Fingerprint
-import sbt.testing.Framework
-import sbt.testing.Runner
-import sbt.testing.Selector
-import sbt.testing.SubclassFingerprint
-import sbt.testing.SuiteSelector
-import sbt.testing.TaskDef
-import sbt.testing.{ Task => TestTask }
+import sbt.testing.{
+  AnnotatedFingerprint,
+  Fingerprint,
+  Framework,
+  Runner,
+  Selector,
+  SubclassFingerprint,
+  SuiteSelector,
+  Task => TestTask,
+  TaskDef
+}
 import sbt.util.Logger
-import xsbt.api.Discovered
-import xsbt.api.Discovery
-import xsbti.api.ClassLike
-import xsbti.api.Definition
+
+import xsbt.api.{ Discovered, Discovery }
+import xsbti.api.{ ClassLike, Definition }
 import xsbti.compile.CompileAnalysis
 
 sealed trait TestOption

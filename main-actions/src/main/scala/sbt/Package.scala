@@ -9,20 +9,20 @@ package sbt
 
 import java.io.File
 import java.util.jar.{ Attributes, Manifest }
+
 import scala.collection.JavaConverters._
+import scala.collection.mutable
+
+import sbt.internal.util.HListFormats._
+import sbt.internal.util.HNil
 import sbt.internal.util.Types.:+:
 import sbt.io.IO
+import sbt.util.CacheImplicits._
+import sbt.util.FileInfo.{ exists, lastModified }
+import sbt.util.Tracked.{ inputChanged, outputChanged }
+import sbt.util.{ CacheStoreFactory, FilesInfo, Logger, ModifiedFileInfo, PlainFileInfo }
 
 import sjsonnew.JsonFormat
-
-import sbt.util.Logger
-
-import sbt.util.{ CacheStoreFactory, FilesInfo, ModifiedFileInfo, PlainFileInfo }
-import sbt.internal.util.HNil
-import sbt.internal.util.HListFormats._
-import sbt.util.FileInfo.{ exists, lastModified }
-import sbt.util.CacheImplicits._
-import sbt.util.Tracked.{ inputChanged, outputChanged }
 
 sealed trait PackageOption
 
@@ -44,7 +44,8 @@ object Package {
     new ManifestAttributes(converted: _*)
   }
 
-  def mergeAttributes(a1: Attributes, a2: Attributes) = a1.asScala ++= a2.asScala
+  def mergeAttributes(a1: Attributes, a2: Attributes): mutable.Map[Object, Object] =
+    a1.asScala ++= a2.asScala
   // merges `mergeManifest` into `manifest` (mutating `manifest` in the process)
   def mergeManifests(manifest: Manifest, mergeManifest: Manifest): Unit = {
     mergeAttributes(manifest.getMainAttributes, mergeManifest.getMainAttributes)

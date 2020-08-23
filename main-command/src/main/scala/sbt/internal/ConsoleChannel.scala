@@ -10,6 +10,7 @@ package internal
 
 import sbt.internal.ui.{ UITask, UserThread }
 import sbt.internal.util._
+
 import sjsonnew.JsonFormat
 
 private[sbt] final class ConsoleChannel(

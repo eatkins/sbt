@@ -9,11 +9,12 @@ package sbt
 
 import java.io.{ File, IOException }
 import java.util.zip.ZipException
-import sbt.internal.util.Relation
+
 import sbt.internal.io.TranslatedException
-import sbt.util.CacheImplicits._
-import sbt.util.{ FileInfo, CacheStore }
+import sbt.internal.util.Relation
 import sbt.io.IO
+import sbt.util.CacheImplicits._
+import sbt.util.{ CacheStore, FileInfo }
 
 import sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
 

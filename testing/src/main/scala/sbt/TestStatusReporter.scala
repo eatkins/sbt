@@ -8,12 +8,12 @@
 package sbt
 
 import java.io.File
-
-import sbt.io.IO
-import sbt.protocol.testing.TestResult
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.concurrent
+
+import sbt.io.IO
+import sbt.protocol.testing.TestResult
 
 // Assumes exclusive ownership of the file.
 private[sbt] class TestStatusReporter(f: File) extends TestsListener {

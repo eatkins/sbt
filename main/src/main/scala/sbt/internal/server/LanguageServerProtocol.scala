@@ -13,6 +13,7 @@ import sbt.internal.langserver._
 import sbt.internal.protocol._
 import sbt.internal.protocol.codec._
 import sbt.protocol.{ CompletionParams => CP, SettingQuery => Q }
+
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 import sjsonnew.support.scalajson.unsafe.Converter
 import xsbti.FileConverter

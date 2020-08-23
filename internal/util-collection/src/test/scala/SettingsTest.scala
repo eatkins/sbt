@@ -7,18 +7,22 @@
 
 package sbt.internal.util
 
-import org.scalacheck._, Prop._
+import scala.collection.immutable
+
+import org.scalacheck.Prop
+import org.scalacheck.Prop._
+import org.scalacheck._
 
 object SettingsTest extends Properties("settings") {
   val settingsExample: SettingsExample = SettingsExample()
   import settingsExample._
-  val settingsUsage = SettingsUsage(settingsExample)
+  val settingsUsage: SettingsUsage = SettingsUsage(settingsExample)
   import settingsUsage._
 
   import scala.reflect.Manifest
 
   final val ChainMax = 5000
-  lazy val chainLengthGen = Gen.choose(1, ChainMax)
+  lazy val chainLengthGen: Gen[Int] = Gen.choose(1, ChainMax)
 
   property("Basic settings test") = secure(all(tests: _*))
 
@@ -167,17 +171,19 @@ object SettingsTest extends Properties("settings") {
     }
   }
 
-  def tests =
+  def tests: immutable.IndexedSeq[Prop] =
     for (i <- 0 to 5; k <- Seq(a, b)) yield {
       val expected = expectedValues(2 * i + (if (k == a) 0 else 1))
       checkKey[Int](ScopedKey(Scope(i), k), expected, applied)
     }
 
-  lazy val expectedValues = None :: None :: None :: None :: None :: None :: Some(3) :: None ::
+  lazy val expectedValues: List[Option[Int]] = None :: None :: None :: None :: None :: None :: Some(
+    3
+  ) :: None ::
     Some(3) :: Some(9) :: Some(4) :: Some(9) :: Nil
 
-  lazy val ch = AttributeKey[Int]("ch")
-  lazy val chk = ScopedKey(Scope(0), ch)
+  lazy val ch: AttributeKey[Int] = AttributeKey[Int]("ch")
+  lazy val chk: ScopedKey[Int] = ScopedKey(Scope(0), ch)
   def chain(i: Int, prev: Initialize[Int]): Initialize[Int] =
     if (i <= 0) prev else chain(i - 1, prev(_ + 1))
 
@@ -185,12 +191,12 @@ object SettingsTest extends Properties("settings") {
     bind(prev) { v =>
       if (v <= 0) prev else chainBind(value(v - 1))
     }
-  def singleIntTest(i: Initialize[Int], expected: Int) = {
+  def singleIntTest(i: Initialize[Int], expected: Int): Prop = {
     val eval = evaluate(setting(chk, i) :: Nil)
     checkKey(chk, Some(expected), eval)
   }
 
-  def checkKey[T](key: ScopedKey[T], expected: Option[T], settings: Settings[Scope]) = {
+  def checkKey[T](key: ScopedKey[T], expected: Option[T], settings: Settings[Scope]): Prop = {
     val value = settings.get(key.scope, key.key)
     ("Key: " + key) |:
       ("Value: " + value) |:
@@ -208,7 +214,7 @@ object SettingsTest extends Properties("settings") {
 // This setup is a workaround for module synchronization issues
 final class CCR(intermediate: Int) {
   import SettingsTest.settingsExample._
-  lazy val top = iterate(value(intermediate))
+  lazy val top: Initialize[Int] = iterate(value(intermediate))
   def iterate(init: Initialize[Int]): Initialize[Int] =
     bind(init) { t =>
       if (t <= 0)

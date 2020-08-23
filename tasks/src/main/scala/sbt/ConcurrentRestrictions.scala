@@ -7,11 +7,10 @@
 
 package sbt
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicInteger }
 
 import sbt.internal.util.AttributeKey
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.RejectedExecutionException
 
 /**
  * Describes restrictions on concurrent execution for a set of tasks.
@@ -52,7 +51,7 @@ import annotation.tailrec
 object ConcurrentRestrictions {
   private[this] val completionServices = new java.util.WeakHashMap[CompletionService[_, _], Boolean]
   import scala.collection.JavaConverters._
-  def cancelAll() = completionServices.keySet.asScala.toVector.foreach {
+  def cancelAll(): Unit = completionServices.keySet.asScala.toVector.foreach {
     case a: AutoCloseable => a.close()
     case _                =>
   }
@@ -84,17 +83,17 @@ object ConcurrentRestrictions {
   /** A key object used for associating information with a task.*/
   final case class Tag(name: String)
 
-  val tagsKey =
+  val tagsKey: AttributeKey[TagMap] =
     AttributeKey[TagMap]("tags", "Attributes restricting concurrent execution of tasks.")
 
   /** A standard tag describing the number of tasks that do not otherwise have any tags.*/
-  val Untagged = Tag("untagged")
+  val Untagged: Tag = Tag("untagged")
 
   /** A standard tag describing the total number of tasks. */
-  val All = Tag("all")
+  val All: Tag = Tag("all")
 
   type TagMap = Map[Tag, Int]
-  val TagMap = Map.empty[Tag, Int]
+  val TagMap: Map[Tag, Int] = Map.empty[Tag, Int]
 
   /**
    * Implements concurrency restrictions on tasks based on Tags.

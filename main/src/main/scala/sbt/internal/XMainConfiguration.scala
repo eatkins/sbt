@@ -11,9 +11,10 @@ import java.io.File
 import java.lang.reflect.InvocationTargetException
 import java.net.URL
 import java.util.concurrent.{ ExecutorService, Executors }
-import ClassLoaderClose.close
 
+import sbt.internal.ClassLoaderClose.close
 import sbt.plugins.{ CorePlugin, IvyPlugin, JvmPlugin }
+
 import xsbti._
 
 private[internal] object ClassLoaderWarmup {

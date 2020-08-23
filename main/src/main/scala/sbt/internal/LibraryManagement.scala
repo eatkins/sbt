@@ -11,13 +11,14 @@ package internal
 import java.io.File
 import java.util.concurrent.Callable
 
+import sbt.Project.richInitializeTask
 import sbt.internal.librarymanagement._
+import sbt.io.IO
+import sbt.io.syntax._
 import sbt.librarymanagement._
 import sbt.librarymanagement.syntax._
 import sbt.util.{ CacheStore, CacheStoreFactory, Level, Logger, Tracked }
-import sbt.io.IO
-import sbt.io.syntax._
-import sbt.Project.richInitializeTask
+
 import sjsonnew.JsonFormat
 
 private[sbt] object LibraryManagement {

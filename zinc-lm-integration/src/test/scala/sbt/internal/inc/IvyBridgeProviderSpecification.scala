@@ -15,8 +15,9 @@ import sbt.io.syntax._
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy._
 import sbt.util.Logger
-import xsbti.compile.CompilerBridgeProvider
+
 import org.scalatest._
+import xsbti.compile.CompilerBridgeProvider
 
 /**
  * Base class for test suites that must be able to fetch and compile the compiler bridge.
@@ -32,7 +33,7 @@ abstract class IvyBridgeProviderSpecification
   def currentManaged: File = currentBase / "target" / "lib_managed"
   def secondaryCacheDirectory: File = file("target").getAbsoluteFile / "zinc-components"
 
-  val resolvers = Array(
+  val resolvers: Array[Resolver] = Array(
     ZincComponentCompiler.LocalResolver: Resolver,
     Resolver.mavenCentral: Resolver,
     MavenRepository(

@@ -7,7 +7,7 @@
 
 package sbt
 
-import annotation.tailrec
+import scala.annotation.tailrec
 
 object Tags {
   type Tag = ConcurrentRestrictions.Tag
@@ -16,19 +16,19 @@ object Tags {
 
   val All = ConcurrentRestrictions.All
   val Untagged = ConcurrentRestrictions.Untagged
-  val Compile = Tag("compile")
-  val Test = Tag("test")
-  val Update = Tag("update")
-  val Publish = Tag("publish")
-  val Clean = Tag("clean")
+  val Compile: Tag = Tag("compile")
+  val Test: Tag = Tag("test")
+  val Update: Tag = Tag("update")
+  val Publish: Tag = Tag("publish")
+  val Clean: Tag = Tag("clean")
   // special tag for waiting on a promise
-  val Sentinel = Tag("sentinel")
+  val Sentinel: Tag = Tag("sentinel")
 
-  val CPU = Tag("cpu")
-  val Network = Tag("network")
-  val Disk = Tag("disk")
+  val CPU: Tag = Tag("cpu")
+  val Network: Tag = Tag("network")
+  val Disk: Tag = Tag("disk")
 
-  val ForkedTestGroup = Tag("forked-test-group")
+  val ForkedTestGroup: Tag = Tag("forked-test-group")
 
   /**
    * Describes a restriction on concurrently executing tasks.
@@ -41,26 +41,26 @@ object Tags {
     def unary_- : Rule = new Not(this)
   }
   private[this] final class Custom(f: TagMap => Boolean) extends Rule {
-    def apply(m: TagMap) = f(m)
+    def apply(m: TagMap): Boolean = f(m)
   }
   private[this] final class Single(tag: Tag, max: Int) extends Rule {
     checkMax(max)
-    def apply(m: TagMap) = getInt(m, tag) <= max
-    override def toString = "Limit " + tag.name + " to " + max
+    def apply(m: TagMap): Boolean = getInt(m, tag) <= max
+    override def toString: String = "Limit " + tag.name + " to " + max
   }
   private[this] final class Sum(tags: Seq[Tag], max: Int) extends Rule {
     checkMax(max)
-    def apply(m: TagMap) = tags.foldLeft(0)((sum, t) => sum + getInt(m, t)) <= max
-    override def toString = tags.mkString("Limit sum of ", ", ", " to " + max)
+    def apply(m: TagMap): Boolean = tags.foldLeft(0)((sum, t) => sum + getInt(m, t)) <= max
+    override def toString: String = tags.mkString("Limit sum of ", ", ", " to " + max)
   }
   private[this] final class Or(a: Rule, b: Rule) extends Rule {
-    def apply(m: TagMap) = a(m) || b(m)
+    def apply(m: TagMap): Boolean = a(m) || b(m)
   }
   private[this] final class And(a: Rule, b: Rule) extends Rule {
-    def apply(m: TagMap) = a(m) && b(m)
+    def apply(m: TagMap): Boolean = a(m) && b(m)
   }
   private[this] final class Not(a: Rule) extends Rule {
-    def apply(m: TagMap) = !a(m)
+    def apply(m: TagMap): Boolean = !a(m)
   }
 
   private[this] def checkMax(max: Int): Unit = assert(max >= 1, "Limit must be at least 1.")

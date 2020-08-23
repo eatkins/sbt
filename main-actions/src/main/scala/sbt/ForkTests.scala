@@ -7,18 +7,20 @@
 
 package sbt
 
-import scala.collection.mutable
-import testing.{ Logger => _, _ }
-import scala.util.control.NonFatal
-import java.net.ServerSocket
 import java.io._
-import Tests.{ Output => TestOutput, _ }
-import sbt.io.IO
-import sbt.util.Logger
+import java.net.ServerSocket
+
+import scala.collection.mutable
+import scala.util.control.NonFatal
+
 import sbt.ConcurrentRestrictions.Tag
-import sbt.protocol.testing._
+import sbt.Tests.{ Output => TestOutput, _ }
 import sbt.internal.util.ConsoleAppender
 import sbt.internal.util.Util.{ AnyOps, none }
+import sbt.io.IO
+import sbt.protocol.testing._
+import sbt.testing.{ Logger => _, _ }
+import sbt.util.Logger
 
 private[sbt] object ForkTests {
   def apply(

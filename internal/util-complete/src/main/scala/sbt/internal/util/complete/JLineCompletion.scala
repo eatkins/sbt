@@ -8,10 +8,11 @@
 package sbt.internal.util
 package complete
 
-import jline.console.ConsoleReader
-import jline.console.completer.{ Completer, CompletionHandler }
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+
+import jline.console.ConsoleReader
+import jline.console.completer.{ Completer, CompletionHandler }
 
 object JLineCompletion {
   def installCustomCompletor(reader: ConsoleReader, parser: Parser[_]): Unit =
@@ -40,7 +41,7 @@ object JLineCompletion {
         reader: ConsoleReader,
         candidates: java.util.List[CharSequence],
         position: Int
-    ) = {
+    ): Boolean = {
       val current = Some(bufferSnapshot(reader))
       level = if (current == previous) level + 1 else 1
       previous = current
@@ -89,7 +90,8 @@ object JLineCompletion {
     (insert.toSeq, display.toSeq.sorted)
   }
 
-  def appendNonEmpty(set: Set[String], add: String) = if (add.trim.isEmpty) set else set + add
+  def appendNonEmpty(set: Set[String], add: String): Set[String] =
+    if (add.trim.isEmpty) set else set + add
 
   def customCompletor(
       f: (String, Int) => (Seq[String], Seq[String])

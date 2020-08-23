@@ -7,9 +7,10 @@
 
 package sbt
 
+import sbt.TaskGen._
+
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
-import TaskGen._
 
 object ExecuteSpec extends Properties("Execute") {
   val iGen = Arbitrary.arbInt.arbitrary

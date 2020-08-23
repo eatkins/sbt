@@ -7,12 +7,12 @@
 
 package sbt
 
-import sbt.internal.util.complete.Parser
-import Def.{ Initialize, ScopedKey }
-import std.TaskExtra._
-import sbt.internal.util.{ ~>, AttributeKey, Types }
+import sbt.Def.{ Initialize, ScopedKey }
 import sbt.internal.util.Types._
 import sbt.internal.util.Util._
+import sbt.internal.util.complete.Parser
+import sbt.internal.util.{ AttributeKey, Types, ~> }
+import sbt.std.TaskExtra._
 
 /** Parses input and produces a task to run.  Constructed using the companion object. */
 final class InputTask[T] private (val parser: State => Parser[Task[T]]) {

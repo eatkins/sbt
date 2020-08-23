@@ -11,17 +11,20 @@ package parser
 
 import java.io.File
 
+import sbt.internal.util.LineRange
+
 import org.specs2.mutable.SpecificationLike
+import org.specs2.specification.core.Fragment
 
 trait SplitExpression {
   def split(s: String, file: File = new File("noFile"))(
       implicit splitter: SplitExpressions.SplitExpression
-  ) = splitter(file, s.split("\n").toSeq)
+  ): (Seq[(String, Int)], Seq[(String, LineRange)]) = splitter(file, s.split("\n").toSeq)
 }
 
 trait SplitExpressionsBehavior extends SplitExpression { this: SpecificationLike =>
 
-  def newExpressionsSplitter(implicit splitter: SplitExpressions.SplitExpression) = {
+  def newExpressionsSplitter(implicit splitter: SplitExpressions.SplitExpression): Fragment = {
 
     "parse a two settings without intervening blank line" in {
       val (imports, settings) = split("""version := "1.0"

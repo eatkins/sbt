@@ -17,6 +17,12 @@ import java.util.UUID
 import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.{ ConcurrentHashMap, LinkedBlockingQueue, TimeUnit }
 
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.util.{ Failure, Properties, Success, Try }
+
 import sbt.BasicCommandStrings.{ Shutdown, TerminateAction }
 import sbt.internal.client.NetworkClient.Arguments
 import sbt.internal.langserver.{ LogMessageParams, MessageType, PublishDiagnosticsParams }
@@ -24,37 +30,31 @@ import sbt.internal.protocol._
 import sbt.internal.util.{ ConsoleAppender, ConsoleOut, Signals, Terminal, Util }
 import sbt.io.IO
 import sbt.io.syntax._
-import sbt.protocol._
-import sbt.util.Level
-import sjsonnew.BasicJsonProtocol._
-import sjsonnew.shaded.scalajson.ast.unsafe.{ JObject, JValue }
-import sjsonnew.support.scalajson.unsafe.Converter
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import scala.util.{ Failure, Properties, Success, Try }
-import Serialization.{
+import sbt.protocol.Serialization.{
   CancelAll,
   attach,
   cancelRequest,
+  getTerminalAttributes,
   promptChannel,
-  systemIn,
+  setTerminalAttributes,
   systemErr,
+  systemErrFlush,
+  systemIn,
   systemOut,
   systemOutFlush,
-  systemErrFlush,
   terminalCapabilities,
   terminalCapabilitiesResponse,
   terminalGetSize,
   terminalPropertiesQuery,
   terminalPropertiesResponse,
-  terminalSetSize,
-  getTerminalAttributes,
-  setTerminalAttributes,
+  terminalSetSize
 }
-import NetworkClient.Arguments
+import sbt.protocol._
+import sbt.util.Level
+
+import sjsonnew.BasicJsonProtocol._
+import sjsonnew.shaded.scalajson.ast.unsafe.{ JObject, JValue }
+import sjsonnew.support.scalajson.unsafe.Converter
 
 trait ConsoleInterface {
   def appendLog(level: Level.Value, message: => String): Unit

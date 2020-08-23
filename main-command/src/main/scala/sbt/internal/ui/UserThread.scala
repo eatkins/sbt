@@ -9,11 +9,12 @@ package sbt.internal
 
 package ui
 
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+
+import scala.concurrent.duration._
 
 import sbt.State
-import scala.concurrent.duration._
 import sbt.internal.util.JoinThread._
 import sbt.internal.util.{ ConsoleAppender, ProgressEvent, ProgressState, Prompt }
 

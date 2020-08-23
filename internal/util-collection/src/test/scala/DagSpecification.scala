@@ -7,10 +7,10 @@
 
 package sbt.internal.util
 
-import org.scalacheck._
-import Prop._
-
 import scala.collection.mutable.HashSet
+
+import org.scalacheck.Prop._
+import org.scalacheck._
 
 object DagSpecification extends Properties("Dag") {
   property("No repeated nodes") = forAll { (dag: TestDag) =>
@@ -55,5 +55,5 @@ object DagSpecification extends Properties("Dag") {
   }
 }
 class TestDag(id: Int, val dependencies: Iterable[TestDag]) extends Dag[TestDag] {
-  override def toString = id + "->" + dependencies.mkString("[", ",", "]")
+  override def toString: String = id + "->" + dependencies.mkString("[", ",", "]")
 }

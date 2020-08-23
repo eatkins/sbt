@@ -11,6 +11,8 @@ package nio
 import java.nio.file.{ Files, Path }
 import java.util.concurrent.ConcurrentHashMap
 
+import scala.collection.immutable.VectorBuilder
+
 import sbt.Keys._
 import sbt.internal.Clean.ToSeqPath
 import sbt.internal.Continuous.FileStampRepository
@@ -21,9 +23,8 @@ import sbt.nio.FileStamper.{ Hash, LastModified }
 import sbt.nio.Keys._
 import sbt.nio.file.{ AllPass, FileAttributes, Glob, RecursiveGlob }
 import sbt.std.TaskExtra._
-import sjsonnew.JsonFormat
 
-import scala.collection.immutable.VectorBuilder
+import sjsonnew.JsonFormat
 
 private[sbt] object Settings {
   private[sbt] def inject(transformed: Seq[Def.Setting[_]]): Seq[Def.Setting[_]] = {

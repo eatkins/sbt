@@ -8,9 +8,11 @@
 package sbt
 package internal
 
-import org.scalatest._
-import sbt.internal.CrossJava.JavaDiscoverConfig._
 import scala.collection.immutable.ListMap
+
+import sbt.internal.CrossJava.JavaDiscoverConfig._
+
+import org.scalatest._
 
 class CrossJavaTest extends FunSuite with DiagrammedAssertions {
   test("The Java home selector should select the most recent") {

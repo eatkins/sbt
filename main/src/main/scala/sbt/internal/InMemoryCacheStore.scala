@@ -13,9 +13,10 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{ Files, Path }
 import java.util.concurrent.atomic.AtomicReference
 
-import com.github.benmanes.caffeine.cache.{ Cache, Caffeine, Weigher }
 import sbt.io.IO
 import sbt.util.{ CacheStore, CacheStoreFactory, DirectoryStoreFactory }
+
+import com.github.benmanes.caffeine.cache.{ Cache, Caffeine, Weigher }
 import sjsonnew.{ IsoString, JsonReader, JsonWriter, SupportConverter }
 
 private[sbt] object InMemoryCacheStore {

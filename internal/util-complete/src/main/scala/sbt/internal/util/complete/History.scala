@@ -8,8 +8,9 @@
 package sbt.internal.util
 package complete
 
-import History.number
 import java.io.File
+
+import sbt.internal.util.complete.History.number
 
 final class History private (val lines: IndexedSeq[String], val path: Option[File]) {
   private def reversed = lines.reverse

@@ -8,11 +8,9 @@
 package sbt
 package internal
 
+import sbt.Def._
 import sbt.internal.util.RangePosition
-
 import sbt.librarymanagement.Configuration
-
-import Def._
 
 /** This represents a `Setting` expression configured by the sbt DSL. */
 sealed trait DslEntry {

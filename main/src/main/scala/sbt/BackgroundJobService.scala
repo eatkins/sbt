@@ -7,15 +7,14 @@
 
 package sbt
 
-import java.io.Closeable
-
-import sbt.util.Logger
-import Def.{ Classpath, ScopedKey }
-import sbt.internal.util.complete._
-import java.io.File
+import java.io.{ Closeable, File }
 
 import scala.util.control.NonFatal
 import scala.util.{ Failure, Success, Try }
+
+import sbt.Def.{ Classpath, ScopedKey }
+import sbt.internal.util.complete._
+import sbt.util.Logger
 
 abstract class BackgroundJobService extends Closeable {
 

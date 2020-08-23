@@ -8,12 +8,12 @@
 package sbt
 package plugins
 
-import Keys._
+import sbt.Keys._
+import sbt.Project.inConfig
 import sbt.internal.SysProp
-import sbt.librarymanagement.syntax._
-import sbt.librarymanagement.CrossVersion
-import Project.inConfig
 import sbt.internal.inc.ScalaInstance
+import sbt.librarymanagement.CrossVersion
+import sbt.librarymanagement.syntax._
 
 object SemanticdbPlugin extends AutoPlugin {
   override def requires = JvmPlugin

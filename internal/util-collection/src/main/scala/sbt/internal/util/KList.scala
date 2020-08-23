@@ -7,8 +7,8 @@
 
 package sbt.internal.util
 
-import Types._
-import Classes.Applicative
+import sbt.internal.util.Classes.Applicative
+import sbt.internal.util.Types._
 
 /** A higher-kinded heterogeneous list of elements that share the same type constructor `M[_]`. */
 sealed trait KList[+M[_]] {
@@ -36,7 +36,7 @@ object KList {
 final case class KCons[H, +T <: KList[M], +M[_]](head: M[H], tail: T) extends KList[M] {
   final type Transform[N[_]] = KCons[H, tail.Transform[N], N]
 
-  def transform[N[_]](f: M ~> N) = KCons(f(head), tail.transform(f))
+  def transform[N[_]](f: M ~> N): Transform[N] = KCons(f(head), tail.transform(f))
   def toList: List[M[_]] = head :: tail.toList
 
   def apply[N[x] >: M[x], Z](f: Transform[Id] => Z)(implicit ap: Applicative[N]): N[Z] = {

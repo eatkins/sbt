@@ -7,14 +7,14 @@
 
 package sbt.std
 
+import scala.io.AnsiColor
+import scala.reflect.macros.blackbox
+
 import sbt.SettingKey
 import sbt.dsl.LinterLevel
 import sbt.dsl.LinterLevel.{ Abort, Warn }
 import sbt.internal.util.ConsoleAppender
 import sbt.internal.util.appmacro.{ Convert, LinterDSL }
-
-import scala.io.AnsiColor
-import scala.reflect.macros.blackbox
 
 abstract class BaseTaskLinterDSL extends LinterDSL {
   def isDynamicTask: Boolean

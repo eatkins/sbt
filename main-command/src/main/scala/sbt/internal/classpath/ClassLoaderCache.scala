@@ -13,18 +13,19 @@ import java.lang.ref.{ Reference, ReferenceQueue, SoftReference }
 import java.net.URLClassLoader
 import java.util.concurrent.atomic.{ AtomicInteger, AtomicReference }
 
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
+
 import sbt.internal.inc.classpath.{
   AbstractClassLoaderCache,
   ClassLoaderCache => IncClassLoaderCache
 }
 import sbt.internal.inc.{ AnalyzingCompiler, ZincUtil }
 import sbt.io.IO
+
 import xsbti.ScalaProvider
 import xsbti.compile.{ ClasspathOptions, ScalaInstance }
-
-import scala.annotation.tailrec
-import scala.collection.JavaConverters._
-import scala.util.control.NonFatal
 
 private object ClassLoaderCache {
   private def threadID = new AtomicInteger(0)
@@ -34,7 +35,7 @@ private[sbt] class ClassLoaderCache(
     private val miniProvider: Option[(File, ClassLoader)]
 ) extends AbstractClassLoaderCache {
   private[this] val parentHolder = new AtomicReference(parent)
-  def commonParent = parentHolder.get()
+  def commonParent: ClassLoader = parentHolder.get()
   def setParent(parent: ClassLoader): Unit = parentHolder.set(parent)
   def this(commonParent: ClassLoader) = this(commonParent, None)
   def this(scalaProvider: ScalaProvider) =

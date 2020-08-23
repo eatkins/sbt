@@ -9,13 +9,14 @@ package sbt.internal.server
 
 import java.io.File
 
+import scala.collection.mutable
+
 import sbt.StandardMain
 import sbt.internal.bsp._
 import sbt.internal.inc.LoggedReporter
 import sbt.internal.util.ManagedLogger
-import xsbti.{ Problem, Severity, Position => XPosition }
 
-import scala.collection.mutable
+import xsbti.{ Position => XPosition, Problem, Severity }
 
 /**
  * Defines a compiler reporter that uses event logging provided by a `ManagedLogger`.

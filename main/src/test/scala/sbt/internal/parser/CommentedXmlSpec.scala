@@ -9,7 +9,7 @@ package sbt.internal.parser
 
 class CommentedXmlSpec extends CheckIfParsedSpec {
 
-  override protected val files = Seq(
+  override protected val files: Seq[(String, String, Boolean, Boolean)] = Seq(
     (
       s"""|
          |val pom = "</scm>"

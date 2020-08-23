@@ -8,8 +8,9 @@
 package sbt
 package internal
 
-import Def.Setting
 import java.net.URI
+
+import sbt.Def.Setting
 
 private[sbt] final class GroupedAutoPlugins(
     val all: Seq[AutoPlugin],

@@ -12,9 +12,9 @@ import java.text.DateFormat
 
 import sbt.Def.ScopedKey
 import sbt.Keys.{ showSuccess, showTiming, timingFormat }
+import sbt.internal.util._
 import sbt.internal.util.complete.Parser
 import sbt.internal.util.complete.Parser.{ failure, seq, success }
-import sbt.internal.util._
 import sbt.std.Transform.DummyTaskMap
 import sbt.util.{ Logger, Show }
 

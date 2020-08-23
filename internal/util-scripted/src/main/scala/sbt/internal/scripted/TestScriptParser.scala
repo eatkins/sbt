@@ -10,9 +10,12 @@ package internal
 package scripted
 
 import java.io.File
+import java.lang.Character.isWhitespace
+
+import scala.util.matching.Regex
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.Positional
-import Character.isWhitespace
+
 import sbt.io.IO
 
 /*
@@ -30,13 +33,13 @@ final case class Statement(
     successExpected: Boolean,
     line: Int
 ) {
-  def linePrefix = "{line " + line + "} "
+  def linePrefix: String = "{line " + line + "} "
 }
 
 private object TestScriptParser {
   val SuccessLiteral = "success"
   val FailureLiteral = "failure"
-  val WordRegex = """[^ \[\]\s'\"][^ \[\]\s]*""".r
+  val WordRegex: Regex = """[^ \[\]\s'\"][^ \[\]\s]*""".r
 }
 
 import TestScriptParser._
@@ -114,5 +117,5 @@ class TestScriptParser(handlers: Map[Char, StatementHandler]) extends RegexParse
           ~> failure("end of input")
       )
 
-  def newline = """\s*([\n\r]|$)""".r
+  def newline: Regex = """\s*([\n\r]|$)""".r
 }

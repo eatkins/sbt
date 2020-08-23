@@ -7,11 +7,12 @@
 
 package sbt.internal.util
 
-import sbt.io.IO
 import scala.collection.mutable.ListBuffer
 
+import sbt.io.IO
+
 object StackTrace {
-  def isSbtClass(name: String) = name.startsWith("sbt.") || name.startsWith("xsbt.")
+  def isSbtClass(name: String): Boolean = name.startsWith("sbt.") || name.startsWith("xsbt.")
 
   /**
    * Return a printable representation of the stack trace associated

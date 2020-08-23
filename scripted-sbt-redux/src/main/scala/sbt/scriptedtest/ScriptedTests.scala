@@ -14,13 +14,13 @@ import java.nio.file.Files
 import java.util.Properties
 import java.util.concurrent.ForkJoinPool
 
-import sbt.internal.io.Resources
-import sbt.internal.scripted._
-import RemoteSbtCreatorProp._
-
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.collection.{ GenSeq, mutable }
 import scala.util.control.NonFatal
+
+import sbt.internal.io.Resources
+import sbt.internal.scripted._
+import sbt.scriptedtest.RemoteSbtCreatorProp._
 
 final class ScriptedTests(
     resourceBaseDirectory: File,
@@ -575,7 +575,7 @@ class ScriptedRunner {
 }
 
 final case class ScriptedTest(group: String, name: String) {
-  override def toString = s"$group/$name"
+  override def toString: String = s"$group/$name"
 }
 
 private[sbt] final class ListTests(
@@ -584,7 +584,7 @@ private[sbt] final class ListTests(
     log: Logger,
 ) {
 
-  def filter = DirectoryFilter -- HiddenFileFilter
+  def filter: FileFilter = DirectoryFilter -- HiddenFileFilter
 
   def listTests: Seq[ScriptedTest] = {
     IO.listFiles(baseDirectory, filter) flatMap { group =>

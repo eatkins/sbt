@@ -7,8 +7,8 @@
 
 package sbt
 
-import testing.{ Logger => TLogger, Event => TEvent, Status => TStatus }
 import sbt.protocol.testing._
+import sbt.testing.{ Event => TEvent, Logger => TLogger, Status => TStatus }
 
 trait TestReportListener {
 

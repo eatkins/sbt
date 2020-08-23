@@ -13,6 +13,11 @@ import java.time.{ Instant, ZoneId, ZonedDateTime }
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+
 import sbt.BasicCommandStrings.{ ContinuousExecutePrefix, TerminateAction }
 import sbt._
 import sbt.internal.LabeledFunctions._
@@ -22,11 +27,6 @@ import sbt.internal.util.complete.Parser._
 import sbt.nio.Keys._
 import sbt.nio.file.FileAttributes
 import sbt.util.{ Level, Logger }
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
 
 object Watch {
 

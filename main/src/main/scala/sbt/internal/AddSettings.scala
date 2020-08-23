@@ -8,8 +8,9 @@
 package sbt
 package internal
 
-import sbt.internal.util.Types.const
 import java.io.File
+
+import sbt.internal.util.Types.const
 
 /**
  * Represents how settings from various sources are automatically merged into a Project's settings.

@@ -22,7 +22,7 @@ sealed trait Completions {
   final def filter(f: Completion => Boolean): Completions = Completions(get filter f)
   final def filterS(f: String => Boolean): Completions = filter(c => f(c.append))
 
-  override def toString = get.mkString("Completions(", ",", ")")
+  override def toString: String = get.mkString("Completions(", ",", ")")
 
   final def flatMap(f: Completion => Completions): Completions =
     Completions(get.flatMap(c => f(c).get))
@@ -30,7 +30,7 @@ sealed trait Completions {
   final def map(f: Completion => Completion): Completions = Completions(get map f)
 
   override final def hashCode = get.hashCode
-  override final def equals(o: Any) = o match {
+  override final def equals(o: Any): Boolean = o match {
     case c: Completions => get == c.get; case _ => false
   }
 }
@@ -94,8 +94,8 @@ sealed trait Completion {
   final def x(o: Completions): Completions =
     if (Completion evaluatesRight this) o.map(this ++ _) else Completions.strict(Set.empty + this)
 
-  override final lazy val hashCode = Completion.hashCode(this)
-  override final def equals(o: Any) = o match {
+  override final lazy val hashCode: Int = Completion.hashCode(this)
+  override final def equals(o: Any): Boolean = o match {
     case c: Completion => Completion.equal(this, c); case _ => false
   }
 }
@@ -103,12 +103,12 @@ sealed trait Completion {
 final class DisplayOnly(val display: String) extends Completion {
   def isEmpty = display.isEmpty
   def append = ""
-  override def toString = "{" + display + "}"
+  override def toString: String = "{" + display + "}"
 }
 
 final class Token(val display: String, val append: String) extends Completion {
-  def isEmpty = display.isEmpty && append.isEmpty
-  override final def toString = "[" + display + "]++" + append
+  def isEmpty: Boolean = display.isEmpty && append.isEmpty
+  override final def toString: String = "[" + display + "]++" + append
 }
 
 final class Suggestion(val append: String) extends Completion {

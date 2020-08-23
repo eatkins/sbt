@@ -10,6 +10,9 @@ package sbt
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
+import scala.Console.RED
+import scala.concurrent.duration.Duration
+
 import sbt.Def.{ ScopedKey, Setting, dummyState }
 import sbt.Keys.{ TaskProgress => _, name => _, _ }
 import sbt.Project.richInitializeTask
@@ -21,9 +24,6 @@ import sbt.internal.util._
 import sbt.librarymanagement.{ Resolver, UpdateReport }
 import sbt.std.Transform.DummyTaskMap
 import sbt.util.{ Logger, Show }
-
-import scala.Console.RED
-import scala.concurrent.duration.Duration
 
 /**
  * An API that allows you to cancel executing tasks upon some signal.
@@ -185,7 +185,7 @@ object EvaluateTask {
     EvaluateTaskConfig(rs, false, progress, canceller, fgc, mfi)
   }
 
-  def defaultRestrictions(maxWorkers: Int) = Tags.limitAll(maxWorkers) :: Nil
+  def defaultRestrictions(maxWorkers: Int): List[Tags.Rule] = Tags.limitAll(maxWorkers) :: Nil
   def defaultRestrictions(extracted: Extracted, structure: BuildStructure): Seq[Tags.Rule] =
     Tags.limitAll(maxWorkers(extracted, structure)) :: Nil
 
@@ -346,7 +346,7 @@ object EvaluateTask {
     }
   }
 
-  def logIncResult(result: Result[_], state: State, streams: Streams) = result match {
+  def logIncResult(result: Result[_], state: State, streams: Streams): Unit = result match {
     case Inc(i) => logIncomplete(i, state, streams); case _ => ()
   }
 

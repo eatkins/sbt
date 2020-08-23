@@ -10,6 +10,7 @@ package sbt.std
 import sbt.internal.util.complete
 import sbt.internal.util.complete.DefaultParsers
 import sbt.{ Def, InputTask, Task }
+import sbt.{ InputKey, SettingKey, TaskKey }
 
 /*object UseTask
 {
@@ -31,23 +32,24 @@ object Assign {
   import Def.{ Initialize, inputKey, macroValueT, parserToInput, settingKey, taskKey }
   //	import UseTask.{x,y,z,a,set,plain}
 
-  val ak = taskKey[Int]("a")
-  val bk = taskKey[Seq[Int]]("b")
-  val ck = settingKey[File]("c")
-  val sk = taskKey[Set[_]]("s")
+  val ak: TaskKey[Int] = taskKey[Int]("a")
+  val bk: TaskKey[Seq[Int]] = taskKey[Seq[Int]]("b")
+  val ck: SettingKey[File] = settingKey[File]("c")
+  val sk: TaskKey[Set[_]] = taskKey[Set[_]]("s")
 
-  val ik = inputKey[Int]("i")
-  val isk = inputKey[String]("is")
-  val mk = settingKey[Int]("m")
-  val tk = taskKey[Int]("t")
-  val name = settingKey[String]("name")
-  val dummyt = taskKey[complete.Parser[String]]("dummyt")
-  val dummys = settingKey[complete.Parser[String]]("dummys")
-  val dummy3 = settingKey[complete.Parser[(String, Int)]]("dummy3")
+  val ik: InputKey[Int] = inputKey[Int]("i")
+  val isk: InputKey[String] = inputKey[String]("is")
+  val mk: SettingKey[Int] = settingKey[Int]("m")
+  val tk: TaskKey[Int] = taskKey[Int]("t")
+  val name: SettingKey[String] = settingKey[String]("name")
+  val dummyt: TaskKey[complete.Parser[String]] = taskKey[complete.Parser[String]]("dummyt")
+  val dummys: SettingKey[complete.Parser[String]] = settingKey[complete.Parser[String]]("dummys")
+  val dummy3: SettingKey[complete.Parser[(String, Int)]] =
+    settingKey[complete.Parser[(String, Int)]]("dummy3")
   val tsk: complete.Parser[Task[String]] = DefaultParsers.failure("ignored")
   val itsk: Initialize[InputTask[Int]] = inputKey[Int]("ignored")
-  val seqSetting = settingKey[Seq[String]]("seqSetting")
-  val listSetting = settingKey[List[String]]("listSetting")
+  val seqSetting: SettingKey[Seq[String]] = settingKey[Seq[String]]("seqSetting")
+  val listSetting: SettingKey[List[String]] = settingKey[List[String]]("listSetting")
 
   /*	def azy = sk.value
 
@@ -60,13 +62,13 @@ object Assign {
 		bk ++= Seq(z.value)
 	)*/
 
-  val zz = Def.task {
+  val zz: Initialize[Task[Int]] = Def.task {
     mk.value + tk.value + mk.value + tk.value + mk.value + tk.value + mk.value + tk.value + mk.value + tk.value + mk.value + tk.value
   }
 
   import DefaultParsers._
-  val p = Def.setting { name.value ~> Space ~> ID }
-  val is = Seq(
+  val p: Initialize[complete.Parser[String]] = Def.setting { name.value ~> Space ~> ID }
+  val is: Seq[Def.Setting[_]] = Seq(
     mk := 3,
     name := "asdf",
     tk := (math.random * 1000).toInt,
@@ -74,10 +76,10 @@ object Assign {
     //		ik := { if( tsk.parsed.value == "blue") tk.value else mk.value }
   )
 
-  val it1 = Def.inputTask {
+  val it1: Initialize[InputTask[Task[String]]] = Def.inputTask {
     tsk.parsed //"as" //dummy.value.parsed
   }
-  val it2 = Def.inputTask {
+  val it2: Initialize[InputTask[String]] = Def.inputTask {
     "lit"
   }
 
@@ -89,16 +91,16 @@ object Assign {
 		dummyt.value.parsed
 	}*/
   // should compile: can use a setting to define the parser
-  val it5 = Def.inputTask {
+  val it5: Initialize[InputTask[String]] = Def.inputTask {
     dummys.parsed
   }
-  val it6 = Def.inputTaskDyn {
+  val it6: Initialize[InputTask[Int]] = Def.inputTaskDyn {
     val d3 = dummy3.parsed
     val i = d3._2
     Def.task { tk.value + i }
   }
 
-  val it7 = Def.inputTask {
+  val it7: Initialize[InputTask[Task[String]]] = Def.inputTask {
     it5.parsed
   }
 

@@ -8,13 +8,13 @@
 package sbt
 
 import java.io.File
-import sbt.internal.inc.{ AnalyzingCompiler, PlainVirtualFile }
+
+import sbt.internal.inc.{ AnalyzingCompiler, MappedFileConverter, PlainVirtualFile }
 import sbt.internal.util.ManagedLogger
-import sbt.util.CacheStoreFactory
-import sbt.util.Logger
+import sbt.util.{ CacheStoreFactory, Logger }
+
 import xsbti.Reporter
 import xsbti.compile.JavaTools
-import sbt.internal.inc.MappedFileConverter
 
 object Doc {
   import RawCompileLike._

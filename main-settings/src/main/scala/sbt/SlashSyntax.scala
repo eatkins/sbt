@@ -7,8 +7,8 @@
 
 package sbt
 
-import sbt.librarymanagement.Configuration
 import sbt.internal.util.AttributeKey
+import sbt.librarymanagement.Configuration
 
 /**
  * SlashSyntax implements the slash syntax to scope keys for build.sbt DSL.

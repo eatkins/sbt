@@ -7,7 +7,7 @@
 
 package sbt.internal.protocol.codec
 
-import _root_.sjsonnew.{ Unbuilder, Builder, JsonFormat, deserializationError }
+import _root_.sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 
 trait JsonRpcResponseErrorFormats {

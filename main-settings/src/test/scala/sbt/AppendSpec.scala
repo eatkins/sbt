@@ -8,7 +8,7 @@
 package sbt
 
 object AppendSpec {
-  val onLoad = SettingKey[State => State]("onLoad")
+  val onLoad: SettingKey[State => State] = SettingKey[State => State]("onLoad")
 
   import Scope.Global
   import SlashSyntax0._

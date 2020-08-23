@@ -8,9 +8,9 @@
 package sbt
 package internal
 
-import sbt.internal.util.{ Relation, Settings, Dag }
-
 import java.net.URI
+
+import sbt.internal.util.{ Dag, Relation, Settings }
 
 final class BuildUtil[Proj](
     val keyIndex: KeyIndex,

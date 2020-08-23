@@ -9,13 +9,13 @@ package sbt
 
 import java.io.File
 import java.lang.ProcessBuilder.Redirect
+import java.lang.{ ProcessBuilder => JProcessBuilder }
 
 import scala.sys.process.Process
-import OutputStrategy._
-import sbt.internal.util.Util
-import Util.{ AnyOps, none }
 
-import java.lang.{ ProcessBuilder => JProcessBuilder }
+import sbt.OutputStrategy._
+import sbt.internal.util.Util
+import sbt.internal.util.Util.{ AnyOps, none }
 
 /**
  * Represents a command that can be forked.

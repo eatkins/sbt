@@ -8,8 +8,8 @@
 package sbt.internal.util
 package complete
 
+import sbt.internal.util.Util.{ AnyOps, nil }
 import sbt.io.IO
-import Util.{ AnyOps, nil }
 
 object HistoryCommands {
   val Start = "!"
@@ -18,20 +18,20 @@ object HistoryCommands {
   val Last = "!"
   val ListCommands = ":"
 
-  def ContainsFull = h(Contains)
-  def LastFull = h(Last)
-  def ListFull = h(ListCommands)
+  def ContainsFull: String = h(Contains)
+  def LastFull: String = h(Last)
+  def ListFull: String = h(ListCommands)
 
-  def ListN = ListFull + "n"
-  def ContainsString = ContainsFull + "string"
-  def StartsWithString = Start + "string"
-  def Previous = Start + "-n"
-  def Nth = Start + "n"
+  def ListN: String = ListFull + "n"
+  def ContainsString: String = ContainsFull + "string"
+  def StartsWithString: String = Start + "string"
+  def Previous: String = Start + "-n"
+  def Nth: String = Start + "n"
 
   private def h(s: String) = Start + s
-  def plainCommands = Seq(ListFull, Start, LastFull, ContainsFull)
+  def plainCommands: Seq[String] = Seq(ListFull, Start, LastFull, ContainsFull)
 
-  def descriptions = Seq(
+  def descriptions: Seq[(String, String)] = Seq(
     LastFull -> "Execute the last command again",
     ListFull -> "Show all previous commands",
     ListN -> "Show the last n commands",
@@ -41,7 +41,7 @@ object HistoryCommands {
     ContainsString -> "Execute the most recent command containing 'string'"
   )
 
-  def helpString =
+  def helpString: String =
     "History commands:\n   " + (descriptions
       .map { case (c, d) => c + "    " + d })
       .mkString("\n   ")
@@ -54,24 +54,31 @@ object HistoryCommands {
   import DefaultParsers._
 
   val MaxLines = 500
-  lazy val num = token(NatBasic, "<integer>")
-  lazy val last = Last ^^^ { execute(_.!!) }
+  lazy val num: Parser[Int] = token(NatBasic, "<integer>")
+  lazy val last: Parser[History => Option[List[String]]] = Last ^^^ { execute(_.!!) }
 
-  lazy val list = ListCommands ~> (num ?? Int.MaxValue) map { show => (h: History) =>
-    { printHistory(h, MaxLines, show); nil[String].some }
+  lazy val list
+      : Parser[History => Option[List[String]]] = ListCommands ~> (num ?? Int.MaxValue) map {
+    show => (h: History) =>
+      { printHistory(h, MaxLines, show); nil[String].some }
   }
 
-  lazy val execStr = flag('?') ~ token(any.+.string, "<string>") map {
+  lazy val execStr: Parser[History => Option[List[String]]] = flag('?') ~ token(
+    any.+.string,
+    "<string>"
+  ) map {
     case (contains, str) =>
       execute(h => if (contains) h !? str else h ! str)
   }
 
-  lazy val execInt = flag('-') ~ num map {
+  lazy val execInt: Parser[History => Option[List[String]]] = flag('-') ~ num map {
     case (neg, value) =>
       execute(h => if (neg) h !- value else h ! value)
   }
 
-  lazy val help = success((h: History) => { printHelp(); nil[String].some })
+  lazy val help: Parser[History => Option[List[String]]] = success((h: History) => {
+    printHelp(); nil[String].some
+  })
 
   def execute(f: History => Option[String]): History => Option[List[String]] = (h: History) => {
     val command = f(h).filterNot(_.startsWith(Start))

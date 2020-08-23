@@ -15,6 +15,7 @@ import sbt.internal.TestBuild._
 import sbt.internal.util.AttributeKey
 import sbt.internal.util.complete.DefaultParsers
 import sbt.librarymanagement.Configuration
+
 import hedgehog._
 import hedgehog.runner._
 

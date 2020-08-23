@@ -7,15 +7,15 @@
 
 package sbt.internal.util
 
+import org.scalacheck.Prop._
 import org.scalacheck._
-import Prop._
 
 object RelationTest extends Properties("Relation") {
   property("Added entry check") = forAll { (pairs: List[(Int, Double)]) =>
     val r = Relation.empty[Int, Double] ++ pairs
     check(r, pairs)
   }
-  def check(r: Relation[Int, Double], pairs: Seq[(Int, Double)]) = {
+  def check(r: Relation[Int, Double], pairs: Seq[(Int, Double)]): Boolean = {
     val _1s = pairs.map(_._1).toSet
     val _2s = pairs.map(_._2).toSet
 
@@ -76,7 +76,7 @@ object RelationTest extends Properties("Relation") {
 }
 
 object EmptyRelationTest extends Properties("Empty relation") {
-  lazy val e = Relation.empty[Int, Double]
+  lazy val e: Relation[Int, Double] = Relation.empty[Int, Double]
 
   property("Forward empty") = forAll((i: Int) => e.forward(i).isEmpty)
   property("Reverse empty") = forAll((i: Double) => e.reverse(i).isEmpty)

@@ -7,9 +7,10 @@
 
 package sbt
 
-import org.specs2._
-import mutable.Specification
 import sbt.util.Logger
+
+import org.specs2._
+import org.specs2.mutable.Specification
 
 object PluginsTest extends Specification {
   import AI._
@@ -59,7 +60,7 @@ object PluginsTest extends Specification {
 
 object AI {
   lazy val allPlugins: List[AutoPlugin] = List(A, B, Q, R, S, T, U)
-  lazy val deducePlugin = Plugins.deducer(allPlugins)
+  lazy val deducePlugin: (Plugins, Logger) => Seq[AutoPlugin] = Plugins.deducer(allPlugins)
   lazy val log = Logger.Null
 
   object A extends AutoPlugin { override def requires = empty }
@@ -76,19 +77,19 @@ object AI {
   }
 
   object S extends AutoPlugin {
-    override def requires = Q && !R
+    override def requires: Plugins = Q && !R
     override def trigger = allRequirements
   }
 
   // This is an opt-in plugin with a requirement
   // Unless explicitly loaded by the build user, this will not be activated.
   object T extends AutoPlugin {
-    override def requires = Q && !R
+    override def requires: Plugins = Q && !R
   }
 
   // This is an opt-in plugin with a requirement
   // Unless explicitly loaded by the build user, this will not be activated.
   object U extends AutoPlugin {
-    override def requires = A && !Q
+    override def requires: Plugins = A && !Q
   }
 }

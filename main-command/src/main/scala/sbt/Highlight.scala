@@ -8,6 +8,7 @@
 package sbt
 
 import java.util.regex.Pattern
+
 import scala.Console.{ BOLD, RESET }
 
 import sbt.internal.util.ConsoleAppender
@@ -25,6 +26,6 @@ object Highlight {
     else
       None
   }
-  def bold(s: String) =
+  def bold(s: String): String =
     if (ConsoleAppender.formatEnabledInEnv) BOLD + s.replace(RESET, RESET + BOLD) + RESET else s
 }

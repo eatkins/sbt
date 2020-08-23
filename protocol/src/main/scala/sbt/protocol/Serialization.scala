@@ -8,19 +8,22 @@
 package sbt
 package protocol
 
-import sjsonnew.{ JsonFormat, JsonWriter }
-import sjsonnew.support.scalajson.unsafe.{ Parser, Converter, CompactPrinter }
-import sjsonnew.shaded.scalajson.ast.unsafe.{ JValue, JObject, JString }
 import java.nio.ByteBuffer
 import java.util.UUID
-import scala.util.{ Success, Failure }
-import sbt.internal.util.StringEvent
+
+import scala.util.{ Failure, Success }
+
 import sbt.internal.protocol.{
   JsonRpcMessage,
+  JsonRpcNotificationMessage,
   JsonRpcRequestMessage,
-  JsonRpcResponseMessage,
-  JsonRpcNotificationMessage
+  JsonRpcResponseMessage
 }
+import sbt.internal.util.StringEvent
+
+import sjsonnew.shaded.scalajson.ast.unsafe.{ JObject, JString, JValue }
+import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter, Parser }
+import sjsonnew.{ JsonFormat, JsonWriter }
 
 object Serialization {
   private[sbt] val VsCode = "application/vscode-jsonrpc; charset=utf-8"

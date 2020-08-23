@@ -8,16 +8,17 @@
 package sbt
 package internal
 
-import sbt.internal.util.Attributed
 import java.io.File
 import java.net.URL
-import Attributed.data
+
 import sbt.internal.BuildDef.analyzed
+import sbt.internal.inc.ModuleUtilities
+import sbt.internal.util.Attributed
+import sbt.internal.util.Attributed.data
+import sbt.io.IO
+
 import xsbt.api.{ Discovered, Discovery }
 import xsbti.compile.CompileAnalysis
-import sbt.internal.inc.ModuleUtilities
-
-import sbt.io.IO
 
 object PluginDiscovery {
 

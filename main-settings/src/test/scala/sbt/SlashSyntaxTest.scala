@@ -8,33 +8,36 @@
 package sbt.test
 
 import java.io.File
-import sjsonnew._, BasicJsonProtocol._
+
 import sbt.Def.{ Setting, inputKey, settingKey, taskKey }
 import sbt.Scope.Global
 import sbt.librarymanagement.ModuleID
 import sbt.librarymanagement.syntax._
+import sbt.{ InputKey, SettingKey, TaskKey }
 import sbt.{ LocalProject, ProjectReference, ThisBuild, Zero }
+
+import sjsonnew.BasicJsonProtocol._
 
 object SlashSyntaxTest extends sbt.SlashSyntax {
   final case class Proj(id: String)
   implicit def projToRef(p: Proj): ProjectReference = LocalProject(p.id)
 
-  val projA = Proj("a")
+  val projA: Proj = Proj("a")
 
-  val cancelable = settingKey[Boolean]("")
-  val console = taskKey[Unit]("")
-  val libraryDependencies = settingKey[Seq[ModuleID]]("")
-  val name = settingKey[String]("")
-  val run = inputKey[Unit]("")
-  val scalaVersion = settingKey[String]("")
-  val scalacOptions = taskKey[Seq[String]]("")
+  val cancelable: SettingKey[Boolean] = settingKey[Boolean]("")
+  val console: TaskKey[Unit] = taskKey[Unit]("")
+  val libraryDependencies: SettingKey[Seq[ModuleID]] = settingKey[Seq[ModuleID]]("")
+  val name: SettingKey[String] = settingKey[String]("")
+  val run: InputKey[Unit] = inputKey[Unit]("")
+  val scalaVersion: SettingKey[String] = settingKey[String]("")
+  val scalacOptions: TaskKey[Seq[String]] = taskKey[Seq[String]]("")
 
-  val foo = taskKey[Int]("")
-  val bar = taskKey[Int]("")
-  val baz = inputKey[Unit]("")
-  val buildInfo = taskKey[Seq[File]]("")
+  val foo: TaskKey[Int] = taskKey[Int]("")
+  val bar: TaskKey[Int] = taskKey[Int]("")
+  val baz: InputKey[Unit] = inputKey[Unit]("")
+  val buildInfo: TaskKey[Seq[File]] = taskKey[Seq[File]]("")
 
-  val uTest = "com.lihaoyi" %% "utest" % "0.5.3"
+  val uTest: ModuleID = "com.lihaoyi" %% "utest" % "0.5.3"
 
   Seq[Setting[_]](
     Global / cancelable := true,

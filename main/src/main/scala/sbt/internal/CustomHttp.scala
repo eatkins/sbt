@@ -7,16 +7,17 @@
 
 package sbt.internal
 
-import sbt.internal.librarymanagement.{ CustomHttp => LMCustomHttp }
-import okhttp3._
-
 import sbt.BuildSyntax._
 import sbt.KeyRanks._
+import sbt.SettingKey
+import sbt.internal.librarymanagement.{ CustomHttp => LMCustomHttp }
+
+import okhttp3._
 
 object CustomHttp {
-  val okhttpClientBuilder =
+  val okhttpClientBuilder: SettingKey[OkHttpClient.Builder] =
     settingKey[OkHttpClient.Builder]("Builder for the HTTP client.").withRank(CSetting)
-  val okhttpClient =
+  val okhttpClient: SettingKey[OkHttpClient] =
     settingKey[OkHttpClient]("HTTP client used for library management.").withRank(CSetting)
 
   def defaultHttpClientBuilder: OkHttpClient.Builder = {

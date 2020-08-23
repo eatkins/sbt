@@ -7,19 +7,19 @@
 
 package sbt
 
-import scala.reflect.Manifest
-import scala.collection.concurrent.TrieMap
+import java.lang.Integer.{ toHexString => hex }
+import java.lang.Thread.currentThread
 import java.lang.ref.WeakReference
-import Thread.currentThread
 import java.security.Permission
 import java.util.concurrent.{ ConcurrentHashMap => CMap }
-import java.lang.Integer.{ toHexString => hex }
 import java.util.function.Supplier
 
-import sbt.util.Logger
-import sbt.util.InterfaceUtil
+import scala.collection.concurrent.TrieMap
+import scala.reflect.Manifest
+
+import sbt.TrapExit._
 import sbt.internal.util.Util.{ AnyOps, none }
-import TrapExit._
+import sbt.util.{ InterfaceUtil, Logger }
 
 /**
  * Provides an approximation to isolated execution within a single JVM.
@@ -235,7 +235,7 @@ private final class TrapExit(delegateManager: SecurityManager) extends SecurityM
     var awtUsed = false
 
     /** The unique ID of the application. */
-    val id = nextID()
+    val id: String = nextID()
 
     /** The ThreadGroup to use to try to track created threads. */
     val mainGroup: ThreadGroup = new ThreadGroup("run-main-group-" + id) {
@@ -246,7 +246,7 @@ private final class TrapExit(delegateManager: SecurityManager) extends SecurityM
     val mainThread = new Thread(mainGroup, this, "run-main-" + id)
 
     /** Saves the ids of the creating thread and thread group to avoid tracking them as coming from this application. */
-    val creatorThreadID = computeID(currentThread)
+    val creatorThreadID: ThreadID = computeID(currentThread)
     val creatorGroup = currentThread.getThreadGroup
 
     register(mainThread)

@@ -12,7 +12,6 @@ import java.lang.reflect.Method
 
 import sbt.Def._
 import sbt.Keys._
-import sbt.nio.Keys._
 import sbt.Project._
 import sbt.internal.inc.ModuleUtilities
 import sbt.internal.inc.classpath.ClasspathUtil
@@ -21,6 +20,7 @@ import sbt.io._
 import sbt.io.syntax._
 import sbt.librarymanagement._
 import sbt.librarymanagement.syntax._
+import sbt.nio.Keys._
 import sbt.nio.file.{ Glob, RecursiveGlob }
 
 object ScriptedPlugin extends AutoPlugin {
@@ -29,25 +29,25 @@ object ScriptedPlugin extends AutoPlugin {
   sys.props(org.apache.logging.log4j.util.LoaderUtil.IGNORE_TCCL_PROPERTY) = "true"
 
   object autoImport {
-    val ScriptedConf = Configurations.config("scripted-sbt") hide
-    val ScriptedLaunchConf = Configurations.config("scripted-sbt-launch") hide
+    val ScriptedConf: Configuration = Configurations.config("scripted-sbt") hide
+    val ScriptedLaunchConf: Configuration = Configurations.config("scripted-sbt-launch") hide
 
-    val scriptedSbt = settingKey[String]("")
-    val sbtLauncher = taskKey[File]("")
-    val sbtTestDirectory = settingKey[File]("")
-    val scriptedBufferLog = settingKey[Boolean]("")
-    val scriptedClasspath = taskKey[PathFinder]("")
-    val scriptedTests = taskKey[AnyRef]("")
-    val scriptedBatchExecution =
+    val scriptedSbt: SettingKey[String] = settingKey[String]("")
+    val sbtLauncher: TaskKey[File] = taskKey[File]("")
+    val sbtTestDirectory: SettingKey[File] = settingKey[File]("")
+    val scriptedBufferLog: SettingKey[Boolean] = settingKey[Boolean]("")
+    val scriptedClasspath: TaskKey[PathFinder] = taskKey[PathFinder]("")
+    val scriptedTests: TaskKey[AnyRef] = taskKey[AnyRef]("")
+    val scriptedBatchExecution: SettingKey[Boolean] =
       settingKey[Boolean]("Enables or disables batch execution for scripted.")
-    val scriptedParallelInstances = settingKey[Int](
+    val scriptedParallelInstances: SettingKey[Int] = settingKey[Int](
       "Configures the number of scripted instances for parallel testing, only used in batch mode."
     )
-    val scriptedRun = taskKey[Method]("")
-    val scriptedLaunchOpts =
+    val scriptedRun: TaskKey[Method] = taskKey[Method]("")
+    val scriptedLaunchOpts: SettingKey[Seq[String]] =
       settingKey[Seq[String]]("options to pass to jvm launching scripted tasks")
-    val scriptedDependencies = taskKey[Unit]("")
-    val scripted = inputKey[Unit]("")
+    val scriptedDependencies: TaskKey[Unit] = taskKey[Unit]("")
+    val scripted: InputKey[Unit] = inputKey[Unit]("")
   }
   import autoImport._
 

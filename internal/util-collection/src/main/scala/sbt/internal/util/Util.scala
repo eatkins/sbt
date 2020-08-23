@@ -9,8 +9,8 @@ package sbt.internal.util
 
 import java.util.Locale
 
-import scala.reflect.macros.blackbox
 import scala.language.experimental.macros
+import scala.reflect.macros.blackbox
 
 object Util {
   def makeList[T](size: Int, value: T): List[T] = List.fill(size)(value)

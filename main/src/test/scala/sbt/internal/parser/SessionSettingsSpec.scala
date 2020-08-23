@@ -11,14 +11,15 @@ package parser
 
 import java.io.{ File, FilenameFilter }
 
-import org.specs2.matcher.MatchResult
-
 import scala.collection.GenTraversableOnce
 import scala.io.Source
-import SessionSettings.SessionSetting
+
+import sbt.internal.SessionSettings.SessionSetting
+
+import org.specs2.matcher.MatchResult
 
 abstract class AbstractSessionSettingsSpec(folder: String) extends AbstractSpec {
-  protected val rootPath = getClass.getResource("/" + folder).getPath
+  protected val rootPath: String = getClass.getResource("/" + folder).getPath
   println(s"Reading files from: $rootPath")
   protected val rootDir = new File(rootPath)
 
@@ -55,7 +56,7 @@ abstract class AbstractSessionSettingsSpec(folder: String) extends AbstractSpec 
     }
   }
 
-  protected def replace(f: File) = {
+  protected def replace(f: File): Seq[(List[String], Seq[(Null, Seq[String])])] = {
     val dirs = rootDir
       .listFiles(new FilenameFilter() {
         def accept(dir: File, name: String) = {

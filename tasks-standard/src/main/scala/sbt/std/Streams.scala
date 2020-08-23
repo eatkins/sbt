@@ -17,6 +17,7 @@ import sbt.internal.util.Util.{ nil }
 import sbt.io.IO
 import sbt.io.syntax._
 import sbt.util._
+
 import sjsonnew.{ IsoString, SupportConverter }
 
 // no longer specific to Tasks, so 'TaskStreams' should be renamed

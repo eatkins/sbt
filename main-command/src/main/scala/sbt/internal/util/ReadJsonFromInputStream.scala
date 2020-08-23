@@ -10,6 +10,7 @@ package sbt.internal.util
 import java.io.InputStream
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicBoolean
+
 import scala.util.Try
 
 private[sbt] object ReadJsonFromInputStream {

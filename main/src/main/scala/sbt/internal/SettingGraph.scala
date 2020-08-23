@@ -8,14 +8,14 @@
 package sbt
 package internal
 
-import sbt.util.Show
 import java.io.File
 
-import Def.{ ScopedKey, compiled, flattenLocals }
-import sbt.internal.util.Terminal
+import scala.Predef.{ any2stringadd => _, _ }
 
-import Predef.{ any2stringadd => _, _ }
+import sbt.Def.{ ScopedKey, compiled, flattenLocals }
+import sbt.internal.util.Terminal
 import sbt.io.IO
+import sbt.util.Show
 
 object SettingGraph {
   def apply(structure: BuildStructure, basedir: File, scoped: ScopedKey[_], generation: Int)(

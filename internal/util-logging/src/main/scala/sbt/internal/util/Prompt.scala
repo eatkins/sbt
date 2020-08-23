@@ -8,6 +8,7 @@
 package sbt.internal.util
 
 import java.util.concurrent.LinkedBlockingQueue
+
 import scala.collection.JavaConverters._
 
 private[sbt] sealed trait Prompt {

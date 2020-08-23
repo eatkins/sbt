@@ -7,14 +7,16 @@
 
 package sbt.internal.util
 
-import org.scalatest._
-import sbt.util._
 import java.io.{ File, PrintWriter }
+
 import sbt.io.Using
+import sbt.util._
+
 import com.github.ghik.silencer.silent
+import org.scalatest._
 
 class ManagedLoggerSpec extends FlatSpec with Matchers {
-  val context = LoggerContext(useLog4J = true)
+  val context: LoggerContext = LoggerContext(useLog4J = true)
   @silent
   val asyncStdout = new ConsoleAppenderFromLog4J("asyncStdout", LogExchange.asyncStdout)
   def newLogger(name: String): ManagedLogger = context.logger(name, None, None)

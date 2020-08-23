@@ -7,6 +7,8 @@
 
 package sbt.internal
 
+import scala.annotation.tailrec
+
 import sbt.Def._
 import sbt.Keys._
 import sbt.Project.richInitializeTask
@@ -18,8 +20,6 @@ import sbt.internal.util.complete.Parser
 import sbt.nio.FileStamper
 import sbt.nio.Keys._
 import sbt.nio.file.Glob
-
-import scala.annotation.tailrec
 
 private[sbt] object WatchTransitiveDependencies {
   private implicit class SourceOps(val source: Source) {

@@ -12,15 +12,20 @@ TODO:
 - error message when a task doesn't exist that it would be provided by plugin x, enabled by natures y,z, blocked by a, b
  */
 
-import sbt.librarymanagement.Configuration
+import scala.annotation.tailrec
 
+import sbt.Def.Setting
+import sbt.PluginTrigger._
+import sbt.Plugins._
+import sbt.internal.util.logic.Logic.{
+  CyclicNegation,
+  InitialContradictions,
+  InitialOverlap,
+  LogicException
+}
 import sbt.internal.util.logic.{ Atom, Clause, Clauses, Formula, Literal, Logic, Negated }
-import Logic.{ CyclicNegation, InitialContradictions, InitialOverlap, LogicException }
-import Def.Setting
-import Plugins._
-import annotation.tailrec
+import sbt.librarymanagement.Configuration
 import sbt.util.Logger
-import PluginTrigger._
 
 /**
  * An AutoPlugin defines a group of settings and the conditions where the settings are automatically added to a build (called "activation").
@@ -318,11 +323,11 @@ ${listConflicts(conflicting)}""")
     def &&(o: Basic): Plugins = And(this :: o :: Nil)
   }
   private[sbt] final case class Exclude(n: AutoPlugin) extends Basic {
-    override def toString = s"!$n"
+    override def toString: String = s"!$n"
   }
   private[sbt] final case class And(plugins: List[Basic]) extends Plugins {
     def &&(o: Basic): Plugins = And(o :: plugins)
-    override def toString = plugins.mkString(" && ")
+    override def toString: String = plugins.mkString(" && ")
   }
   private[sbt] def and(a: Plugins, b: Plugins) = b match {
     case Empty    => a

@@ -12,6 +12,7 @@ import java.util.concurrent.{ Executors, TimeUnit, TimeoutException }
 
 import scala.collection.mutable
 import scala.concurrent.duration._
+
 import sbt.internal.scripted._
 
 private[sbt] object BatchScriptRunner {

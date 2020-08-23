@@ -7,20 +7,19 @@
 
 package sbt
 
-import sbt.librarymanagement.{ MavenRepository, Resolver }
-import sbt.librarymanagement.ivy.Credentials
-
 import java.io.File
 import java.net.URL
 
-import sbt.io.Path
-import Path._
+import sbt.io.Path._
+import sbt.librarymanagement.ivy.Credentials
+import sbt.librarymanagement.{ FileRepository, URLRepository }
+import sbt.librarymanagement.{ MavenRepository, Resolver }
 
 /** Options for well-known tasks. */
 object Opts {
   object compile {
     val deprecation = "-deprecation"
-    def encoding(enc: String) = Seq("-encoding", enc)
+    def encoding(enc: String): Seq[String] = Seq("-encoding", enc)
     val explaintypes = "-explaintypes"
     val nowarn = "-nowarn"
     val optimise = "-optimise"
@@ -41,17 +40,18 @@ object Opts {
   }
   object resolver {
     import sbt.io.syntax._
-    val sonatypeReleases = Resolver.sonatypeRepo("releases")
-    val sonatypeSnapshots = Resolver.sonatypeRepo("snapshots")
-    val sonatypeStaging = MavenRepository(
+    val sonatypeReleases: MavenRepository = Resolver.sonatypeRepo("releases")
+    val sonatypeSnapshots: MavenRepository = Resolver.sonatypeRepo("snapshots")
+    val sonatypeStaging: MavenRepository = MavenRepository(
       "sonatype-staging",
       "https://oss.sonatype.org/service/local/staging/deploy/maven2"
     )
-    val mavenLocalFile = Resolver.file("Local Repository", userHome / ".m2" / "repository")(
-      Resolver.defaultPatterns
-    )
-    val sbtSnapshots = Resolver.bintrayRepo("sbt", "maven-snapshots")
-    val sbtIvySnapshots = Resolver.bintrayIvyRepo("sbt", "ivy-snapshots")
+    val mavenLocalFile: FileRepository =
+      Resolver.file("Local Repository", userHome / ".m2" / "repository")(
+        Resolver.defaultPatterns
+      )
+    val sbtSnapshots: MavenRepository = Resolver.bintrayRepo("sbt", "maven-snapshots")
+    val sbtIvySnapshots: URLRepository = Resolver.bintrayIvyRepo("sbt", "ivy-snapshots")
   }
 }
 

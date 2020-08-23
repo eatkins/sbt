@@ -7,9 +7,9 @@
 
 package sbt.internal.util
 
-import Types._
+import sbt.internal.util.Types._
+import sbt.internal.util.Util.{ nil, nilSeq }
 import sbt.util.Show
-import Util.{ nil, nilSeq }
 
 sealed trait Settings[ScopeType] {
   def data: Map[ScopeType, AttributeMap]

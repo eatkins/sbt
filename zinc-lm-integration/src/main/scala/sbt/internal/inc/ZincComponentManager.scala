@@ -14,8 +14,9 @@ import java.util.concurrent.Callable
 
 import sbt.internal.util.FullLogger
 import sbt.io.IO
-import xsbti._
+
 import xsbti.ArtifactInfo.SbtOrganization
+import xsbti._
 
 /**
  * A component manager provides access to the pieces of zinc that are distributed as components.
@@ -118,5 +119,5 @@ object ZincComponentManager {
     val properties = ResourceLoader.getPropertiesFor("/incrementalcompiler.version.properties")
     (properties.getProperty("version"), properties.getProperty("timestamp"))
   }
-  lazy val stampedVersion = s"${version}_$timestamp"
+  lazy val stampedVersion: String = s"${version}_$timestamp"
 }

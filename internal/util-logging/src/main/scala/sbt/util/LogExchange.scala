@@ -8,14 +8,17 @@
 package sbt.util
 
 import java.util.concurrent.ConcurrentHashMap
-import org.apache.logging.log4j.{ LogManager => XLogManager, Level => XLevel }
-import org.apache.logging.log4j.core.{ Appender => XAppender, LoggerContext => XLoggerContext }
+
+import scala.collection.concurrent
+
+import sbt.internal.util._
+
+import org.apache.logging.log4j.core.appender.AsyncAppender
 import org.apache.logging.log4j.core.config.{ AppenderRef, LoggerConfig }
 import org.apache.logging.log4j.core.layout.PatternLayout
-import sbt.internal.util._
-import scala.collection.concurrent
+import org.apache.logging.log4j.core.{ Appender => XAppender, LoggerContext => XLoggerContext }
+import org.apache.logging.log4j.{ Level => XLevel, LogManager => XLogManager }
 import sjsonnew.JsonFormat
-import org.apache.logging.log4j.core.appender.AsyncAppender
 
 // http://logging.apache.org/log4j/2.x/manual/customconfig.html
 // https://logging.apache.org/log4j/2.x/log4j-core/apidocs/index.html
@@ -77,9 +80,12 @@ sealed abstract class LogExchange {
   // Construct these StringTypeTags manually, because they're used at the very startup of sbt
   // and we'll try not to initialize the universe by using the StringTypeTag.apply that requires a TypeTag
   // A better long-term solution could be to make StringTypeTag.apply a macro.
-  lazy val stringTypeTagThrowable = StringTypeTag[Throwable]("scala.Throwable")
-  lazy val stringTypeTagTraceEvent = StringTypeTag[TraceEvent]("sbt.internal.util.TraceEvent")
-  lazy val stringTypeTagSuccessEvent = StringTypeTag[SuccessEvent]("sbt.internal.util.SuccessEvent")
+  lazy val stringTypeTagThrowable: StringTypeTag[Throwable] =
+    StringTypeTag[Throwable]("scala.Throwable")
+  lazy val stringTypeTagTraceEvent: StringTypeTag[TraceEvent] =
+    StringTypeTag[TraceEvent]("sbt.internal.util.TraceEvent")
+  lazy val stringTypeTagSuccessEvent: StringTypeTag[SuccessEvent] =
+    StringTypeTag[SuccessEvent]("sbt.internal.util.SuccessEvent")
 
   private[sbt] def initStringCodecs(): Unit = {
     import sbt.internal.util.codec.ThrowableShowLines._

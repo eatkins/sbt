@@ -8,8 +8,10 @@
 package sbt.util
 
 import java.io.{ Closeable, OutputStream }
-import sjsonnew.{ IsoString, JsonWriter, SupportConverter }
+
 import sbt.io.Using
+
+import sjsonnew.{ IsoString, JsonWriter, SupportConverter }
 
 trait Output extends Closeable {
   def write[T: JsonWriter](value: T): Unit
@@ -19,7 +21,7 @@ class PlainOutput[J: IsoString](output: OutputStream, converter: SupportConverte
     extends Output {
   val isoFormat: IsoString[J] = implicitly
 
-  def write[T: JsonWriter](value: T) = {
+  def write[T: JsonWriter](value: T): Unit = {
     val js = converter.toJson(value).get
     val asString = isoFormat.to(js)
     Using.bufferedOutputStream(output) { writer =>
@@ -29,5 +31,5 @@ class PlainOutput[J: IsoString](output: OutputStream, converter: SupportConverte
     }
   }
 
-  def close() = output.close()
+  def close(): Unit = output.close()
 }

@@ -5,13 +5,14 @@
  * Licensed under Apache License 2.0 (see LICENSE)
  */
 
-import sbt.nio.FileStamp
-import sjsonnew.JsonFormat
 import java.nio.file.{ Path => NioPath }
 
-import sbt.internal.FileChangesMacro
-
 import scala.language.experimental.macros
+
+import sbt.internal.FileChangesMacro
+import sbt.nio.FileStamp
+
+import sjsonnew.JsonFormat
 
 package object sbt
     extends sbt.IOSyntax0

@@ -8,14 +8,14 @@
 package sbt
 package internal
 
-import sbt.internal.util.{ AttributeKey, complete, Types }
-
-import complete.{ DefaultParsers, Parser }
-import DefaultParsers._
-import Def.ScopedKey
-import Types.idFun
 import java.io.File
-import Scope.Global
+
+import sbt.Def.ScopedKey
+import sbt.Scope.Global
+import sbt.internal.util.AttributeKey
+import sbt.internal.util.Types.idFun
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.{ DefaultParsers, Parser }
 
 object Inspect {
   sealed trait Mode

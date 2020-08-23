@@ -9,8 +9,8 @@ package sbt
 
 import scala.collection.mutable.ListBuffer
 
+import sbt.Incomplete.{ Error, Value => IValue }
 import sbt.internal.util.IDSet
-import Incomplete.{ Error, Value => IValue }
 
 /**
  * Describes why a task did not complete.
@@ -29,7 +29,7 @@ final case class Incomplete(
     directCause: Option[Throwable] = None
 ) extends Exception(message.orNull, directCause.orNull)
     with sbt.internal.util.UnprintableException {
-  override def toString =
+  override def toString: String =
     "Incomplete(node=" + node + ", tpe=" + tpe + ", msg=" + message + ", causes=" + causes + ", directCause=" + directCause + ")"
 }
 
@@ -70,5 +70,5 @@ object Incomplete extends Enumeration {
     visitAll(i) { exceptions ++= _.directCause.toList }
     exceptions.all
   }
-  def show(tpe: Value) = tpe match { case Skipped => "skipped"; case Error => "error" }
+  def show(tpe: Value): String = tpe match { case Skipped => "skipped"; case Error => "error" }
 }

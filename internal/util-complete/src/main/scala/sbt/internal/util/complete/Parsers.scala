@@ -8,9 +8,7 @@
 package sbt.internal.util
 package complete
 
-import Parser._
 import java.io.File
-import java.net.URI
 import java.lang.Character.{
   CURRENCY_SYMBOL,
   DASH_PUNCTUATION,
@@ -20,69 +18,73 @@ import java.lang.Character.{
   OTHER_SYMBOL,
   getType
 }
+import java.net.URI
 
 import scala.annotation.tailrec
+
 import sbt.internal.util.Util.nilSeq
+import sbt.internal.util.complete.Parser._
 
 /** Provides standard implementations of commonly useful [[Parser]]s. */
 trait Parsers {
 
   /** Matches the end of input, providing no useful result on success. */
-  lazy val EOF = not(any, "Expected EOF")
+  lazy val EOF: Parser[Unit] = not(any, "Expected EOF")
 
   /** Parses any single character and provides that character as the result. */
   lazy val any: Parser[Char] = charClass(_ => true, "any character")
 
   /** Set that contains each digit in a String representation.*/
-  lazy val DigitSet = Set("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+  lazy val DigitSet: Set[String] = Set("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
 
   /** Parses any single digit and provides that digit as a Char as the result.*/
-  lazy val Digit = charClass(_.isDigit, "digit") examples DigitSet
+  lazy val Digit: Parser[Char] = charClass(_.isDigit, "digit") examples DigitSet
 
   /** Set containing Chars for hexadecimal digits 0-9 and A-F (but not a-f). */
-  lazy val HexDigitSet =
+  lazy val HexDigitSet: Set[Char] =
     Set('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F')
 
   /** Parses a single hexadecimal digit (0-9, a-f, A-F). */
-  lazy val HexDigit = charClass(c => HexDigitSet(c.toUpper), "hex digit") examples HexDigitSet.map(
+  lazy val HexDigit
+      : Parser[Char] = charClass(c => HexDigitSet(c.toUpper), "hex digit") examples HexDigitSet.map(
     _.toString
   )
 
   /** Parses a single letter, according to Char.isLetter, into a Char. */
-  lazy val Letter = charClass(_.isLetter, "letter")
+  lazy val Letter: Parser[Char] = charClass(_.isLetter, "letter")
 
   /** Parses a single letter, according to Char.isUpper, into a Char. */
-  lazy val Upper = charClass(_.isUpper, "upper")
+  lazy val Upper: Parser[Char] = charClass(_.isUpper, "upper")
 
   /** Parses a single letter, according to Char.isLower, into a Char. */
-  lazy val Lower = charClass(_.isLower, "lower")
+  lazy val Lower: Parser[Char] = charClass(_.isLower, "lower")
 
   /** Parses the first Char in an sbt identifier, which must be a [[Letter]].*/
   def IDStart = Letter
 
   /** Parses an identifier Char other than the first character.  This includes letters, digits, dash `-`, and underscore `_`.*/
-  lazy val IDChar = charClass(isIDChar, "ID character")
+  lazy val IDChar: Parser[Char] = charClass(isIDChar, "ID character")
 
   /** Parses an identifier String, which must start with [[IDStart]] and contain zero or more [[IDChar]]s after that. */
-  lazy val ID = identifier(IDStart, IDChar)
+  lazy val ID: Parser[String] = identifier(IDStart, IDChar)
 
   /** Parses a single operator Char, as allowed by [[isOpChar]]. */
-  lazy val OpChar = charClass(isOpChar, "symbol")
+  lazy val OpChar: Parser[Char] = charClass(isOpChar, "symbol")
 
   /** Parses a non-empty operator String, which consists only of characters allowed by [[OpChar]]. */
   lazy val Op = OpChar.+.string
 
   /** Parses either an operator String defined by [[Op]] or a non-symbolic identifier defined by [[ID]]. */
-  lazy val OpOrID = ID | Op
+  lazy val OpOrID: Parser[String] = ID | Op
 
   /** Parses a single, non-symbolic Scala identifier Char.  Valid characters are letters, digits, and the underscore character `_`. */
-  lazy val ScalaIDChar = charClass(isScalaIDChar, "Scala identifier character")
+  lazy val ScalaIDChar: Parser[Char] = charClass(isScalaIDChar, "Scala identifier character")
 
   /** Parses a non-symbolic Scala-like identifier.  The identifier must start with [[IDStart]] and contain zero or more [[ScalaIDChar]]s after that.*/
-  lazy val ScalaID = identifier(IDStart, ScalaIDChar)
+  lazy val ScalaID: Parser[String] = identifier(IDStart, ScalaIDChar)
 
   /** Parses a non-symbolic Scala-like identifier.  The identifier must start with [[Upper]] and contain zero or more [[ScalaIDChar]]s after that.*/
-  lazy val CapitalizedID = identifier(Upper, ScalaIDChar)
+  lazy val CapitalizedID: Parser[String] = identifier(Upper, ScalaIDChar)
 
   /** Parses a String that starts with `start` and is followed by zero or more characters parsed by `rep`.*/
   def identifier(start: Parser[Char], rep: Parser[Char]): Parser[String] =
@@ -97,29 +99,29 @@ trait Parsers {
       any
 
   /** Returns true if `c` an operator character. */
-  def isOpChar(c: Char) = !isDelimiter(c) && isOpType(getType(c))
+  def isOpChar(c: Char): Boolean = !isDelimiter(c) && isOpType(getType(c))
 
-  def isOpType(cat: Int) = cat match {
+  def isOpType(cat: Int): Boolean = cat match {
     case MATH_SYMBOL | OTHER_SYMBOL | DASH_PUNCTUATION | OTHER_PUNCTUATION | MODIFIER_SYMBOL |
         CURRENCY_SYMBOL =>
       true; case _      => false
   }
 
   /** Returns true if `c` is a dash `-`, a letter, digit, or an underscore `_`. */
-  def isIDChar(c: Char) = isScalaIDChar(c) || c == '-'
+  def isIDChar(c: Char): Boolean = isScalaIDChar(c) || c == '-'
 
   /** Returns true if `c` is a letter, digit, or an underscore `_`. */
-  def isScalaIDChar(c: Char) = c.isLetterOrDigit || c == '_'
+  def isScalaIDChar(c: Char): Boolean = c.isLetterOrDigit || c == '_'
 
-  def isDelimiter(c: Char) = c match {
+  def isDelimiter(c: Char): Boolean = c match {
     case '`' | '\'' | '\"' | /*';' | */ ',' | '.' => true; case _ => false
   }
 
   /** Matches a single character that is not a whitespace character. */
-  lazy val NotSpaceClass = charClass(!_.isWhitespace, "non-whitespace character")
+  lazy val NotSpaceClass: Parser[Char] = charClass(!_.isWhitespace, "non-whitespace character")
 
   /** Matches a single whitespace character, as determined by Char.isWhitespace.*/
-  lazy val SpaceClass = charClass(_.isWhitespace, "whitespace character")
+  lazy val SpaceClass: Parser[Char] = charClass(_.isWhitespace, "whitespace character")
 
   /** Matches a non-empty String consisting of non-whitespace characters. */
   lazy val NotSpace = NotSpaceClass.+.string
@@ -137,10 +139,10 @@ trait Parsers {
    * Matches a possibly empty String consisting of whitespace characters.
    * The suggested tab completion is a single, constant space character.
    */
-  lazy val OptSpace = SpaceClass.*.examples(" ")
+  lazy val OptSpace: Parser[Seq[Char]] = SpaceClass.*.examples(" ")
 
   /** Parses a non-empty String that contains only valid URI characters, as defined by [[URIChar]].*/
-  lazy val URIClass = URIChar.+.string !!! "Invalid URI"
+  lazy val URIClass: Parser[String] = URIChar.+.string !!! "Invalid URI"
 
   /** Triple-quotes, as used for verbatim quoting.*/
   lazy val VerbatimDQuotes = "\"\"\""
@@ -152,25 +154,27 @@ trait Parsers {
   lazy val BackslashChar = '\\'
 
   /** Matches a single double quote. */
-  lazy val DQuoteClass = charClass(_ == DQuoteChar, "double-quote character")
+  lazy val DQuoteClass: Parser[Char] = charClass(_ == DQuoteChar, "double-quote character")
 
   /** Matches any character except a double quote or whitespace. */
-  lazy val NotDQuoteSpaceClass =
+  lazy val NotDQuoteSpaceClass: Parser[Char] =
     charClass({ c: Char =>
       (c != DQuoteChar) && !c.isWhitespace
     }, "non-double-quote-space character")
 
   /** Matches any character except a double quote or backslash. */
-  lazy val NotDQuoteBackslashClass =
+  lazy val NotDQuoteBackslashClass: Parser[Char] =
     charClass({ c: Char =>
       (c != DQuoteChar) && (c != BackslashChar)
     }, "non-double-quote-backslash character")
 
   /** Matches a single character that is valid somewhere in a URI. */
-  lazy val URIChar = charClass(alphanum, "alphanum") | chars("_-!.~'()*,;:$&+=?/[]@%#")
+  lazy val URIChar: Parser[Char] = charClass(alphanum, "alphanum") | chars(
+    "_-!.~'()*,;:$&+=?/[]@%#"
+  )
 
   /** Returns true if `c` is an ASCII letter or digit. */
-  def alphanum(c: Char) =
+  def alphanum(c: Char): Boolean =
     ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')
 
   /**
@@ -184,25 +188,25 @@ trait Parsers {
       .map(new File(_))
 
   /** Parses a port number.  Currently, this accepts any integer and presents a tab completion suggestion of `<port>`. */
-  lazy val Port = token(IntBasic, "<port>")
+  lazy val Port: Parser[Int] = token(IntBasic, "<port>")
 
   /** Parses a signed integer. */
-  lazy val IntBasic = mapOrFail('-'.? ~ Digit.+)(Function.tupled(toInt))
+  lazy val IntBasic: Parser[Int] = mapOrFail('-'.? ~ Digit.+)(Function.tupled(toInt))
 
   /** Parses an unsigned integer. */
-  lazy val NatBasic = mapOrFail(Digit.+)(_.mkString.toInt)
+  lazy val NatBasic: Parser[Int] = mapOrFail(Digit.+)(_.mkString.toInt)
 
   private[this] def toInt(neg: Option[Char], digits: Seq[Char]): Int =
     (neg.toSeq ++ digits).mkString.toInt
 
   /** Parses the lower-case values `true` and `false` into their corresponding Boolean values.  */
-  lazy val Bool = ("true" ^^^ true) | ("false" ^^^ false)
+  lazy val Bool: Parser[Boolean] = ("true" ^^^ true) | ("false" ^^^ false)
 
   /**
    * Parses a potentially quoted String value.  The value may be verbatim quoted ([[StringVerbatim]]),
    * quoted with interpreted escapes ([[StringEscapable]]), or unquoted ([[NotQuoted]]).
    */
-  lazy val StringBasic = StringVerbatim | StringEscapable | NotQuoted
+  lazy val StringBasic: Parser[String] = StringVerbatim | StringEscapable | NotQuoted
 
   /**
    * Parses a verbatim quoted String value, discarding the quotes in the result.  This kind of quoted text starts with triple quotes `"""`
@@ -268,7 +272,9 @@ trait Parsers {
     }
 
   /** Parses an unquoted, non-empty String value that cannot start with a double quote and cannot contain whitespace.*/
-  lazy val NotQuoted = (NotDQuoteSpaceClass ~ OptNotSpace) map { case (c, s) => c.toString + s }
+  lazy val NotQuoted: Parser[String] = (NotDQuoteSpaceClass ~ OptNotSpace) map {
+    case (c, s) => c.toString + s
+  }
 
   /**
    * Applies `rep` zero or more times, separated by `sep`.
@@ -329,13 +335,13 @@ trait Parsers {
   }
 
   /** Applies String.trim to the result of `p`. */
-  def trimmed(p: Parser[String]) = p map { _.trim }
+  def trimmed(p: Parser[String]): Parser[String] = p map { _.trim }
 
   /** Parses a URI that is valid according to the single argument java.net.URI constructor. */
-  lazy val basicUri = mapOrFail(URIClass)(uri => new URI(uri))
+  lazy val basicUri: Parser[URI] = mapOrFail(URIClass)(uri => new URI(uri))
 
   /** Parses a URI that is valid according to the single argument java.net.URI constructor, using `ex` as tab completion examples. */
-  def Uri(ex: Set[URI]) = basicUri examples (ex.map(_.toString))
+  def Uri(ex: Set[URI]): Parser[URI] = basicUri examples (ex.map(_.toString))
 }
 
 /** Provides standard [[Parser]] implementations. */

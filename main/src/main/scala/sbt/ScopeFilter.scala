@@ -7,12 +7,13 @@
 
 package sbt
 
-import sbt.internal.{ Load, LoadedBuildUnit }
-import sbt.internal.util.{ AttributeKey, Dag, Types }
-import sbt.librarymanagement.{ ConfigRef, Configuration }
-import Types.const
-import Def.Initialize
 import java.net.URI
+
+import sbt.Def.Initialize
+import sbt.internal.util.Types.const
+import sbt.internal.util.{ AttributeKey, Dag }
+import sbt.internal.{ Load, LoadedBuildUnit }
+import sbt.librarymanagement.{ ConfigRef, Configuration }
 
 object ScopeFilter {
   type ScopeFilter = Base[Scope]

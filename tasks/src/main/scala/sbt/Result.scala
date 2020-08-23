@@ -28,7 +28,7 @@ final case class Value[+T](value: T) extends Result[T] {
 
 object Result {
   type Id[X] = X
-  val tryValue = λ[Result ~> Id] {
+  val tryValue: Result ~> Id = λ[Result ~> Id] {
     case Value(v) => v
     case Inc(i)   => throw i
   }

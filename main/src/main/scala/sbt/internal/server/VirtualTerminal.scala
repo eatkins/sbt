@@ -9,8 +9,9 @@ package sbt
 package internal
 package server
 
-import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap }
 import java.util.UUID
+import java.util.concurrent.{ ArrayBlockingQueue, ConcurrentHashMap }
+
 import sbt.internal.protocol.{
   JsonRpcNotificationMessage,
   JsonRpcRequestMessage,
@@ -24,21 +25,21 @@ import sbt.protocol.Serialization.{
   terminalPropertiesQuery,
   terminalSetSize,
 }
-import sjsonnew.support.scalajson.unsafe.Converter
+import sbt.protocol.codec.JsonProtocol._
 import sbt.protocol.{
   Attach,
   TerminalAttributesQuery,
   TerminalAttributesResponse,
   TerminalCapabilitiesQuery,
   TerminalCapabilitiesResponse,
-  TerminalPropertiesResponse,
   TerminalGetSizeQuery,
   TerminalGetSizeResponse,
+  TerminalPropertiesResponse,
   TerminalSetAttributesCommand,
-  TerminalSetSizeCommand,
+  TerminalSetSizeCommand
 }
-import sbt.protocol.codec.JsonProtocol._
-import sbt.protocol.TerminalGetSizeResponse
+
+import sjsonnew.support.scalajson.unsafe.Converter
 
 object VirtualTerminal {
   private[this] val pendingTerminalProperties =
@@ -134,7 +135,7 @@ object VirtualTerminal {
     queue
   }
 
-  val handler = ServerHandler { cb =>
+  val handler: ServerHandler = ServerHandler { cb =>
     ServerIntent(requestHandler(cb), responseHandler(cb), notificationHandler(cb))
   }
   type Handler[R] = ServerCallback => PartialFunction[R, Unit]

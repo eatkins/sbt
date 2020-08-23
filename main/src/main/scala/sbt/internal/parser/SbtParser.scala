@@ -9,24 +9,23 @@ package sbt
 package internal
 package parser
 
-import sbt.internal.util.{ LineRange, MessageOnlyException }
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-import sbt.internal.parser.SbtParser._
-
 import scala.compat.Platform.EOL
+import scala.reflect.internal.Positions
 import scala.reflect.internal.util.{ BatchSourceFile, Position }
 import scala.reflect.io.VirtualDirectory
-import scala.reflect.internal.Positions
-import scala.tools.nsc.{ CompilerCommand, Global }
 import scala.tools.nsc.reporters.{ ConsoleReporter, Reporter, StoreReporter }
-import scala.util.Random
-import scala.util.{ Failure, Success }
+import scala.tools.nsc.{ CompilerCommand, Global }
+import scala.util.{ Failure, Random, Success }
+
+import sbt.internal.parser.SbtParser._
+import sbt.internal.util.{ LineRange, MessageOnlyException }
 
 private[sbt] object SbtParser {
   val END_OF_LINE_CHAR = '\n'
-  val END_OF_LINE = String.valueOf(END_OF_LINE_CHAR)
+  val END_OF_LINE: String = String.valueOf(END_OF_LINE_CHAR)
   private[parser] val NOT_FOUND_INDEX = -1
   private[sbt] val FAKE_FILE = new File("fake")
   private[parser] val XML_ERROR = "';' expected but 'val' found."

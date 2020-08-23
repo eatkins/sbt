@@ -7,10 +7,11 @@
 
 package sbt
 
+import scala.reflect.runtime.universe
+import scala.tools.reflect.{ FrontEnd, ToolBoxError }
+
 import org.scalatest
 import org.scalatest.{ TestData, fixture }
-
-import scala.tools.reflect.{ FrontEnd, ToolBoxError }
 
 class IllegalReferenceSpec extends fixture.FunSuite with fixture.TestDataFixture {
   private def toolboxClasspath(td: TestData): String =
@@ -48,7 +49,8 @@ class IllegalReferenceSpec extends fixture.FunSuite with fixture.TestDataFixture
     }
 
     import scala.tools.reflect.ToolBox
-    val toolbox = m.mkToolBox(frontEnd, options = s"-cp ${toolboxClasspath(td)}")
+    val toolbox: ToolBox[universe.type] =
+      m.mkToolBox(frontEnd, options = s"-cp ${toolboxClasspath(td)}")
     def eval(code: String): Any = toolbox.eval(toolbox.parse(code))
     def infos: List[FrontEnd#Info] = _infos
   }

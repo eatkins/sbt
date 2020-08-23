@@ -11,15 +11,15 @@ import java.io.File
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicBoolean
 
-import sbt.BasicCommandStrings.{ Cancel, TerminateAction, Shutdown }
+import scala.annotation.tailrec
+
+import sbt.BasicCommandStrings.{ Cancel, Shutdown, TerminateAction }
 import sbt.BasicKeys.{ historyPath, terminalShellPrompt }
 import sbt.State
 import sbt.internal.CommandChannel
 import sbt.internal.util.ConsoleAppender.{ ClearPromptLine, ClearScreenAfterCursor, DeleteLine }
 import sbt.internal.util._
 import sbt.internal.util.complete.{ Parser }
-
-import scala.annotation.tailrec
 
 private[sbt] trait UITask extends Runnable with AutoCloseable {
   private[sbt] val channel: CommandChannel

@@ -10,10 +10,11 @@ package internal
 
 import java.io.File
 import java.net.URI
-import BuildLoader._
+
+import sbt.internal.BuildLoader._
 import sbt.internal.util.Types.{ const, idFun }
-import sbt.util.Logger
 import sbt.librarymanagement.ModuleID
+import sbt.util.Logger
 
 private[internal] object Alternatives {
   private[internal] implicit class Alternative[A, B](val f: A => Option[B]) {
@@ -101,7 +102,7 @@ object BuildLoader {
   def resolve(r: Resolver): Components = components(resolver = r)
   def build(b: Builder): Components = components(builder = b)
   def full(f: Loader): Components = components(full = f)
-  def transformAll(t: TransformAll) = components(transformAll = t)
+  def transformAll(t: TransformAll): Components = components(transformAll = t)
   def components(
       resolver: Resolver = const(None),
       builder: Builder = const(None),

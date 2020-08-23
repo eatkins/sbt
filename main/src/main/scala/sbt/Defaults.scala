@@ -9,16 +9,15 @@ package sbt
 
 import java.io.{ File, PrintWriter }
 import java.net.{ URI, URL }
-import java.nio.file.{ Paths, Path => NioPath }
+import java.nio.file.{ Path => NioPath, Paths }
 import java.util.Optional
 import java.util.concurrent.TimeUnit
 
-import lmcoursier.CoursierDependencyResolution
-import lmcoursier.definitions.{ Configuration => CConfiguration }
-import org.apache.ivy.core.module.descriptor.ModuleDescriptor
-import org.apache.ivy.core.module.id.ModuleRevisionId
-import org.apache.logging.log4j.core.{ Appender => XAppender }
-import org.scalasbt.ipcsocket.Win32SecurityLevel
+import scala.collection.immutable.ListMap
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.xml.NodeSeq
+
 import sbt.Def.{ Initialize, ScopedKey, Setting, SettingsDefinition }
 import sbt.Keys._
 import sbt.Project.{
@@ -31,13 +30,25 @@ import sbt.Project.{
   sbtRichTaskPromise,
 }
 import sbt.Scope.{ GlobalScope, ThisScope, fillTaskAxis }
+import sbt.SlashSyntax0._
 import sbt.coursierint._
 import sbt.internal.CommandStrings.ExportStream
 import sbt.internal._
 import sbt.internal.classpath.{ AlternativeZincUtil, ClassLoaderCache }
 import sbt.internal.inc.JavaInterfaceUtil._
 import sbt.internal.inc.classpath.{ ClasspathFilter, ClasspathUtil }
-import sbt.internal.inc.{ CompileOutput, MappedFileConverter, Stamps, ZincLmUtil, ZincUtil }
+import sbt.internal.inc.{
+  Analysis,
+  AnalyzingCompiler,
+  CompileOutput,
+  ManagedLoggedReporter,
+  MappedFileConverter,
+  MixedAnalyzingCompiler,
+  ScalaInstance,
+  Stamps,
+  ZincLmUtil,
+  ZincUtil
+}
 import sbt.internal.io.{ Source, WatchState }
 import sbt.internal.librarymanagement.mavenint.{
   PomExtraDependencyAttributes,
@@ -75,34 +86,24 @@ import sbt.librarymanagement.CrossVersion.{ binarySbtVersion, binaryScalaVersion
 import sbt.librarymanagement._
 import sbt.librarymanagement.ivy._
 import sbt.librarymanagement.syntax._
-import sbt.nio.FileStamp
 import sbt.nio.Keys._
 import sbt.nio.file.syntax._
 import sbt.nio.file.{ FileTreeView, Glob, RecursiveGlob }
-import sbt.nio.Watch
+import sbt.nio.{ FileStamp, Watch }
 import sbt.std.TaskExtra._
 import sbt.testing.{ AnnotatedFingerprint, Framework, Runner, SubclassFingerprint }
 import sbt.util.CacheImplicits._
-import sbt.util.InterfaceUtil.{ toJavaFunction => f1, t2 }
+import sbt.util.InterfaceUtil.{ t2, toJavaFunction => f1 }
 import sbt.util._
+
+import lmcoursier.CoursierDependencyResolution
+import lmcoursier.definitions.{ Configuration => CConfiguration }
+import org.apache.ivy.core.module.descriptor.ModuleDescriptor
+import org.apache.ivy.core.module.id.ModuleRevisionId
+import org.apache.logging.log4j.core.{ Appender => XAppender }
+import org.scalasbt.ipcsocket.Win32SecurityLevel
 import sjsonnew._
 import sjsonnew.support.scalajson.unsafe.Converter
-
-import scala.collection.immutable.ListMap
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import scala.xml.NodeSeq
-
-// incremental compiler
-import sbt.SlashSyntax0._
-import sbt.internal.inc.{
-  Analysis,
-  AnalyzingCompiler,
-  ManagedLoggedReporter,
-  MixedAnalyzingCompiler,
-  ScalaInstance
-}
-import xsbti.{ CrossValue, VirtualFile, VirtualFileRef }
 import xsbti.compile.{
   AnalysisContents,
   ClassFileManagerType,
@@ -110,8 +111,8 @@ import xsbti.compile.{
   CompileAnalysis,
   CompileOptions,
   CompileOrder,
-  CompileResult,
   CompileProgress,
+  CompileResult,
   CompilerCache,
   Compilers,
   DefinesClass,
@@ -124,6 +125,7 @@ import xsbti.compile.{
   Setup,
   TransactionalManagerType
 }
+import xsbti.{ CrossValue, VirtualFile, VirtualFileRef }
 
 object Defaults extends BuildCommon {
   final val CacheDirectoryName = "cache"

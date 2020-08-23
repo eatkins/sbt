@@ -7,11 +7,12 @@
 
 package sbt.test
 
-import org.scalacheck.{ Test => _, _ }, Arbitrary.arbitrary, Gen._
-
 import java.io.File
+
+import sbt.ConfigKey
+import sbt.internal.util.{ AttributeKey, AttributeMap }
 import sbt.io.IO
-import sbt.{ Scope, ScopeAxis, Scoped, Select, This, Zero }
+import sbt.librarymanagement.syntax._
 import sbt.{
   BuildRef,
   LocalProject,
@@ -22,10 +23,12 @@ import sbt.{
   ThisBuild,
   ThisProject
 }
-import sbt.ConfigKey
-import sbt.librarymanagement.syntax._
 import sbt.{ InputKey, SettingKey, TaskKey }
-import sbt.internal.util.{ AttributeKey, AttributeMap }
+import sbt.{ Scope, ScopeAxis, Scoped, Select, This, Zero }
+
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen._
+import org.scalacheck.{ Test => _, _ }
 
 object BuildSettingsInstances {
   val genFile: Gen[File] = Gen.oneOf(new File("."), new File("/tmp")) // for now..

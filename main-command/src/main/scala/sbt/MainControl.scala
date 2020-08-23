@@ -32,7 +32,7 @@ final case class ApplicationID(
 ) extends xsbti.ApplicationID {
   def mainComponents = components.toArray
   def classpathExtra = extra.toArray
-  def crossVersioned = crossVersionedValue != xsbti.CrossValue.Disabled
+  def crossVersioned: Boolean = crossVersionedValue != xsbti.CrossValue.Disabled
 }
 object ApplicationID {
   def apply(delegate: xsbti.ApplicationID, newVersion: String): ApplicationID =

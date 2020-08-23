@@ -9,9 +9,10 @@ package sbt.internal
 
 import java.nio.file.{ Path, Paths }
 
-import org.scalatest.FlatSpec
 import sbt.nio.FileStamp
 import sbt.nio.FileStamp.Formats
+
+import org.scalatest.FlatSpec
 import sjsonnew.JsonFormat
 import sjsonnew.support.scalajson.unsafe.Converter
 

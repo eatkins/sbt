@@ -19,6 +19,7 @@ import sbt.nio.Keys._
 import sbt.nio.file._
 import sbt.nio.file.syntax._
 import sbt.util.Level
+
 import sjsonnew.JsonFormat
 
 private[sbt] object Clean {

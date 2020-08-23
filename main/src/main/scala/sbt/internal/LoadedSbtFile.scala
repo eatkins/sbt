@@ -8,8 +8,9 @@
 package sbt
 package internal
 
-import Def.Setting
 import java.io.File
+
+import sbt.Def.Setting
 
 /**
  * Represents the exported contents of a .sbt file.  Currently, that includes the list of settings,

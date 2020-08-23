@@ -8,6 +8,7 @@
 package sbt.internal.util
 
 import sbt.util._
+
 import com.github.ghik.silencer.silent
 
 /** Promotes the simple Logger interface to the full AbstractLogger interface. */

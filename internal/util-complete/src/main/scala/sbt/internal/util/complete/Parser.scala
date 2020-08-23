@@ -8,9 +8,9 @@
 package sbt.internal.util
 package complete
 
-import Parser._
 import sbt.internal.util.Types.{ left, right, some }
 import sbt.internal.util.Util.{ makeList, separate }
+import sbt.internal.util.complete.Parser._
 
 /**
  * A String parser that provides semi-automatic tab completion.

@@ -8,15 +8,16 @@
 package sbt
 package internal
 
-import Def.{ ScopedKey, Setting }
-import sbt.internal.util.{ AttributeKey, AttributeMap, Relation, Settings }
-import sbt.internal.util.Types.{ const, some }
-import sbt.internal.util.complete.Parser
-import sbt.librarymanagement.Configuration
-
 import java.net.URI
 
+import sbt.Def.{ ScopedKey, Setting }
+import sbt.internal.util.Types.{ const, some }
+import sbt.internal.util.complete.Parser
+import sbt.internal.util.{ AttributeKey, AttributeMap, Relation, Settings }
+import sbt.librarymanagement.Configuration
+
 import hedgehog._
+import hedgehog.core.GenT
 import hedgehog.predef.sequence
 
 object TestBuild extends TestBuild
@@ -29,12 +30,12 @@ abstract class TestBuild {
   val MaxDeps = 8
   val KeysPerEnv = 10
 
-  val MaxTasksGen = Range.linear(1, MaxTasks)
-  val MaxProjectsGen = Range.linear(1, MaxProjects)
-  val MaxConfigsGen = Range.linear(1, MaxConfigs)
-  val MaxBuildsGen = Range.linear(1, MaxBuilds)
-  val MaxDepsGen = Range.linear(0, MaxDeps)
-  val MaxIDSizeGen = Range.linear(0, MaxIDSize)
+  val MaxTasksGen: Range[Int] = Range.linear(1, MaxTasks)
+  val MaxProjectsGen: Range[Int] = Range.linear(1, MaxProjects)
+  val MaxConfigsGen: Range[Int] = Range.linear(1, MaxConfigs)
+  val MaxBuildsGen: Range[Int] = Range.linear(1, MaxBuilds)
+  val MaxDepsGen: Range[Int] = Range.linear(0, MaxDeps)
+  val MaxIDSizeGen: Range[Int] = Range.linear(0, MaxIDSize)
 
   def alphaLowerChar: Gen[Char] = Gen.char('a', 'z')
   def alphaUpperChar: Gen[Char] = Gen.char('A', 'Z')
@@ -42,17 +43,18 @@ abstract class TestBuild {
   def alphaNumChar: Gen[Char] =
     Gen.frequency1(8 -> alphaLowerChar, 1 -> alphaUpperChar, 1 -> numChar)
 
-  val nonEmptyId = for {
+  val nonEmptyId: GenT[String] = for {
     c <- alphaLowerChar
     cs <- Gen.list(alphaNumChar, MaxIDSizeGen)
   } yield (c :: cs).mkString
 
-  def cGen = genConfigs(nonEmptyId map { _.capitalize }, MaxDepsGen, MaxConfigsGen)
-  def tGen = genTasks(kebabIdGen, MaxDepsGen, MaxTasksGen)
+  def cGen: Gen[Vector[Configuration]] =
+    genConfigs(nonEmptyId map { _.capitalize }, MaxDepsGen, MaxConfigsGen)
+  def tGen: Gen[Vector[Taskk]] = genTasks(kebabIdGen, MaxDepsGen, MaxTasksGen)
 
   class TestKeys(val env: Env, val scopes: Seq[Scope]) {
-    override def toString = env + "\n" + scopes.mkString("Scopes:\n\t", "\n\t", "")
-    lazy val delegated = scopes map env.delegates
+    override def toString: String = env + "\n" + scopes.mkString("Scopes:\n\t", "\n\t", "")
+    lazy val delegated: Seq[Seq[Scope]] = scopes map env.delegates
   }
 
   sealed case class Structure(
@@ -62,7 +64,7 @@ abstract class TestBuild {
       keyIndex: KeyIndex,
       keyMap: Map[String, AttributeKey[_]]
   ) {
-    override def toString =
+    override def toString: String =
       env.toString + "\n" + "current: " + current + "\nSettings:\n\t" + showData + keyMap.keys
         .mkString("All keys:\n\t", ", ", "")
     def showKeys(map: AttributeMap): String = map.keys.mkString("\n\t   ", ",", "\n")
@@ -126,26 +128,27 @@ abstract class TestBuild {
     }
   }
   case class Env(builds: Vector[Build], tasks: Vector[Taskk]) {
-    override def toString =
+    override def toString: String =
       "Env:\n  " + "  Tasks:\n    " + tasks.mkString("\n    ") + "\n" + builds.mkString("\n  ")
     val root = builds.head
-    val buildMap = mapBy(builds)(_.uri)
-    val taskMap = mapBy(tasks)(getKey)
-    def project(ref: ProjectRef) = buildMap(ref.build).projectMap(ref.project)
-    def projectFor(ref: ResolvedReference) = ref match {
+    val buildMap: Map[URI, Build] = mapBy(builds)(_.uri)
+    val taskMap: Map[AttributeKey[_], Taskk] = mapBy(tasks)(getKey)
+    def project(ref: ProjectRef): Proj = buildMap(ref.build).projectMap(ref.project)
+    def projectFor(ref: ResolvedReference): Proj = ref match {
       case pr: ProjectRef => project(pr); case BuildRef(uri) => buildMap(uri).root
     }
 
-    lazy val allProjects = builds.flatMap(_.allProjects)
+    lazy val allProjects: Vector[(ProjectRef, Proj)] = builds.flatMap(_.allProjects)
     def rootProject(uri: URI): String = buildMap(uri).root.id
-    def inheritConfig(ref: ResolvedReference, config: ConfigKey) =
+    def inheritConfig(ref: ResolvedReference, config: ConfigKey): Vector[ConfigKey] =
       projectFor(ref).confMap(config.name).extendsConfigs map toConfigKey
-    def inheritTask(task: AttributeKey[_]) = taskMap.get(task) match {
+    def inheritTask(task: AttributeKey[_]): Vector[AttributeKey[_]] = taskMap.get(task) match {
       case None    => Vector()
       case Some(t) => t.delegates.toVector map getKey
     }
-    def inheritProject(ref: ProjectRef) = project(ref).delegates.toVector
-    def resolve(ref: Reference) = Scope.resolveReference(root.uri, rootProject, ref)
+    def inheritProject(ref: ProjectRef): Vector[ProjectRef] = project(ref).delegates.toVector
+    def resolve(ref: Reference): ResolvedReference =
+      Scope.resolveReference(root.uri, rootProject, ref)
     lazy val delegates: Scope => Seq[Scope] =
       Scope.delegates(
         allProjects,
@@ -166,26 +169,27 @@ abstract class TestBuild {
   def getKey: Taskk => AttributeKey[_] = _.key
   def toConfigKey: Configuration => ConfigKey = c => ConfigKey(c.name)
   case class Build(uri: URI, projects: Seq[Proj]) {
-    override def toString = "Build " + uri.toString + " :\n    " + projects.mkString("\n    ")
-    val allProjects = projects map { p =>
+    override def toString: String =
+      "Build " + uri.toString + " :\n    " + projects.mkString("\n    ")
+    val allProjects: Seq[(ProjectRef, Proj)] = projects map { p =>
       (ProjectRef(uri, p.id), p)
     }
     val root = projects.head
-    val projectMap = mapBy(projects)(_.id)
+    val projectMap: Map[String, Proj] = mapBy(projects)(_.id)
   }
   case class Proj(
       id: String,
       delegates: Seq[ProjectRef],
       configurations: Seq[Configuration]
   ) {
-    override def toString =
+    override def toString: String =
       "Project " + id + "\n      Delegates:\n        " + delegates.mkString("\n        ") +
         "\n      Configurations:\n        " + configurations.mkString("\n        ")
-    val confMap = mapBy(configurations)(_.name)
+    val confMap: Map[String, Configuration] = mapBy(configurations)(_.name)
   }
 
   case class Taskk(key: AttributeKey[String], delegates: Seq[Taskk]) {
-    override def toString =
+    override def toString: String =
       key.label + " (delegates: " + delegates.map(_.key.label).mkString(", ") + ")"
   }
 
@@ -275,7 +279,7 @@ abstract class TestBuild {
 
   val optIDGen: Gen[Option[String]] = Gen.choice1(nonEmptyId.map(some.fn), Gen.constant(None))
 
-  val pathGen = for {
+  val pathGen: GenT[String] = for {
     c <- alphaLowerChar
     cs <- Gen.list(alphaNumChar, Range.linear(6, MaxIDSize))
   } yield (c :: cs).mkString

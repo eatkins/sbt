@@ -9,82 +9,85 @@ package sbt
 
 import java.io.File
 
-import com.github.ghik.silencer.silent
-import sbt.internal.inc.classpath.{ ClassLoaderCache => IncClassLoaderCache }
+import scala.concurrent.duration.FiniteDuration
+
 import sbt.internal.classpath.ClassLoaderCache
+import sbt.internal.inc.classpath.{ ClassLoaderCache => IncClassLoaderCache }
 import sbt.internal.server.ServerHandler
 import sbt.internal.util.{ AttributeKey, Terminal }
 import sbt.librarymanagement.ModuleID
 import sbt.util.Level
-import scala.concurrent.duration.FiniteDuration
+
+import com.github.ghik.silencer.silent
 
 object BasicKeys {
-  val historyPath = AttributeKey[Option[File]](
+  val historyPath: AttributeKey[Option[File]] = AttributeKey[Option[File]](
     "history",
     "The location where command line history is persisted.",
     40
   )
 
-  val extraMetaSbtFiles = AttributeKey[Seq[File]](
+  val extraMetaSbtFiles: AttributeKey[Seq[File]] = AttributeKey[Seq[File]](
     "extraMetaSbtFile",
     "Additional plugin.sbt files.",
     10000
   )
 
-  val shellPrompt = AttributeKey[State => String](
+  val shellPrompt: AttributeKey[State => String] = AttributeKey[State => String](
     "shell-prompt",
     "The function that constructs the command prompt from the current build state.",
     10000
   )
-  val terminalShellPrompt = AttributeKey[(Terminal, State) => String](
-    "new-shell-prompt",
-    "The function that constructs the command prompt from the current build state for a given terminal.",
-    10000
-  )
-  @silent val watch =
+  val terminalShellPrompt: AttributeKey[(Terminal, State) => String] =
+    AttributeKey[(Terminal, State) => String](
+      "new-shell-prompt",
+      "The function that constructs the command prompt from the current build state for a given terminal.",
+      10000
+    )
+  @silent val watch: AttributeKey[Watched] =
     AttributeKey[Watched]("watched", "Continuous execution configuration.", 1000)
-  val serverPort =
+  val serverPort: AttributeKey[Int] =
     AttributeKey[Int]("server-port", "The port number used by server command.", 10000)
 
-  val serverHost =
+  val serverHost: AttributeKey[String] =
     AttributeKey[String]("serverHost", "The host used by server command.", 10000)
 
-  val serverAuthentication =
+  val serverAuthentication: AttributeKey[Set[ServerAuthentication]] =
     AttributeKey[Set[ServerAuthentication]](
       "serverAuthentication",
       "Method of authenticating server command.",
       10000
     )
 
-  val serverConnectionType =
+  val serverConnectionType: AttributeKey[ConnectionType] =
     AttributeKey[ConnectionType](
       "serverConnectionType",
       "The wire protocol for the server command.",
       10000
     )
 
-  val fullServerHandlers =
+  val fullServerHandlers: AttributeKey[Seq[ServerHandler]] =
     AttributeKey[Seq[ServerHandler]](
       "fullServerHandlers",
       "Combines default server handlers and user-defined handlers.",
       10000
     )
 
-  val autoStartServer =
+  val autoStartServer: AttributeKey[Boolean] =
     AttributeKey[Boolean](
       "autoStartServer",
       "If true, the sbt server will startup automatically during interactive sessions.",
       10000
     )
 
-  val windowsServerSecurityLevel =
+  val windowsServerSecurityLevel: AttributeKey[Int] =
     AttributeKey[Int](
       "windowsServerSecurityLevel",
       "Configures the security level of the named pipe. Values: 0 - No security; 1 - Logon user only; 2 - Process owner only",
       10000
     )
 
-  val serverIdleTimeout =
+  val serverIdleTimeout: AttributeKey[Option[FiniteDuration]] =
     AttributeKey[Option[FiniteDuration]](
       "serverIdleTimeOut",
       "If set to a defined value, sbt server will exit if it goes at least the specified duration without receiving any commands.",

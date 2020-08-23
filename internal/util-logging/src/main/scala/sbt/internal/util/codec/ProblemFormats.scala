@@ -7,9 +7,10 @@
 
 package sbt.internal.util.codec
 
-import xsbti.{ Problem, Severity, Position }
-import _root_.sjsonnew.{ deserializationError, Builder, JsonFormat, Unbuilder }
 import java.util.Optional
+
+import _root_.sjsonnew.{ Builder, JsonFormat, Unbuilder, deserializationError }
+import xsbti.{ Position, Problem, Severity }
 
 trait ProblemFormats { self: SeverityFormats with PositionFormats with sjsonnew.BasicJsonProtocol =>
   implicit lazy val ProblemFormat: JsonFormat[Problem] = new JsonFormat[Problem] {

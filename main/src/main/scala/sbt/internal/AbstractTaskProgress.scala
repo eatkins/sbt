@@ -10,9 +10,10 @@ package internal
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.collection.immutable.VectorBuilder
+import scala.collection.mutable
 import scala.concurrent.duration._
 
 private[sbt] abstract class AbstractTaskExecuteProgress extends ExecuteProgress[Task] {

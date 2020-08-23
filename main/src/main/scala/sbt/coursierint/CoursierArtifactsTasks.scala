@@ -8,6 +8,9 @@
 package sbt
 package coursierint
 
+import sbt.Keys._
+import sbt.librarymanagement._
+
 import lmcoursier.definitions.{
   Classifier => CClassifier,
   Configuration => CConfiguration,
@@ -15,8 +18,6 @@ import lmcoursier.definitions.{
   Publication => CPublication,
   Type => CType
 }
-import sbt.librarymanagement._
-import sbt.Keys._
 
 object CoursierArtifactsTasks {
   def coursierPublicationsTask(

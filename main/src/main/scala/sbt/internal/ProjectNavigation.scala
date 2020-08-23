@@ -9,10 +9,13 @@ package sbt
 package internal
 
 import java.net.URI
-import sbt.internal.util.complete, complete.{ DefaultParsers, Parser }, DefaultParsers._
+
+import sbt.Keys.sessionSettings
+import sbt.Project.updateCurrent
 import sbt.compiler.Eval
-import Keys.sessionSettings
-import Project.updateCurrent
+import sbt.internal.util.complete
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.Parser
 
 object ProjectNavigation {
   def command(s: State): Parser[() => State] =
@@ -68,7 +71,7 @@ final class ProjectNavigation(s: State) {
     success(None) | some(token(Space) ~> (root | reference))
   }
 
-  def rootRef = ProjectRef(currentRef.build, getRoot(currentRef.build))
+  def rootRef: ProjectRef = ProjectRef(currentRef.build, getRoot(currentRef.build))
 
   val command: Parser[() => State] = Command.applyEffect(parser)(apply)
 }

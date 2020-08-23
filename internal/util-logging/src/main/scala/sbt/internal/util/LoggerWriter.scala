@@ -24,7 +24,7 @@ class LoggerWriter(
   private[this] val buffer = new StringBuilder
   private[this] val lines = new collection.mutable.ListBuffer[String]
 
-  override def close() = flush()
+  override def close(): Unit = flush()
 
   override def flush(): Unit =
     synchronized {

@@ -11,10 +11,9 @@ import java.io.File
 import java.util.regex.{ Pattern, PatternSyntaxException }
 
 import sbt.internal.util.AttributeKey
-import sbt.internal.util.complete.Parser
-import sbt.internal.util.complete.DefaultParsers._
 import sbt.internal.util.Util.nilSeq
-
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.Parser
 import sbt.io.IO
 import sbt.io.syntax._
 
@@ -90,7 +89,7 @@ object CommandUtil {
   def layoutDetails(details: Map[String, String]): String =
     details.map { case (k, v) => k + "\n\n  " + v } mkString ("\n", "\n\n", "\n")
 
-  final val HelpPatternFlags = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+  final val HelpPatternFlags: Int = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
 
   private[sbt] def isSbtBuild(baseDir: File) =
     (baseDir / "project").exists() || (baseDir * "*.sbt").get.nonEmpty

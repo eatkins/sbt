@@ -11,20 +11,20 @@ import java.io.File
 import java.net.{ URL, URLClassLoader }
 import java.util.concurrent.Callable
 
-import sbt.internal.classpath.ClassLoaderCache
-import sbt.internal.inc.classpath.{ ClassLoaderCache => IncClassLoaderCache }
-import sbt.internal.util.complete.{ HistoryCommands, Parser }
-import sbt.internal.util._
-import sbt.util.Logger
-import BasicCommandStrings.{
+import sbt.BasicCommandStrings.{
   CompleteExec,
   MapExec,
   PopOnFailure,
   ReportResult,
   StartServer,
   StashOnFailure,
-  networkExecPrefix,
+  networkExecPrefix
 }
+import sbt.internal.classpath.ClassLoaderCache
+import sbt.internal.inc.classpath.{ ClassLoaderCache => IncClassLoaderCache }
+import sbt.internal.util._
+import sbt.internal.util.complete.{ HistoryCommands, Parser }
+import sbt.util.Logger
 
 /**
  * Data structure representing all command execution information.
@@ -78,7 +78,7 @@ private[sbt] final case class SafeState(
 )
 
 private[sbt] object SafeState {
-  def apply(s: State) = {
+  def apply(s: State): SafeState = {
     new SafeState(
       currentExecId = s.currentCommand.map(_.execId).flatten,
       combinedParser = s.combinedParser
@@ -87,9 +87,9 @@ private[sbt] object SafeState {
 }
 
 trait Identity {
-  override final def hashCode = super.hashCode
-  override final def equals(a: Any) = super.equals(a)
-  override final def toString = super.toString
+  override final def hashCode: Int = super.hashCode
+  override final def equals(a: Any): Boolean = super.equals(a)
+  override final def toString: String = super.toString
 }
 
 /** Convenience methods for State transformations and operations. */
@@ -332,8 +332,8 @@ object State {
       s.copy(definedCommands = (s.definedCommands ++ newCommands).distinct)
     def +(newCommand: Command): State = this ++ (newCommand :: Nil)
     def baseDir: File = s.configuration.baseDirectory
-    def setNext(n: Next) = s.copy(next = n)
-    def continue = setNext(Continue)
+    def setNext(n: Next): State = s.copy(next = n)
+    def continue: State = setNext(Continue)
 
     /** Implementation of reboot. */
     def reboot(full: Boolean): State = reboot(full, false)
@@ -351,18 +351,19 @@ object State {
       else throw new xsbti.FullReload(fullRemaining.toArray, full)
     }
 
-    def reload = runExitHooks().setNext(new Return(defaultReload(s)))
-    def clearGlobalLog = setNext(ClearGlobalLog)
-    def keepLastLog = setNext(KeepLastLog)
-    def exit(ok: Boolean) = runExitHooks().setNext(new Return(Exit(if (ok) 0 else 1)))
-    def get[T](key: AttributeKey[T]) = s.attributes get key
-    def put[T](key: AttributeKey[T], value: T) = s.copy(attributes = s.attributes.put(key, value))
+    def reload: State = runExitHooks().setNext(new Return(defaultReload(s)))
+    def clearGlobalLog: State = setNext(ClearGlobalLog)
+    def keepLastLog: State = setNext(KeepLastLog)
+    def exit(ok: Boolean): State = runExitHooks().setNext(new Return(Exit(if (ok) 0 else 1)))
+    def get[T](key: AttributeKey[T]): Option[T] = s.attributes get key
+    def put[T](key: AttributeKey[T], value: T): State =
+      s.copy(attributes = s.attributes.put(key, value))
     def update[T](key: AttributeKey[T])(f: Option[T] => T): State = put(key, f(get(key)))
-    def has(key: AttributeKey[_]) = s.attributes contains key
-    def remove(key: AttributeKey[_]) = s.copy(attributes = s.attributes remove key)
+    def has(key: AttributeKey[_]): Boolean = s.attributes contains key
+    def remove(key: AttributeKey[_]): State = s.copy(attributes = s.attributes remove key)
     def log = s.globalLogging.full
     def handleError(t: Throwable): State = handleException(t, s, log)
-    def fail = {
+    def fail: State = {
       val remaining = s.remainingCommands.dropWhile(c => c.commandLine != FailureWall)
       if (remaining.isEmpty)
         applyOnFailure(s, Nil, exit(ok = false))
@@ -386,8 +387,8 @@ object State {
         def call = t
       })
 
-    def interactive = getBoolean(s, BasicKeys.interactive, false)
-    def setInteractive(i: Boolean) = s.put(BasicKeys.interactive, i)
+    def interactive: Boolean = getBoolean(s, BasicKeys.interactive, false)
+    def setInteractive(i: Boolean): State = s.put(BasicKeys.interactive, i)
 
     def classLoaderCache: IncClassLoaderCache =
       s get BasicKeys.classLoaderCache getOrElse (throw new IllegalStateException(

@@ -9,12 +9,12 @@ package sbt
 
 import java.io.File.pathSeparator
 
-import sbt.internal.scriptedtest.ScriptedLauncher
-import sbt.util.LoggerContext
-
 import scala.annotation.tailrec
 import scala.sys.process.Process
+
 import sbt.internal.SysProp
+import sbt.internal.scriptedtest.ScriptedLauncher
+import sbt.util.LoggerContext
 
 object RunFromSourceMain {
   def fork(

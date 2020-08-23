@@ -8,9 +8,11 @@
 package sbt
 
 import org.specs2.Specification
+import org.specs2.matcher.MatchResult
+import org.specs2.specification.core.SpecStructure
 
 class ProjectSpec extends Specification {
-  def is = s2"""
+  def is: SpecStructure = s2"""
 
   This is a specification to check utility methods on the Project object
 
@@ -21,6 +23,6 @@ class ProjectSpec extends Specification {
 
   def emptyFilename = ""
 
-  def normalizeEmptyFileName =
+  def normalizeEmptyFileName: MatchResult[Either[String, String]] =
     Project.normalizeProjectID(emptyFilename) must equalTo(Right("root"))
 }

@@ -7,7 +7,7 @@
 
 package sbt.internal.util
 
-import Types._
+import sbt.internal.util.Types._
 
 /**
  * A minimal heterogeneous list type.  For background, see
@@ -30,7 +30,7 @@ final case class HCons[H, T <: HList](head: H, tail: T) extends HList {
   type Wrap[M[_]] = M[H] :+: T#Wrap[M]
   def :+:[G](g: G): G :+: H :+: T = HCons(g, this)
 
-  override def toString = head + " :+: " + tail.toString
+  override def toString: String = head + " :+: " + tail.toString
 }
 
 object HList {

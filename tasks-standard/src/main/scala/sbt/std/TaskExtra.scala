@@ -8,11 +8,12 @@
 package sbt
 package std
 
-import scala.sys.process.{ BasicIO, ProcessIO, ProcessBuilder }
-
-import sbt.internal.util.{ AList, AttributeMap }
-import sbt.internal.util.Types._
 import java.io.{ BufferedInputStream, BufferedReader, File, InputStream }
+
+import scala.sys.process.{ BasicIO, ProcessBuilder, ProcessIO }
+
+import sbt.internal.util.Types._
+import sbt.internal.util.{ AList, AttributeMap }
 import sbt.io.IO
 
 sealed trait MultiInTask[K[L[x]]] {

@@ -40,11 +40,11 @@ object KeyRanks {
 
   final val MainTaskCutoff = AMinusTask
   final val MainSettingCutoff = AMinusSetting
-  final val MainCutoff = math.max(AMinusTask, AMinusSetting)
+  final val MainCutoff: Int = math.max(AMinusTask, AMinusSetting)
 
-  final val DefaultTaskRank = (ATask + BTask) / 2
+  final val DefaultTaskRank: Int = (ATask + BTask) / 2
   final val DefaultInputRank = ATask // input tasks are likely a main task
-  final val DefaultSettingRank = (ASetting + BSetting) / 2
+  final val DefaultSettingRank: Int = (ASetting + BSetting) / 2
 
   // implementation details
   val Invisible = Int.MaxValue

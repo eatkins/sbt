@@ -8,8 +8,8 @@
 package sbt.internal.util
 package complete
 
-import DefaultParsers._
-import TypeString._
+import sbt.internal.util.complete.DefaultParsers._
+import sbt.internal.util.complete.TypeString._
 
 /**
  * Basic representation of types parsed from Manifest.toString.
@@ -17,7 +17,7 @@ import TypeString._
  * All other types are represented by a TypeString with an empty `args`.
  */
 private[sbt] final class TypeString(val base: String, val args: List[TypeString]) {
-  override def toString =
+  override def toString: String =
     if (base.startsWith(FunctionName))
       args.dropRight(1).mkString("(", ",", ")") + " => " + args.last
     else if (base.startsWith(TupleName))
@@ -66,9 +66,9 @@ private[sbt] object TypeString {
   final val ScalaPrefix = "scala."
   final val JavaPrefix = "java.lang."
   /* scala.collection.X -> X */
-  val ShortenCollection = Set("Seq", "List", "Set", "Map", "Iterable")
+  val ShortenCollection: Set[String] = Set("Seq", "List", "Set", "Map", "Iterable")
 
-  val TypeMap = Map(
+  val TypeMap: Map[String, String] = Map(
     "java.io.File" -> "File",
     "java.net.URL" -> "URL",
     "java.net.URI" -> "URI"

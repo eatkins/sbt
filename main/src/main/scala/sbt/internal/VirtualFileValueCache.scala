@@ -9,11 +9,12 @@ package sbt
 package internal
 
 import java.util.concurrent.ConcurrentHashMap
-import sbt.internal.inc.Stamper
-import xsbti.{ FileConverter, VirtualFile, VirtualFileRef }
+
+import sbt.internal.inc.{ Locate, Stamper }
+
 import xsbti.compile.DefinesClass
 import xsbti.compile.analysis.{ Stamp => XStamp }
-import sbt.internal.inc.Locate
+import xsbti.{ FileConverter, VirtualFile, VirtualFileRef }
 
 /**
  * Cache based on path and its stamp.
@@ -52,7 +53,7 @@ private[this] final class VirtualFileValueCache0[A](
   private[this] val backing = new ConcurrentHashMap[VirtualFile, VirtualFileCache]
 
   def clear(): Unit = backing.clear()
-  def get = file => {
+  def get: VirtualFile => A = file => {
     val ifAbsent = new VirtualFileCache(file)
     val cache = backing.putIfAbsent(file, ifAbsent)
     (if (cache eq null) ifAbsent else cache).get()

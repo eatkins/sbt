@@ -8,21 +8,16 @@
 package sbt
 package internal
 
-import sbt.librarymanagement.{
-  Configuration,
-  Configurations,
-  ModuleID,
-  Resolver,
-  SbtArtifacts,
-  UpdateReport
-}
-import sbt.internal.util.Attributed
-import Def.{ ScopedKey, Setting }
-import Keys._
-import Configurations.{ Compile, Runtime }
 import java.io.File
-import org.apache.ivy.core.module.{ descriptor, id }
-import descriptor.ModuleDescriptor, id.ModuleRevisionId
+
+import sbt.Def.{ ScopedKey, Setting }
+import sbt.Keys._
+import sbt.internal.util.Attributed
+import sbt.librarymanagement.Configurations.{ Compile, Runtime }
+import sbt.librarymanagement.{ Configuration, ModuleID, Resolver, SbtArtifacts, UpdateReport }
+
+import org.apache.ivy.core.module.descriptor.ModuleDescriptor
+import org.apache.ivy.core.module.id.ModuleRevisionId
 
 object GlobalPlugin {
   // constructs a sequence of settings that may be appended to a project's settings to
@@ -105,15 +100,16 @@ object GlobalPlugin {
       (newS, processResult2(result))
     }
   }
-  val globalPluginSettings = Project.inScope(Scope.GlobalScope in LocalRootProject)(
-    Seq(
-      organization := SbtArtifacts.Organization,
-      onLoadMessage := Keys.baseDirectory("loading global plugins from " + _).value,
-      name := "global-plugin",
-      sbtPlugin := true,
-      version := "0.0"
+  val globalPluginSettings: Seq[Setting[_]] =
+    Project.inScope(Scope.GlobalScope in LocalRootProject)(
+      Seq(
+        organization := SbtArtifacts.Organization,
+        onLoadMessage := Keys.baseDirectory("loading global plugins from " + _).value,
+        name := "global-plugin",
+        sbtPlugin := true,
+        version := "0.0"
+      )
     )
-  )
 }
 final case class GlobalPluginData(
     projectID: ModuleID,

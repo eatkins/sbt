@@ -8,38 +8,20 @@
 package sbt
 package compiler
 
-import java.io.File
-import java.io.FileNotFoundException
+import java.io.{ File, FileNotFoundException }
 import java.net.URLClassLoader
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 
 import scala.collection.mutable.ListBuffer
-import scala.reflect.internal.util.AbstractFileClassLoader
-import scala.reflect.internal.util.BatchSourceFile
-import scala.tools.nsc.CompilerCommand
-import scala.tools.nsc.Global
-import scala.tools.nsc.Phase
-import scala.tools.nsc.Settings
-import scala.tools.nsc.ast.parser.Tokens.EOF
-import scala.tools.nsc.ast.parser.Tokens.NEWLINE
-import scala.tools.nsc.ast.parser.Tokens.NEWLINES
-import scala.tools.nsc.ast.parser.Tokens.SEMI
-import scala.tools.nsc.io.AbstractFile
-import scala.tools.nsc.io.PlainFile
-import scala.tools.nsc.io.VirtualDirectory
-import scala.tools.nsc.reporters.ConsoleReporter
-import scala.tools.nsc.reporters.Reporter
+import scala.reflect.internal.util.{ AbstractFileClassLoader, BatchSourceFile }
+import scala.tools.nsc.ast.parser.Tokens.{ EOF, NEWLINE, NEWLINES, SEMI }
+import scala.tools.nsc.io.{ AbstractFile, PlainFile, VirtualDirectory }
+import scala.tools.nsc.reporters.{ ConsoleReporter, Reporter }
+import scala.tools.nsc.{ CompilerCommand, Global, Phase, Settings }
 
-import sbt.compiler.Eval.WrapValName
-import sbt.compiler.Eval.getModule
-import sbt.compiler.Eval.getValue
-import sbt.io.DirectoryFilter
-import sbt.io.FileFilter
-import sbt.io.GlobFilter
-import sbt.io.Hash
-import sbt.io.IO
-import sbt.io.Path
+import sbt.compiler.Eval.{ WrapValName, getModule, getValue }
+import sbt.io.{ DirectoryFilter, FileFilter, GlobFilter, Hash, IO, Path }
 
 // TODO: provide a way to cleanup backing directory
 

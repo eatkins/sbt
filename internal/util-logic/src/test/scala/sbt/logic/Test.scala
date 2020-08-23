@@ -8,9 +8,10 @@
 package sbt.internal.util
 package logic
 
+import sbt.internal.util.logic.Logic.{ LogicException, Matched }
+
+import org.scalacheck.Prop.secure
 import org.scalacheck._
-import Prop.secure
-import Logic.{ LogicException, Matched }
 
 object LogicTest extends Properties("Logic") {
   import TestClauses._
@@ -30,7 +31,7 @@ object LogicTest extends Properties("Logic") {
     }
   )
 
-  def expect(result: Either[LogicException, Matched], expected: Set[Atom]) = result match {
+  def expect(result: Either[LogicException, Matched], expected: Set[Atom]): Boolean = result match {
     case Left(_) => false
     case Right(res) =>
       val actual = res.provenSet
@@ -43,15 +44,15 @@ object LogicTest extends Properties("Logic") {
 
 object TestClauses {
 
-  val A = Atom("A")
-  val B = Atom("B")
-  val C = Atom("C")
-  val D = Atom("D")
-  val E = Atom("E")
-  val F = Atom("F")
-  val G = Atom("G")
+  val A: Atom = Atom("A")
+  val B: Atom = Atom("B")
+  val C: Atom = Atom("C")
+  val D: Atom = Atom("D")
+  val E: Atom = Atom("E")
+  val F: Atom = Atom("F")
+  val G: Atom = Atom("G")
 
-  val clauses =
+  val clauses: List[Clause] =
     A.proves(B) ::
       A.proves(F) ::
       B.proves(F) ::
@@ -61,13 +62,13 @@ object TestClauses {
       C.proves(D) ::
       Nil
 
-  val cycles = Logic.reduceAll(clauses, Set())
+  val cycles: Either[LogicException, Matched] = Logic.reduceAll(clauses, Set())
 
-  val badClauses =
+  val badClauses: List[Clause] =
     A.proves(D) ::
       clauses
 
-  val excludedNeg = {
+  val excludedNeg: Either[LogicException, Matched] = {
     val cs =
       (!A).proves(B) ::
         Nil
@@ -78,7 +79,7 @@ object TestClauses {
     Logic.reduceAll(cs, init.toSet)
   }
 
-  val excludedPos = {
+  val excludedPos: Either[LogicException, Matched] = {
     val cs =
       A.proves(B) ::
         Nil
@@ -89,14 +90,14 @@ object TestClauses {
     Logic.reduceAll(cs, init.toSet)
   }
 
-  val trivial = {
+  val trivial: Either[LogicException, Matched] = {
     val cs =
       Formula.True.proves(A) ::
         Nil
     Logic.reduceAll(cs, Set.empty)
   }
 
-  val lessTrivial = {
+  val lessTrivial: Either[LogicException, Matched] = {
     val cs =
       Formula.True.proves(A) ::
         Formula.True.proves(B) ::
@@ -105,7 +106,7 @@ object TestClauses {
     Logic.reduceAll(cs, Set())
   }
 
-  val ordering = {
+  val ordering: Either[LogicException, Matched] = {
     val cs =
       E.proves(F) ::
         (C && !D).proves(E) ::

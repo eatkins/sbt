@@ -7,10 +7,11 @@
 
 package sbt
 
-import org.scalacheck._
-import org.scalacheck.Arbitrary._
-import Prop._
 import sbt.librarymanagement._
+
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Prop._
+import org.scalacheck._
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 
 class CacheIvyTest extends Properties("CacheIvy") {

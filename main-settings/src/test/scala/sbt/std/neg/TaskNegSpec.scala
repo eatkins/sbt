@@ -8,15 +8,18 @@
 package sbt.std.neg
 
 import scala.tools.reflect.ToolBoxError
-import org.scalatest.{ TestData, fixture }
-import sbt.std.{ TaskLinterDSLFeedback, TestUtil }
+
 import sbt.std.TestUtil._
+import sbt.std.{ TaskLinterDSLFeedback, TestUtil }
+
+import org.scalatest.Assertion
+import org.scalatest.{ TestData, fixture }
 
 class TaskNegSpec extends fixture.FunSuite with fixture.TestDataFixture {
   def expectError(
       errorSnippet: String,
       compileOptions: String = "",
-  )(code: String)(implicit td: TestData) = {
+  )(code: String)(implicit td: TestData): Assertion = {
     val errorMessage = intercept[ToolBoxError] {
       val baseCompileOptions = s"-cp ${TestUtil.toolboxClasspath(td)}"
       eval(code, s"$compileOptions $baseCompileOptions")

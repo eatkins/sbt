@@ -9,8 +9,10 @@ package sbt.internal.util
 package complete
 
 import java.io.File
-import org.scalatest.Assertion
+
 import sbt.io.IO
+
+import org.scalatest.Assertion
 
 class FileExamplesTest extends UnitSpec {
 

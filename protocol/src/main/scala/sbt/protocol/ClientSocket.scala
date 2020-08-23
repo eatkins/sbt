@@ -9,14 +9,16 @@ package sbt
 package protocol
 
 import java.io.File
-import java.net.{ Socket, URI, InetAddress }
-import sjsonnew.BasicJsonProtocol
-import sjsonnew.support.scalajson.unsafe.{ Parser, Converter }
-import sjsonnew.shaded.scalajson.ast.unsafe.JValue
-import sbt.internal.protocol.{ PortFile, TokenFile }
+import java.net.{ InetAddress, Socket, URI }
+
 import sbt.internal.protocol.codec.{ PortFileFormats, TokenFileFormats }
+import sbt.internal.protocol.{ PortFile, TokenFile }
 import sbt.internal.util.Util.isWindows
+
 import org.scalasbt.ipcsocket._
+import sjsonnew.BasicJsonProtocol
+import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import sjsonnew.support.scalajson.unsafe.{ Converter, Parser }
 
 object ClientSocket {
   private lazy val fileFormats = new BasicJsonProtocol with PortFileFormats with TokenFileFormats {}

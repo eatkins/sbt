@@ -7,8 +7,9 @@
 
 package sbt
 
-import sbt.util.Logger
 import java.io.OutputStream
+
+import sbt.util.Logger
 
 /** Configures where the standard output and error streams from a forked process go.*/
 sealed abstract class OutputStrategy

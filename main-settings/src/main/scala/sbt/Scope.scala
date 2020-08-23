@@ -9,9 +9,8 @@ package sbt
 
 import java.net.URI
 
-import sbt.internal.util.{ AttributeKey, AttributeMap, Dag }
 import sbt.internal.util.Util._
-
+import sbt.internal.util.{ AttributeKey, AttributeMap, Dag }
 import sbt.io.IO
 
 final case class Scope(
@@ -193,7 +192,7 @@ object Scope {
    * Now whenever the `foo_slash_bar` task specified by sanitizedKey is evaluated, it will display
    * "foo/bar" in super shell progress and in the error message if an error is thrown.
    */
-  val customShowString = AttributeKey[String]("scope-custom-show-string")
+  val customShowString: AttributeKey[String] = AttributeKey[String]("scope-custom-show-string")
 
   /**
    * unified slash style introduced in sbt 1.1.0.
@@ -250,12 +249,12 @@ object Scope {
   ): String =
     project.foldStrict(show, "*/", "./")
 
-  def showProject = (ref: Reference) => Reference.display(ref) + " /"
+  def showProject: Reference => String = (ref: Reference) => Reference.display(ref) + " /"
 
-  def showProject012Style = (ref: Reference) => Reference.display(ref) + "/"
+  def showProject012Style: Reference => String = (ref: Reference) => Reference.display(ref) + "/"
 
   @deprecated("No longer used", "1.1.3")
-  def transformTaskName(s: String) = {
+  def transformTaskName(s: String): String = {
     val parts = s.split("-+")
     (parts.take(1) ++ parts.drop(1).map(_.capitalize)).mkString
   }

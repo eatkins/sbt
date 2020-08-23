@@ -7,15 +7,16 @@
 
 package sbt.util
 
-import scala.util.{ Failure, Try, Success => USuccess }
-
 import java.io.File
+
+import scala.util.{ Failure, Success => USuccess, Try }
+
+import sbt.internal.util.EmptyCacheError
 import sbt.io.IO
 import sbt.io.syntax._
-import sbt.internal.util.EmptyCacheError
 
-import sjsonnew.{ JsonFormat, JsonWriter }
 import sjsonnew.support.murmurhash.Hasher
+import sjsonnew.{ JsonFormat, JsonWriter }
 
 object Tracked {
 
@@ -305,7 +306,7 @@ trait Tracked {
 
 class Timestamp(val store: CacheStore, useStartTime: Boolean)(implicit format: JsonFormat[Long])
     extends Tracked {
-  def clean() = store.delete()
+  def clean(): Unit = store.delete()
 
   /**
    * Reads the previous timestamp, evaluates the provided function,
@@ -326,7 +327,7 @@ class Timestamp(val store: CacheStore, useStartTime: Boolean)(implicit format: J
 
 @deprecated("Use Tracked.inputChanged and Tracked.outputChanged instead", "1.0.1")
 class Changed[O: Equiv: JsonFormat](val store: CacheStore) extends Tracked {
-  def clean() = store.delete()
+  def clean(): Unit = store.delete()
 
   def apply[O2](ifChanged: O => O2, ifUnchanged: O => O2): O => O2 = value => {
     if (uptodate(value))
@@ -358,13 +359,13 @@ object Difference {
    * hash/last modified time of the files as they are after running the function.  This means that this information must be evaluated twice:
    * before and after running the function.
    */
-  val outputs = constructor(true, true)
+  val outputs: (CacheStore, FileInfo.Style) => Difference = constructor(true, true)
 
   /**
    * Provides a constructor for a Difference that does nothing on a call to 'clean' and saves the
    * hash/last modified time of the files as they were prior to running the function.
    */
-  val inputs = constructor(false, false)
+  val inputs: (CacheStore, FileInfo.Style) => Difference = constructor(false, false)
 
 }
 
@@ -374,7 +375,7 @@ class Difference(
     val defineClean: Boolean,
     val filesAreOutputs: Boolean
 ) extends Tracked {
-  def clean() = {
+  def clean(): Unit = {
     if (defineClean) IO.delete(raw(cachedFilesInfo)) else ()
     clearCache()
   }

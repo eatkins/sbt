@@ -8,11 +8,13 @@
 package sbt.util
 
 import java.io.{ File, InputStream, OutputStream }
+
 import sbt.io.syntax.fileToRichFile
 import sbt.io.{ IO, Using }
-import sjsonnew.{ IsoString, JsonReader, JsonWriter, SupportConverter }
-import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter, Parser }
+
 import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+import sjsonnew.support.scalajson.unsafe.{ CompactPrinter, Converter, Parser }
+import sjsonnew.{ IsoString, JsonReader, JsonWriter, SupportConverter }
 
 /** A `CacheStore` is used by the caching infrastructure to persist cached information. */
 abstract class CacheStore extends Input with Output {
@@ -72,15 +74,15 @@ class DirectoryStoreFactory[J: IsoString](base: File, converter: SupportConverte
 class FileBasedStore[J: IsoString](file: File, converter: SupportConverter[J]) extends CacheStore {
   IO.touch(file, setModified = false)
 
-  def read[T: JsonReader]() =
+  def read[T: JsonReader](): T =
     Using.fileInputStream(file)(stream => new PlainInput(stream, converter).read())
 
-  def write[T: JsonWriter](value: T) =
+  def write[T: JsonWriter](value: T): Unit =
     Using.fileOutputStream(append = false)(file) { stream =>
       new PlainOutput(stream, converter).write(value)
     }
 
-  def delete() = IO.delete(file)
+  def delete(): Unit = IO.delete(file)
   def close() = ()
 }
 
@@ -90,8 +92,8 @@ class StreamBasedStore[J: IsoString](
     outputStream: OutputStream,
     converter: SupportConverter[J]
 ) extends CacheStore {
-  def read[T: JsonReader]() = new PlainInput(inputStream, converter).read()
-  def write[T: JsonWriter](value: T) = new PlainOutput(outputStream, converter).write(value)
+  def read[T: JsonReader](): T = new PlainInput(inputStream, converter).read()
+  def write[T: JsonWriter](value: T): Unit = new PlainOutput(outputStream, converter).write(value)
   def delete() = ()
-  def close() = { inputStream.close(); outputStream.close() }
+  def close(): Unit = { inputStream.close(); outputStream.close() }
 }

@@ -9,12 +9,14 @@ package sbt
 
 import java.io.File
 import java.nio.channels.ClosedChannelException
+
+import scala.util.Try
+
 import sbt.internal.inc.{ AnalyzingCompiler, MappedFileConverter, PlainVirtualFile }
 import sbt.internal.util.{ DeprecatedJLine, Terminal }
 import sbt.util.Logger
-import xsbti.compile.{ Compilers, Inputs }
 
-import scala.util.Try
+import xsbti.compile.{ Compilers, Inputs }
 
 final class Console(compiler: AnalyzingCompiler) {
 

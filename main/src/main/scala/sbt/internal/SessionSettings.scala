@@ -8,17 +8,15 @@
 package sbt
 package internal
 
-import sbt.internal.util.{ complete, LineRange, RangePosition, Types }
-
 import java.io.File
 import java.net.URI
-import Def.{ ScopedKey, Setting }
-import Types.Endo
-import compiler.Eval
 
-import SessionSettings._
+import sbt.Def.{ ScopedKey, Setting }
+import sbt.compiler.Eval
+import sbt.internal.SessionSettings._
 import sbt.internal.parser.SbtRefactorings
-
+import sbt.internal.util.Types.Endo
+import sbt.internal.util.{ LineRange, RangePosition, complete }
 import sbt.io.IO
 
 /**
@@ -144,7 +142,7 @@ object SessionSettings {
   }
 
   /** Adds `s` to a strings when needed.    Maybe one day we'll care about non-english languages. */
-  def pluralize(size: Int, of: String) = size.toString + (if (size == 1) of else (of + "s"))
+  def pluralize(size: Int, of: String): String = size.toString + (if (size == 1) of else (of + "s"))
 
   /** Checks to see if any session settings are being discarded and issues a warning. */
   def checkSession(newSession: SessionSettings, oldState: State): Unit = {
@@ -255,7 +253,7 @@ object SessionSettings {
     (newWithPos.reverse, other ++ oldShifted)
   }
 
-  def needsTrailingBlank(lines: Seq[String]) =
+  def needsTrailingBlank(lines: Seq[String]): Boolean =
     lines.nonEmpty && !lines.takeRight(1).exists(_.trim.isEmpty)
 
   /** Prints all the user-defined SessionSettings (not raw) to System.out. */
@@ -329,7 +327,7 @@ save, save-all
   import DefaultParsers._
 
   /** Parser for the session command. */
-  lazy val parser =
+  lazy val parser: Parser[SessionCommand] =
     token(Space) ~>
       (token("list-all" ^^^ new Print(true)) | token("list" ^^^ new Print(false)) | token(
         "clear" ^^^ new Clear(false)
@@ -339,9 +337,11 @@ save, save-all
       ) |
         remove)
 
-  lazy val remove = token("remove") ~> token(Space) ~> natSelect.map(ranges => new Remove(ranges))
+  lazy val remove: Parser[Remove] = token("remove") ~> token(Space) ~> natSelect.map(
+    ranges => new Remove(ranges)
+  )
 
-  def natSelect = rep1sep(token(range, "<range>"), ',')
+  def natSelect: Parser[Seq[(Int, Int)]] = rep1sep(token(range, "<range>"), ',')
 
   def range: Parser[(Int, Int)] = (NatBasic ~ ('-' ~> NatBasic).?).map {
     case lo ~ hi => (lo, hi getOrElse lo)

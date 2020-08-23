@@ -7,15 +7,15 @@
 
 package sbt.internal
 
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+
 import sbt.BasicCommandStrings.{ ClearOnFailure, FailureWall }
 import sbt.Watched.ContinuousEventMonitor
 import sbt.internal.io.{ EventMonitor, WatchState }
 import sbt.internal.nio.{ FileEventMonitor, FileTreeRepository, WatchLogger }
 import sbt.{ State, Watched }
-
-import scala.annotation.tailrec
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
 
 private[sbt] object LegacyWatched {
   @deprecated("Replaced by Watched.command", "1.3.0")

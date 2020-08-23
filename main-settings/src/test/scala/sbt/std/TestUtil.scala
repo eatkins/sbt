@@ -7,9 +7,9 @@
 
 package sbt.std
 
-import org.scalatest.TestData
-
 import scala.tools.reflect.ToolBox
+
+import org.scalatest.TestData
 
 object TestUtil {
   def eval(code: String, compileOptions: String = ""): Any = {

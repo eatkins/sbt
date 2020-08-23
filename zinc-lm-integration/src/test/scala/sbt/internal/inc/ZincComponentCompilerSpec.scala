@@ -23,7 +23,7 @@ class ZincComponentCompilerSpec extends IvyBridgeProviderSpecification {
 
   def isJava8: Boolean = sys.props("java.specification.version") == "1.8"
 
-  val logger = ConsoleLogger()
+  val logger: ConsoleLogger = ConsoleLogger()
 
   it should "compile the bridge for Scala 2.10.5 and 2.10.6" in { implicit td =>
     if (isJava8) {

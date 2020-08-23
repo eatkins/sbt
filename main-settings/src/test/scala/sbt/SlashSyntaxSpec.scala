@@ -7,15 +7,16 @@
 
 package sbt.test
 
-import org.scalacheck.{ Test => _, _ }, Prop._
-
-import sbt.SlashSyntax
-import sbt.{ Scope, ScopeAxis, Scoped }, Scope.{ Global, ThisScope }
-import sbt.Reference
 import sbt.ConfigKey
+import sbt.Reference
+import sbt.Scope.{ Global, ThisScope }
+import sbt.SlashSyntax
 import sbt.internal.util.AttributeKey
+import sbt.test.BuildSettingsInstances._
+import sbt.{ Scope, ScopeAxis, Scoped }
 
-import BuildSettingsInstances._
+import org.scalacheck.Prop._
+import org.scalacheck.{ Test => _, _ }
 
 object SlashSyntaxSpec extends Properties("SlashSyntax") with SlashSyntax {
   property("Global / key == key in Global") = {
@@ -103,7 +104,7 @@ object SlashSyntaxSpec extends Properties("SlashSyntax") with SlashSyntax {
     }
   }
 
-  def expectValue(expected: Scoped)(x: Scoped) = {
+  def expectValue(expected: Scoped)(x: Scoped): Prop = {
     val equals = x.scope == expected.scope && x.key == expected.key
     if (equals) proved else falsified :| s"Expected $expected but got $x"
   }

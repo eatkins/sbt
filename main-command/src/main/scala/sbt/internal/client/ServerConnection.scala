@@ -13,9 +13,9 @@ import java.io.IOException
 import java.net.{ Socket, SocketTimeoutException }
 import java.util.concurrent.atomic.AtomicBoolean
 
-import sbt.protocol._
 import sbt.internal.protocol._
 import sbt.internal.util.ReadJsonFromInputStream
+import sbt.protocol._
 
 abstract class ServerConnection(connection: Socket) {
 
@@ -26,7 +26,7 @@ abstract class ServerConnection(connection: Socket) {
 
   private val out = connection.getOutputStream
 
-  val thread = new Thread(s"sbt-serverconnection-${connection.getPort}") {
+  val thread: Thread = new Thread(s"sbt-serverconnection-${connection.getPort}") {
     setDaemon(true)
     override def run(): Unit = {
       try {

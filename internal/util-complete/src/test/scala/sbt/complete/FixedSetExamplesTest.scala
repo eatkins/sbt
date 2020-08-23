@@ -26,7 +26,7 @@ class FixedSetExamplesTest extends UnitSpec {
   }
 
   trait Examples {
-    val exampleSet = List("foo", "bar", "fool", "fu")
-    val fixedSetExamples = FixedSetExamples(exampleSet)
+    val exampleSet: List[String] = List("foo", "bar", "fool", "fu")
+    val fixedSetExamples: FixedSetExamples = FixedSetExamples(exampleSet)
   }
 }

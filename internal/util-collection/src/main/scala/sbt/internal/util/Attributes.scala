@@ -7,8 +7,9 @@
 
 package sbt.internal.util
 
-import Types._
 import scala.reflect.Manifest
+
+import sbt.internal.util.Types._
 import sbt.util.OptJsonWriter
 
 // T must be invariant to work properly.
@@ -53,7 +54,7 @@ sealed trait AttributeKey[T] {
 private[sbt] abstract class SharedAttributeKey[T] extends AttributeKey[T] {
   override final def toString = label
   override final def hashCode = label.hashCode
-  override final def equals(o: Any) =
+  override final def equals(o: Any): Boolean =
     (this eq o.asInstanceOf[AnyRef]) || (o match {
       case a: SharedAttributeKey[t] => a.label == this.label && a.manifest == this.manifest
       case _                        => false
@@ -210,10 +211,10 @@ private class BasicAttributeMap(private val backing: Map[AttributeKey[_], Any])
     extends AttributeMap {
 
   def isEmpty: Boolean = backing.isEmpty
-  def apply[T](k: AttributeKey[T]) = backing(k).asInstanceOf[T]
-  def get[T](k: AttributeKey[T]) = backing.get(k).asInstanceOf[Option[T]]
+  def apply[T](k: AttributeKey[T]): T = backing(k).asInstanceOf[T]
+  def get[T](k: AttributeKey[T]): Option[T] = backing.get(k).asInstanceOf[Option[T]]
   def remove[T](k: AttributeKey[T]): AttributeMap = new BasicAttributeMap(backing - k)
-  def contains[T](k: AttributeKey[T]) = backing.contains(k)
+  def contains[T](k: AttributeKey[T]): Boolean = backing.contains(k)
 
   def put[T](k: AttributeKey[T], value: T): AttributeMap =
     new BasicAttributeMap(backing.updated(k, value: Any))
@@ -240,13 +241,13 @@ private class BasicAttributeMap(private val backing: Map[AttributeKey[_], Any])
       case None    => remove(k)
     }
 
-  override def toString = entries.mkString("(", ", ", ")")
+  override def toString: String = entries.mkString("(", ", ", ")")
 }
 
 // type inference required less generality
 /** A map entry where `key` is constrained to only be associated with a fixed value of type `T`. */
 final case class AttributeEntry[T](key: AttributeKey[T], value: T) {
-  override def toString = key.label + ": " + value
+  override def toString: String = key.label + ": " + value
 }
 
 /** Associates a `metadata` map with `data`. */

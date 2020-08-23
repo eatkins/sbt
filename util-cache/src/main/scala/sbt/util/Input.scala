@@ -8,10 +8,13 @@
 package sbt.util
 
 import java.io.{ Closeable, InputStream }
+
 import scala.util.control.NonFatal
-import sjsonnew.{ IsoString, JsonReader, SupportConverter }
-import sbt.io.{ IO, Using }
+
 import sbt.internal.util.EmptyCacheError
+import sbt.io.{ IO, Using }
+
+import sjsonnew.{ IsoString, JsonReader, SupportConverter }
 
 trait Input extends Closeable {
   def read[T: JsonReader](): T
@@ -42,5 +45,5 @@ class PlainInput[J: IsoString](input: InputStream, converter: SupportConverter[J
     else converter.fromJson(isoFormat.from(str)).get
   }
 
-  def close() = input.close()
+  def close(): Unit = input.close()
 }

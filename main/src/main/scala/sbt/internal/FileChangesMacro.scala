@@ -10,12 +10,12 @@ package internal
 
 import java.nio.file.{ Path => NioPath }
 
-import sbt.nio.Keys._
-import sbt.nio.{ FileChanges, FileStamp }
-
 import scala.annotation.compileTimeOnly
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
+
+import sbt.nio.Keys._
+import sbt.nio.{ FileChanges, FileStamp }
 
 /**
  * Provides extension methods to `TaskKey[T]` that can be use to fetch the input and output file

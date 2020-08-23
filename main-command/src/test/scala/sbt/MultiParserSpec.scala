@@ -8,8 +8,10 @@
 package sbt
 
 import scala.concurrent.duration._
-import org.scalatest.FlatSpec
+
 import sbt.internal.util.complete.Parser
+
+import org.scalatest.FlatSpec
 
 object MultiParserSpec {
   val parser: Parser[Seq[String]] = BasicCommands.multiParserImpl(None)

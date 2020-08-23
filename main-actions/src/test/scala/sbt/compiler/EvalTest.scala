@@ -9,11 +9,12 @@ package sbt
 package compiler
 
 import scala.language.reflectiveCalls
-import org.scalacheck._
-import Prop._
 import scala.tools.nsc.reporters.StoreReporter
 
 import sbt.io.IO
+
+import org.scalacheck.Prop._
+import org.scalacheck._
 
 class EvalTest extends Properties("eval") {
   private[this] lazy val reporter = new StoreReporter
@@ -54,7 +55,7 @@ class EvalTest extends Properties("eval") {
     }
   }
 
-  val ValTestNames = Set("x", "a")
+  val ValTestNames: Set[String] = Set("x", "a")
   val ValTestContent = """
 val x: Int = {
   val y: Int = 4
@@ -109,5 +110,5 @@ val p = {
   val IntType = "Int"
   val BooleanType = "Boolean"
 
-  def label(s: String, value: Any) = s + " (" + value + ")"
+  def label(s: String, value: Any): String = s + " (" + value + ")"
 }

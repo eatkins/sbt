@@ -10,12 +10,15 @@ package internal
 package server
 
 import java.net.URI
-import sjsonnew.shaded.scalajson.ast.unsafe.JValue
+
 import scala.util.{ Left, Right }
-import sbt.util.{ SomeJsonWriter, NoJsonWriter }
+
 import sbt.librarymanagement.LibraryManagementCodec._
 import sbt.protocol._
+import sbt.util.{ NoJsonWriter, SomeJsonWriter }
+
 import sjsonnew._
+import sjsonnew.shaded.scalajson.ast.unsafe.JValue
 import sjsonnew.support.scalajson.unsafe._
 
 object SettingQuery {

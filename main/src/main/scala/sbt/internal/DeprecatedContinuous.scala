@@ -11,11 +11,12 @@ package internal
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 
-import com.github.ghik.silencer.silent
-import sbt.{ ProjectRef, State, Watched }
 import sbt.internal.io.{ EventMonitor, Source, WatchState => WS }
 import sbt.internal.util.AttributeKey
 import sbt.nio.file.Glob
+import sbt.{ ProjectRef, State, Watched }
+
+import com.github.ghik.silencer.silent
 
 @silent
 private[internal] trait DeprecatedContinuous {

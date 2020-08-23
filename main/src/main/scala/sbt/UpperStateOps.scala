@@ -7,9 +7,10 @@
 
 package sbt
 
-import sjsonnew.JsonFormat
-import Def.Setting
+import sbt.Def.Setting
 import sbt.internal.{ BuildStructure, LoadedBuildUnit, SessionSettings }
+
+import sjsonnew.JsonFormat
 
 /**
  * Extends State with setting-level knowledge.

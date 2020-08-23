@@ -8,24 +8,27 @@
 package sbt
 
 import java.io.File
-import scala.util.control.NonFatal
-import testing.{ Task => TestTask, _ }
-import org.scalatools.testing.{ Framework => OldFramework }
-import sbt.internal.inc.classpath.{ ClasspathUtilities, DualLoader }
-import sbt.internal.inc.ScalaInstance
+
 import scala.annotation.tailrec
+import scala.util.control.NonFatal
+
+import sbt.internal.inc.ScalaInstance
+import sbt.internal.inc.classpath.{ ClasspathUtilities, DualLoader }
 import sbt.internal.util.ManagedLogger
 import sbt.io.IO
 import sbt.protocol.testing.TestResult
+import sbt.testing.{ Task => TestTask, _ }
+
+import org.scalatools.testing.{ Framework => OldFramework }
 
 object TestFrameworks {
-  val ScalaCheck = TestFramework("org.scalacheck.ScalaCheckFramework")
-  val ScalaTest =
+  val ScalaCheck: TestFramework = TestFramework("org.scalacheck.ScalaCheckFramework")
+  val ScalaTest: TestFramework =
     TestFramework("org.scalatest.tools.Framework", "org.scalatest.tools.ScalaTestFramework")
-  val Specs = TestFramework("org.specs.runner.SpecsFramework")
-  val Specs2 =
+  val Specs: TestFramework = TestFramework("org.specs.runner.SpecsFramework")
+  val Specs2: TestFramework =
     TestFramework("org.specs2.runner.Specs2Framework", "org.specs2.runner.SpecsFramework")
-  val JUnit = TestFramework("com.novocode.junit.JUnitFramework")
+  val JUnit: TestFramework = TestFramework("com.novocode.junit.JUnitFramework")
 }
 
 final class TestFramework(val implClassNames: String*) extends Serializable {
@@ -85,8 +88,8 @@ final class TestDefinition(
     val explicitlySpecified: Boolean,
     val selectors: Array[Selector]
 ) {
-  override def toString = "Test " + name + " : " + TestFramework.toString(fingerprint)
-  override def equals(t: Any) =
+  override def toString: String = "Test " + name + " : " + TestFramework.toString(fingerprint)
+  override def equals(t: Any): Boolean =
     t match {
       case r: TestDefinition => name == r.name && TestFramework.matches(fingerprint, r.fingerprint)
       case _                 => false
@@ -186,7 +189,7 @@ object TestFramework {
     case a: AnnotatedFingerprint => (a.isModule, a.annotationName).hashCode
     case _                       => 0
   }
-  def matches(a: Fingerprint, b: Fingerprint) =
+  def matches(a: Fingerprint, b: Fingerprint): Boolean =
     (a, b) match {
       case (a: SubclassFingerprint, b: SubclassFingerprint) =>
         a.isModule == b.isModule && a.superclassName == b.superclassName

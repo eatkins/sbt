@@ -13,10 +13,10 @@ package sbt
  * terminating the thread's execution.
  */
 private final class TrapExitSecurityException(val exitCode: Int) extends SecurityException {
-  override def printStackTrace = throw this
-  override def toString = throw this
-  override def getCause = throw this
-  override def getMessage = throw this
-  override def fillInStackTrace = throw this
-  override def getLocalizedMessage = throw this
+  override def printStackTrace: Unit = throw this
+  override def toString: String = throw this
+  override def getCause: Throwable = throw this
+  override def getMessage: String = throw this
+  override def fillInStackTrace: Throwable = throw this
+  override def getLocalizedMessage: String = throw this
 }
