@@ -8,9 +8,10 @@
 package sbt.internal.util
 package appmacro
 
-import scala.reflect._
-import macros._
-import ContextUtil.{ DynamicDependencyError, DynamicReferenceError }
+import scala.reflect.macros._
+
+import sbt.internal.util.appmacro.ContextUtil.DynamicDependencyError
+import sbt.internal.util.appmacro.ContextUtil.DynamicReferenceError
 
 object ContextUtil {
   final val DynamicDependencyError = "Illegal dynamic dependency"
@@ -55,25 +56,26 @@ final class ContextUtil[C <: blackbox.Context](val ctx: C) {
   import ctx.universe.{ Apply => ApplyTree, _ }
   import internal.decorators._
 
-  val powerContext = ctx.asInstanceOf[reflect.macros.runtime.Context]
+  val powerContext: reflect.macros.runtime.Context =
+    ctx.asInstanceOf[reflect.macros.runtime.Context]
   val global: powerContext.universe.type = powerContext.universe
   def callsiteTyper: global.analyzer.Typer = powerContext.callsiteTyper
   val initialOwner: Symbol = callsiteTyper.context.owner.asInstanceOf[ctx.universe.Symbol]
 
-  lazy val alistType = ctx.typeOf[AList[KList]]
+  lazy val alistType: Type = ctx.typeOf[AList[KList]]
   lazy val alist: Symbol = alistType.typeSymbol.companion
   lazy val alistTC: Type = alistType.typeConstructor
 
   /** Modifiers for a local val.*/
-  lazy val localModifiers = Modifiers(NoFlags)
+  lazy val localModifiers: Modifiers = Modifiers(NoFlags)
 
-  def getPos(sym: Symbol) = if (sym eq null) NoPosition else sym.pos
+  def getPos(sym: Symbol): Position = if (sym eq null) NoPosition else sym.pos
 
   /**
    * Constructs a unique term name with the given prefix within this Context.
    * (The current implementation uses Context.freshName, which increments
    */
-  def freshTermName(prefix: String) = TermName(ctx.freshName("$" + prefix))
+  def freshTermName(prefix: String): TermName = TermName(ctx.freshName("$" + prefix))
 
   /**
    * Constructs a new, synthetic, local ValDef Type `tpe`, a unique name,
@@ -88,7 +90,7 @@ final class ContextUtil[C <: blackbox.Context](val ctx: C) {
     vd
   }
 
-  lazy val parameterModifiers = Modifiers(Flag.PARAM)
+  lazy val parameterModifiers: Modifiers = Modifiers(Flag.PARAM)
 
   /**
    * Collects all definitions in the tree for use in checkReferences.

@@ -8,9 +8,9 @@
 package sbt.internal.util
 package appmacro
 
-import scala.reflect._
-import macros._
-import Types.idFun
+import scala.reflect.macros._
+
+import sbt.internal.util.Types.idFun
 
 abstract class Convert {
   def apply[T: c.WeakTypeTag](c: blackbox.Context)(nme: String, in: c.Tree): Converted[c.type]

@@ -10,14 +10,14 @@ package internal
 package scripted
 
 import java.io.File
-import sbt.io.{ IO, Path }
-import sbt.io.syntax._
-import Path._
+
 import sbt.io.IO
+import sbt.io.Path._
+import sbt.io.syntax._
 
 class FileCommands(baseDirectory: File) extends BasicStatementHandler {
   lazy val commands = commandMap
-  def commandMap =
+  def commandMap: Map[String, List[String] => Unit] =
     Map(
       "touch" nonEmpty touch _,
       "delete" nonEmpty delete _,
@@ -48,8 +48,8 @@ class FileCommands(baseDirectory: File) extends BasicStatementHandler {
     }
 
   def scriptError(message: String): Unit = sys.error("Test script error: " + message)
-  def spaced[T](l: Seq[T]) = l.mkString(" ")
-  def fromStrings(paths: List[String]) = paths.map(fromString)
+  def spaced[T](l: Seq[T]): String = l.mkString(" ")
+  def fromStrings(paths: List[String]): List[File] = paths.map(fromString)
   def fromString(path: String) = new File(baseDirectory, path)
   def touch(paths: List[String]): Unit = IO.touch(fromStrings(paths))
   def delete(paths: List[String]): Unit = IO.delete(fromStrings(paths))
@@ -57,7 +57,7 @@ class FileCommands(baseDirectory: File) extends BasicStatementHandler {
 		IO.sync(fromString(from), fromString(to), log)*/
   def copyFile(from: String, to: String): Unit =
     IO.copyFile(fromString(from), fromString(to))
-  def makeDirectories(paths: List[String]) =
+  def makeDirectories(paths: List[String]): Unit =
     IO.createDirectories(fromStrings(paths))
   def diffFiles(file1: String, file2: String): Unit = {
     val lines1 = IO.readLines(fromString(file1))

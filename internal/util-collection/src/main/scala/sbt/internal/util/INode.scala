@@ -8,9 +8,13 @@
 package sbt.internal.util
 
 import java.lang.Runnable
-import java.util.concurrent.{ atomic, Executor, LinkedBlockingQueue }
-import atomic.{ AtomicBoolean, AtomicInteger }
-import Types.{ ConstK, Id }
+import java.util.concurrent.Executor
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+
+import sbt.internal.util.Types.ConstK
+import sbt.internal.util.Types.Id
 
 object EvaluationState extends Enumeration {
   val New, Blocked, Ready, Calling, Evaluated = Value
@@ -114,7 +118,7 @@ abstract class EvaluateSettings[ScopeType] {
     private[this] var blockedOn: Int = 0
     private[this] val calledBy = new collection.mutable.ListBuffer[BindNode[_, T]]
 
-    override def toString =
+    override def toString: String =
       getClass.getName + " (state=" + state + ",blockedOn=" + blockedOn + ",calledBy=" + calledBy.size + ",blocking=" + blocking.size + "): " +
         keyString
 
@@ -214,7 +218,7 @@ abstract class EvaluateSettings[ScopeType] {
     new MixedNode[λ[L[x] => L[S]], T](in, f, AList.single[S])
 
   private[this] final class BindNode[S, T](in: INode[S], f: S => INode[T]) extends INode[T] {
-    protected def dependsOn = in :: Nil
+    protected def dependsOn: List[INode[S]] = in :: Nil
     protected def evaluate0(): Unit = makeCall(this, f(in.get))
     def callComplete(value: T): Unit = synchronized {
       assert(isCalling, "Invalid state for callComplete(" + value + "): " + toString)
@@ -224,7 +228,7 @@ abstract class EvaluateSettings[ScopeType] {
 
   private[this] final class MixedNode[K[L[x]], T](in: K[INode], f: K[Id] => T, alist: AList[K])
       extends INode[T] {
-    protected def dependsOn = alist.toList(in)
+    protected def dependsOn: Seq[INode[_]] = alist.toList(in)
     protected def evaluate0(): Unit = setValue(f(alist.transform(in, getValue)))
   }
 }

@@ -8,20 +8,38 @@
 package sbt
 package compiler
 
-import scala.collection.mutable.ListBuffer
-import scala.tools.nsc.{ ast, io, reporters, CompilerCommand, Global, Phase, Settings }
-import io.{ AbstractFile, PlainFile, VirtualDirectory }
-import ast.parser.Tokens
-import reporters.{ ConsoleReporter, Reporter }
-import scala.reflect.internal.util.{ AbstractFileClassLoader, BatchSourceFile }
-import Tokens.{ EOF, NEWLINE, NEWLINES, SEMI }
-import java.io.{ File, FileNotFoundException }
-import java.nio.ByteBuffer
+import java.io.File
+import java.io.FileNotFoundException
 import java.net.URLClassLoader
+import java.nio.ByteBuffer
 import java.security.MessageDigest
-import Eval.{ getModule, getValue, WrapValName }
 
-import sbt.io.{ DirectoryFilter, FileFilter, GlobFilter, Hash, IO, Path }
+import scala.collection.mutable.ListBuffer
+import scala.reflect.internal.util.AbstractFileClassLoader
+import scala.reflect.internal.util.BatchSourceFile
+import scala.tools.nsc.CompilerCommand
+import scala.tools.nsc.Global
+import scala.tools.nsc.Phase
+import scala.tools.nsc.Settings
+import scala.tools.nsc.ast.parser.Tokens.EOF
+import scala.tools.nsc.ast.parser.Tokens.NEWLINE
+import scala.tools.nsc.ast.parser.Tokens.NEWLINES
+import scala.tools.nsc.ast.parser.Tokens.SEMI
+import scala.tools.nsc.io.AbstractFile
+import scala.tools.nsc.io.PlainFile
+import scala.tools.nsc.io.VirtualDirectory
+import scala.tools.nsc.reporters.ConsoleReporter
+import scala.tools.nsc.reporters.Reporter
+
+import sbt.compiler.Eval.WrapValName
+import sbt.compiler.Eval.getModule
+import sbt.compiler.Eval.getValue
+import sbt.io.DirectoryFilter
+import sbt.io.FileFilter
+import sbt.io.GlobFilter
+import sbt.io.Hash
+import sbt.io.IO
+import sbt.io.Path
 
 // TODO: provide a way to cleanup backing directory
 
@@ -73,15 +91,15 @@ final class Eval(
   def this() = this(s => new ConsoleReporter(s), None)
 
   backing.foreach(IO.createDirectory)
-  val classpathString = Path.makeString(classpath ++ backing.toList)
-  val options = "-cp" +: classpathString +: optionsNoncp
+  val classpathString: String = Path.makeString(classpath ++ backing.toList)
+  val options: Seq[String] = "-cp" +: classpathString +: optionsNoncp
 
-  lazy val settings = {
+  lazy val settings: Settings = {
     val s = new Settings(println)
     new CompilerCommand(options.toList, s) // this side-effects on Settings..
     s
   }
-  lazy val reporter = mkReporter(settings)
+  lazy val reporter: Reporter = mkReporter(settings)
 
   /**
    * Subclass of Global which allows us to mutate currentRun from outside.
@@ -322,7 +340,7 @@ final class Eval(
 
   private[this] final class TypeExtractor extends Traverser {
     private[this] var result = ""
-    def getType(t: Tree) = { result = ""; traverse(t); result }
+    def getType(t: Tree): String = { result = ""; traverse(t); result }
     override def traverse(tree: Tree): Unit = tree match {
       case d: DefDef if d.symbol.nameString == WrapValName =>
         result = d.symbol.tpe.finalResultType.toString

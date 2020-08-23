@@ -7,33 +7,30 @@
 
 package sbt
 
-import std._
-import xsbt.api.{ Discovered, Discovery }
-import sbt.internal.inc.Analysis
-import TaskExtra._
-import sbt.internal.util.FeedbackProvidedException
-import xsbti.api.Definition
-import xsbti.api.ClassLike
-import xsbti.compile.CompileAnalysis
-import ConcurrentRestrictions.Tag
-import testing.{
-  AnnotatedFingerprint,
-  Fingerprint,
-  Framework,
-  Runner,
-  Selector,
-  SubclassFingerprint,
-  SuiteSelector,
-  TaskDef,
-  Task => TestTask
-}
-
 import scala.annotation.tailrec
-import sbt.internal.util.ManagedLogger
-import sbt.util.Logger
-import sbt.protocol.testing.TestResult
-
 import scala.runtime.AbstractFunction3
+
+import sbt.ConcurrentRestrictions.Tag
+import sbt.internal.inc.Analysis
+import sbt.internal.util.FeedbackProvidedException
+import sbt.internal.util.ManagedLogger
+import sbt.protocol.testing.TestResult
+import sbt.std.TaskExtra._
+import sbt.testing.AnnotatedFingerprint
+import sbt.testing.Fingerprint
+import sbt.testing.Framework
+import sbt.testing.Runner
+import sbt.testing.Selector
+import sbt.testing.SubclassFingerprint
+import sbt.testing.SuiteSelector
+import sbt.testing.TaskDef
+import sbt.testing.{ Task => TestTask }
+import sbt.util.Logger
+import xsbt.api.Discovered
+import xsbt.api.Discovery
+import xsbti.api.ClassLike
+import xsbti.api.Definition
+import xsbti.compile.CompileAnalysis
 
 sealed trait TestOption
 
@@ -521,7 +518,7 @@ object Tests {
   ): (Seq[TestDefinition], Set[String]) =
     discover(frameworks flatMap TestFramework.getFingerprints, allDefs(analysis), log)
 
-  def allDefs(analysis: CompileAnalysis) = analysis match {
+  def allDefs(analysis: CompileAnalysis): Seq[Definition] = analysis match {
     case analysis: Analysis =>
       val acs: Seq[xsbti.api.AnalyzedClass] = analysis.apis.internal.values.toVector
       acs.flatMap { ac =>

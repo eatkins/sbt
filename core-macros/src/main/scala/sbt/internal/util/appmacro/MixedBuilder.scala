@@ -8,8 +8,7 @@
 package sbt.internal.util
 package appmacro
 
-import scala.reflect._
-import macros._
+import scala.reflect.macros._
 
 /**
  * A builder that uses `TupleN` as the representation for small numbers of inputs (up to `TupleNBuilder.MaxInputs`)

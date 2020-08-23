@@ -8,8 +8,7 @@
 package sbt.internal.util
 package appmacro
 
-import scala.reflect._
-import macros._
+import scala.reflect.macros._
 
 /**
  * A `TupleBuilder` abstracts the work of constructing a tuple data structure such as a `TupleN` or `KList`

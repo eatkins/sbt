@@ -7,9 +7,11 @@
 
 package sbt
 
-import sbt.Tests.{ Output, Summary }
+import sbt.Tests.Output
+import sbt.Tests.Summary
 import sbt.protocol.testing.TestResult
-import sbt.util.{ Level, Logger }
+import sbt.util.Level
+import sbt.util.Logger
 
 /**
  * Logs information about tests after they finish.
@@ -34,34 +36,34 @@ trait TestResultLogger {
   final def onlyIf(
       f: (Output, String) => Boolean,
       otherwise: TestResultLogger = TestResultLogger.Null
-  ) =
+  ): TestResultLogger =
     TestResultLogger.choose(f, this, otherwise)
 
   /** Allow invocation unless a certain predicate passes, in which case use another `TestResultLogger` (defaulting to nothing) . */
   final def unless(
       f: (Output, String) => Boolean,
       otherwise: TestResultLogger = TestResultLogger.Null
-  ) =
+  ): TestResultLogger =
     TestResultLogger.choose(f, otherwise, this)
 }
 
 object TestResultLogger {
 
   /** A `TestResultLogger` that does nothing. */
-  val Null = const(_ => ())
+  val Null: TestResultLogger = const(_ => ())
 
   /** sbt's default `TestResultLogger`. Use `copy()` to change selective portions. */
-  val Default = Defaults.Main()
+  val Default: Defaults.Main = Defaults.Main()
 
   /** Twist on the default which is completely silent when the subject module doesn't contain any tests. */
-  def SilentWhenNoTests = silenceWhenNoTests(Default)
+  def SilentWhenNoTests: Defaults.Main = silenceWhenNoTests(Default)
 
   /** Creates a `TestResultLogger` using a given function. */
   def apply(f: (Logger, Output, String) => Unit): TestResultLogger =
     (log, results, taskName) => f(log, results, taskName)
 
   /** Creates a `TestResultLogger` that ignores its input and always performs the same logging. */
-  def const(f: Logger => Unit) = apply((l, _, _) => f(l))
+  def const(f: Logger => Unit): TestResultLogger = apply((l, _, _) => f(l))
 
   /**
    * Selects a `TestResultLogger` based on a given predicate.
@@ -69,14 +71,18 @@ object TestResultLogger {
    * @param t The `TestResultLogger` to choose if the predicate passes.
    * @param f The `TestResultLogger` to choose if the predicate fails.
    */
-  def choose(cond: (Output, String) => Boolean, t: TestResultLogger, f: TestResultLogger) =
+  def choose(
+      cond: (Output, String) => Boolean,
+      t: TestResultLogger,
+      f: TestResultLogger
+  ): TestResultLogger =
     TestResultLogger(
       (log, results, taskName) =>
         (if (cond(results, taskName)) t else f).run(log, results, taskName)
     )
 
   /** Transforms the input to be completely silent when the subject module doesn't contain any tests. */
-  def silenceWhenNoTests(d: Defaults.Main) =
+  def silenceWhenNoTests(d: Defaults.Main): Defaults.Main =
     d.copy(
       printStandard = d.printStandard.unless((results, _) => results.events.isEmpty),
       printNoTests = Null
@@ -113,7 +119,7 @@ object TestResultLogger {
       }
     }
 
-    val printSummary = TestResultLogger((log, results, _) => {
+    val printSummary: TestResultLogger = TestResultLogger((log, results, _) => {
       val multipleFrameworks = results.summaries.size > 1
       for (Summary(name, message) <- results.summaries)
         if (message.isEmpty)
@@ -129,7 +135,7 @@ object TestResultLogger {
         // Print the standard one-liner statistic if no framework summary is defined, or when > 1 framework is in used.
         results.summaries.size > 1 || results.summaries.headOption.forall(_.summaryText.isEmpty)
 
-    val printStandard = TestResultLogger((log, results, _) => {
+    val printStandard: TestResultLogger = TestResultLogger((log, results, _) => {
       val (
         skippedCount,
         errorsCount,
@@ -173,7 +179,7 @@ object TestResultLogger {
       }
     })
 
-    val printFailures = TestResultLogger((log, results, _) => {
+    val printFailures: TestResultLogger = TestResultLogger((log, results, _) => {
       def select(resultTpe: TestResult) = results.events collect {
         case (name, tpe) if tpe.result == resultTpe =>
           scala.reflect.NameTransformer.decode(name)
@@ -190,7 +196,7 @@ object TestResultLogger {
       show("Error during tests:", Level.Error, select(TestResult.Error))
     })
 
-    val printNoTests = TestResultLogger(
+    val printNoTests: TestResultLogger = TestResultLogger(
       (log, results, taskName) => log.info("No tests to run for " + taskName)
     )
   }

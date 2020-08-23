@@ -8,8 +8,7 @@
 package sbt.internal.util
 package appmacro
 
-import scala.reflect._
-import macros._
+import scala.reflect.macros._
 
 /** A `TupleBuilder` that uses a KList as the tuple representation.*/
 object KListBuilder extends TupleBuilder {
