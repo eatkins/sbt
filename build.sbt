@@ -57,6 +57,9 @@ def buildLevelSettings: Seq[Setting[_]] =
       homepage := Some(url("https://github.com/sbt/sbt")),
       scmInfo := Some(ScmInfo(url("https://github.com/sbt/sbt"), "git@github.com:sbt/sbt.git")),
       resolvers += Resolver.mavenLocal,
+      scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.4.0",
+      semanticdbEnabled := true,
+      semanticdbVersion := scalafixSemanticdb.revision,
     )
   )
 
@@ -226,7 +229,20 @@ lazy val sbtRoot: Project = (project in file("."))
       val exec = (sbtClientProj / buildNativeThinClient).value
       streams.value.log.info(s"installing thin client ${base.relativize(exec)} to ${target}")
       Files.copy(exec, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-    }
+    },
+    TaskKey[Unit]("checkGitDiff") := {
+      import scala.sys.process._
+      val changes = Seq("git", "diff", "--name-only").!!
+      val log = streams.value.log
+      if (changes.nonEmpty) {
+        val changedFiles = changes.linesIterator.toVector match {
+          case Vector(f) => f.toString
+          case files     => files.mkString("\n", "\n", "")
+        }
+        log.error(s"There were diffs after scalafix: $changedFiles")
+        assert(false)
+      }
+    },
   )
 
 // This is used to configure an sbt-launcher for this version of sbt.
@@ -1511,7 +1527,10 @@ def customCommands: Seq[Setting[_]] = Seq(
       "publish" ::
       "bintrayRelease" ::
       state
-  }
+  },
+  commands += Command.command("scalafixCheck") { state =>
+    "scalafixAll" :: "scalafmtAll" :: "checkGitDiff" :: state
+  },
 )
 
 ThisBuild / publishTo := {
