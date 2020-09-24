@@ -812,14 +812,20 @@ object Terminal {
       system.setSize(new org.jline.terminal.Size(width, height))
 
     override private[sbt] def enterRawMode(): Unit = if (rawMode.compareAndSet(false, true)) {
+      val now = System.nanoTime
       in.setRawMode(true)
       try JLine3.enterRawMode(system)
       catch { case _: java.io.IOError => }
+      val elapsed = System.nanoTime - now
+      System.err.println(s"$this took ${elapsed / 10e6} ms to enter raw mode")
     }
     override private[sbt] def exitRawMode(): Unit = if (rawMode.compareAndSet(true, false)) {
+      val now = System.nanoTime
       in.setRawMode(false)
       try JLine3.exitRawMode(system)
       catch { case _: java.io.IOError => }
+      val elapsed = System.nanoTime - now
+      System.err.println(s"$this took ${elapsed / 10e6} ms to exit raw mode")
     }
     override def isColorEnabled: Boolean =
       props
