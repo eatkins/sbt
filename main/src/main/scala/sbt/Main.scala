@@ -8,6 +8,7 @@
 package sbt
 
 import java.io.{ File, IOException }
+import java.lang.management.ManagementFactory
 import java.net.URI
 import java.nio.channels.ClosedChannelException
 import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
@@ -109,6 +110,21 @@ private[sbt] object xMain {
         System.out.print(ConsoleAppender.ClearScreenAfterCursor)
         System.out.flush()
       }
+      new Thread("") {
+        setDaemon(true)
+        start()
+        override def run(): Unit = {
+          Thread.sleep(10000)
+          ManagementFactory.getThreadMXBean().dumpAllThreads(true, true).foreach { ti =>
+            System.err.println(
+              s"${ti.getThreadName()} ${ti.getThreadId()} ${ti.getThreadState()} ${ti.isSuspended} ${ti.isInNative}"
+            )
+            ti.getStackTrace().foreach(System.err.println)
+            System.err.println("")
+          }
+        }
+      }
+      ()
     }
   }
 
