@@ -38,10 +38,7 @@ private[sbt] object ShutdownHooks extends AutoCloseable {
     () => Option(hooks.remove(id)).foreach(_.apply())
   }
   private def runAll(): Unit = if (ranHooks.compareAndSet(false, true)) {
-    val n = System.nanoTime
     hooks.forEachValue(runtime.availableProcessors.toLong, (_: () => Unit).apply())
-    val elapsed = System.nanoTime - n
-    System.err.println(s"took ${elapsed / 1.0e6} ms to run shutdown hooks")
   }
   override def close(): Unit = {
     runtime.removeShutdownHook(thread)

@@ -154,8 +154,7 @@ private[sbt] object Server {
       }
 
       override def shutdown(): Unit = {
-        log.info(s"${System.currentTimeMillis} shutting down sbt server")
-        val now = System.nanoTime
+        log.info("shutting down sbt server")
         if (portfile.exists) {
           IO.delete(portfile)
         }
@@ -167,8 +166,6 @@ private[sbt] object Server {
           case null =>
           case s    => s.close()
         }
-        val elapsed = System.nanoTime - now
-        System.err.println(s"Took ${elapsed / 1.0e6} ms to shutdown sbt")
       }
 
       private[this] def writeTokenfile(): Unit = {

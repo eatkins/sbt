@@ -564,7 +564,6 @@ class NetworkClient(
           synchronized(errorStream.flush())
           Vector.empty
         case (`promptChannel`, _) =>
-          new Exception("prompt").printStackTrace(System.err)
           batchMode.set(false)
           Vector.empty
         case ("textDocument/publishDiagnostics", Some(json)) =>
@@ -761,12 +760,10 @@ class NetworkClient(
         }
         console.appendLog(Level.Info, "terminate the server with `shutdown`")
         if (interactive) {
-          new Exception("").printStackTrace(System.err)
           console.appendLog(Level.Info, "disconnect from the server with `exit`")
           block()
         } else if (exit) 0
         else {
-          System.err.println("set batchmode")
           batchMode.set(true)
           val res = batchExecute(userCommands.toList)
           if (!batchMode.get) block() else res
@@ -922,10 +919,8 @@ class NetworkClient(
       connectionHolder.get match {
         case null =>
         case c =>
-          System.err.println(s"${System.currentTimeMillis} do shutdown ${batchMode}")
           if (batchMode.get) sendExecCommand("exit")
           c.shutdown()
-          System.err.println(s"${System.currentTimeMillis} finish shutdown")
       }
       Option(inputThread.get).foreach(_.interrupt())
     } catch {
@@ -1061,7 +1056,7 @@ object NetworkClient {
     try f
     finally {
       val elapsed = System.nanoTime - now
-      System.err.println(s"$tag ${System.currentTimeMillis} took ${elapsed / 1.0e6} ms")
+      System.err.println(s"$tag took ${elapsed / 1.0e6} ms")
     }
   }
   def client(

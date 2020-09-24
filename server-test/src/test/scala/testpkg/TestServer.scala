@@ -257,11 +257,7 @@ case class TestServer(
           Thread.sleep(10)
         }
       }
-      val elapsed = System.nanoTime - now
       if (process.isAlive) throw new IllegalStateException(s"process $process failed to exit")
-      System.err.println(
-        s"Took ${System.currentTimeMillis} ${elapsed / 1.0e6} ms to shutdown server"
-      )
     } finally {
       readThread.interrupt()
       /*
@@ -278,9 +274,7 @@ case class TestServer(
       readThread.join(5000)
       if (readThread.isAlive) throw new IllegalStateException(s"Unable to join read thread")
       val elapsed = System.nanoTime - now
-      System.err.println(
-        s"Took ${System.currentTimeMillis} ${elapsed / 1.0e6} ms to shutdown server and join threads"
-      )
+      System.err.println(s"Took ${elapsed / 1.0e6} ms to shutdown server")
     }
   }
 
