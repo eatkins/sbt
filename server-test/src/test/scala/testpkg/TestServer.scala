@@ -25,6 +25,7 @@ import scala.concurrent.duration._
 import scala.util.{ Success, Try }
 import sbt.OutputStrategy
 import sbt.ForkOptions
+import sbt.file
 
 trait AbstractServerTest extends TestSuite[Unit] {
   private var temp: File = _
@@ -45,18 +46,9 @@ trait AbstractServerTest extends TestSuite[Unit] {
       "server-test"
     )
     temp = base.toFile
-    val classpath = sys.props.get("sbt.server.classpath") match {
-      case Some(s: String) => s.split(java.io.File.pathSeparator).map(file)
-      case _               => throw new IllegalStateException("No server classpath was specified.")
-    }
-    val sbtVersion = sys.props.get("sbt.server.version") match {
-      case Some(v: String) => v
-      case _               => throw new IllegalStateException("No server version was specified.")
-    }
-    val scalaVersion = sys.props.get("sbt.server.scala.version") match {
-      case Some(v: String) => v
-      case _               => throw new IllegalStateException("No server scala version was specified.")
-    }
+    val classpath = TestProperties.classpath.split(java.io.File.pathSeparator).map(file)
+    val sbtVersion = TestProperties.version
+    val scalaVersion = TestProperties.scalaVersion
     svr = TestServer.get(testDirectory, scalaVersion, sbtVersion, classpath, temp)
   }
   override def tearDownSuite(): Unit = {

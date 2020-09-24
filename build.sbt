@@ -1075,7 +1075,7 @@ lazy val sbtProj = (project in file("sbt"))
   .configure(addSbtIO, addSbtCompilerBridge)
 
 lazy val serverTestProj = (project in file("server-test"))
-  .dependsOn(sbtProj % "test->test", scriptedSbtReduxProj % "test->test")
+  .dependsOn(sbtProj % "compile->test", scriptedSbtReduxProj % "compile->test")
   .settings(
     testedBaseSettings,
     crossScalaVersions := Seq(baseScalaVersion),
@@ -1086,15 +1086,23 @@ lazy val serverTestProj = (project in file("server-test"))
     Test / run / connectInput := true,
     Test / run / outputStrategy := Some(StdoutOutput),
     Test / run / fork := true,
-    Test / fork := true,
-    Test / javaOptions ++= {
-      val cp = (Test / fullClasspathAsJars).value.map(_.data).mkString(java.io.File.pathSeparator)
-      List(
-        s"-Dsbt.server.classpath=$cp",
-        s"-Dsbt.server.version=${version.value}",
-        s"-Dsbt.server.scala.version=${scalaVersion.value}",
-        s"-Dsbt.supershell=false",
-      )
+    Test / sourceGenerators += Def.task {
+      val cp =
+        (Compile / fullClasspathAsJars).value.map(_.data).mkString(java.io.File.pathSeparator)
+      val content = {
+        s"""|
+            |package testpkg
+            |
+            |object TestProperties {
+            |  val classpath = "$cp"
+            |  val version = "${version.value}"
+            |  val scalaVersion = "${scalaVersion.value}"
+            |}
+          """.stripMargin
+      }
+      val file = (Test / managedDirectory).value / "src" / "test" / "scala" / "testpkg" / "TestProperties.scala"
+      IO.write(file, content)
+      file :: Nil
     },
   )
 
