@@ -573,6 +573,7 @@ final class NetworkChannel(
       logShutdown: Boolean,
       remainingCommands: Option[(String, String)]
   ): Unit = {
+    val now = System.nanoTime
     terminal.close()
     StandardMain.exchange.removeChannel(this)
     super.shutdown(logShutdown)
@@ -585,6 +586,10 @@ final class NetworkChannel(
     outputStream.close()
     thread.interrupt()
     writeThread.interrupt()
+    val elapsed = System.nanoTime - now
+    System.err.println(
+      s"${System.currentTimeMillis} Took ${elapsed / 1.0e6} ms to shutdown client connection $name"
+    )
   }
 
   /** Respond back to Language Server's client. */
