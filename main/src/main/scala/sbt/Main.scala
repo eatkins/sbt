@@ -125,6 +125,7 @@ private[sbt] object xMain {
         System.out.print(ConsoleAppender.ClearScreenAfterCursor)
         System.out.flush()
       }
+      System.err.println("server exited")
       ()
     }
   }
