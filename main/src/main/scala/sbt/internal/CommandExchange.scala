@@ -376,7 +376,10 @@ private[sbt] final class CommandExchange {
           .withChannelName(currentExec.flatMap(_.source.map(_.channelName)))
       case _ => pe
     }
-    if (channels.isEmpty) addConsoleChannel()
+    if (channels.isEmpty && !Terminal.isCI) {
+      System.err.println(Terminal.isCI)
+      addConsoleChannel()
+    }
     channels.foreach(c => ProgressState.updateProgressState(newPE, c.terminal))
   }
 

@@ -23,6 +23,8 @@ import scala.annotation.tailrec
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{ Success, Try }
+import sbt.OutputStrategy
+import sbt.ForkOptions
 
 trait AbstractServerTest extends TestSuite[Unit] {
   private var temp: File = _
@@ -169,7 +171,12 @@ case class TestServer(
   import TestServer.hostLog
 
   hostLog("fork to a new sbt instance")
-  val process = RunFromSourceMain.fork(baseDirectory, scalaVersion, sbtVersion, classpath)
+  val forkOptions =
+    ForkOptions()
+      .withOutputStrategy(OutputStrategy.StdoutOutput)
+      .withRunJVMOptions(Vector("-Dsbt.ci=true"))
+  val process =
+    RunFromSourceMain.fork(forkOptions, baseDirectory, scalaVersion, sbtVersion, classpath)
 
   lazy val portfile = baseDirectory / "project" / "target" / "active.json"
 
