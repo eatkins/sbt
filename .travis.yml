@@ -28,6 +28,7 @@ matrix:
         - SBT_CMD="publishLocalBin; serverTestProj/test"
 
 before_install:
+  - ulimit -n 4096
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
   - if [ $SBT_LOCAL == true ]; then sbt -Dsbt.io.virtual=false publishLocalBin; fi
 
