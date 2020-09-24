@@ -721,15 +721,17 @@ class NetworkClient(
     if (Terminal.console.getLastLine.nonEmpty)
       printStream.print(ConsoleAppender.DeleteLine + Terminal.console.getLastLine.get)
   }
-  private[this] def withSignalHandler[R](handler: () => Unit, sig: String)(f: => R): R = {
-    val registration = Signals.register(handler, sig)
+  private[this] def withSignalHandler[R](useSignals: Boolean, handler: () => Unit, sig: String)(
+      f: => R
+  ): R = {
+    val registration = if (useSignals) Some(Signals.register(handler, sig)) else None
     try f
-    finally registration.remove()
+    finally registration.foreach(_.remove())
   }
   private[this] val cancelled = new AtomicBoolean(false)
 
-  def run(): Int =
-    withSignalHandler(contHandler, Signals.CONT) {
+  def run(useSignals: Boolean): Int =
+    withSignalHandler(useSignals, contHandler, Signals.CONT) {
       interactiveThread.set(Thread.currentThread)
       val cleaned = arguments.commandArguments
       val userCommands = cleaned.takeWhile(_ != TerminateAction)
@@ -750,7 +752,7 @@ class NetworkClient(
           else cancelled.set(false)
         } else exitAbruptly() // handles double ctrl+c to force a shutdown
       }
-      withSignalHandler(handler, Signals.INT) {
+      withSignalHandler(useSignals, handler, Signals.INT) {
         def block(): Int = {
           try this.synchronized(this.wait)
           catch { case _: InterruptedException => }
@@ -776,6 +778,7 @@ class NetworkClient(
   }
 
   def getCompletions(query: String): Seq[String] = {
+    batchMode.set(true)
     val quoteCount = query.foldLeft(0) {
       case (count, '"') => count + 1
       case (count, _)   => count
@@ -915,7 +918,9 @@ class NetworkClient(
       if (mainThread != null && mainThread != Thread.currentThread) mainThread.interrupt
       connectionHolder.get match {
         case null =>
-        case c    => c.shutdown()
+        case c =>
+          if (batchMode.get) sendExecCommand("exit")
+          c.shutdown()
       }
       Option(inputThread.get).foreach(_.interrupt())
     } catch {
@@ -1074,7 +1079,7 @@ object NetworkClient {
       )
     try {
       if (bm("connect")(client.connect(log = true, promptCompleteUsers = false)))
-        bm("run")(client.run())
+        bm("run")(client.run(useSignals = false))
       else 1
     } catch { case _: Exception => 1 } finally bm("close")(client.close())
   }
@@ -1095,7 +1100,7 @@ object NetworkClient {
         terminal
       )
     try {
-      if (client.connect(log = true, promptCompleteUsers = false)) client.run()
+      if (client.connect(log = true, promptCompleteUsers = false)) client.run(useSignals = true)
       else 1
     } catch { case _: Exception => 1 } finally client.close()
   }
@@ -1194,7 +1199,7 @@ object NetworkClient {
     try {
       val client = new NetworkClient(configuration, parseArgs(arguments.toArray))
       try {
-        if (client.connect(log = true, promptCompleteUsers = false)) client.run()
+        if (client.connect(log = true, promptCompleteUsers = false)) client.run(useSignals = true)
         else 1
       } catch { case _: Throwable => 1 } finally client.close()
     } catch {

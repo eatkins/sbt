@@ -174,7 +174,7 @@ case class TestServer(
   val forkOptions =
     ForkOptions()
       .withOutputStrategy(OutputStrategy.CustomOutput(System.out))
-      .withRunJVMOptions(Vector("-Dsbt.ci=true"))
+      .withRunJVMOptions(Vector("-Dsbt.ci=true", "-Dsbt.io.virtual=false"))
   val process =
     RunFromSourceMain.fork(forkOptions, baseDirectory, scalaVersion, sbtVersion, classpath)
 
