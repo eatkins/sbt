@@ -173,7 +173,7 @@ case class TestServer(
   hostLog("fork to a new sbt instance")
   val forkOptions =
     ForkOptions()
-      .withOutputStrategy(OutputStrategy.StdoutOutput)
+      .withOutputStrategy(OutputStrategy.CustomOutput(System.out))
       .withRunJVMOptions(Vector("-Dsbt.ci=true"))
   val process =
     RunFromSourceMain.fork(forkOptions, baseDirectory, scalaVersion, sbtVersion, classpath)
@@ -237,7 +237,8 @@ case class TestServer(
     f(this)
   }
 
-  def bye(): Unit =
+  def bye(): Unit = {
+    val now = System.nanoTime
     try {
       running.set(false)
       hostLog("sending exit")
@@ -272,7 +273,10 @@ case class TestServer(
        */
       readThread.join(5000)
       if (readThread.isAlive) throw new IllegalStateException(s"Unable to join read thread")
+      val elapsed = System.nanoTime - now
+      System.err.println(s"Took ${elapsed / 1.0e6} ms to shutdown server")
     }
+  }
 
   def sendJsonRpc(message: String): Unit = {
     writeLine(s"""Content-Length: ${message.size + 2}""")

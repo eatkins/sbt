@@ -1046,6 +1046,14 @@ object NetworkClient {
     new Arguments(base, sbtArguments, commandArgs, completionArguments, sbtScript)
   }
 
+  def bm[R](tag: String)(f: => R): R = {
+    val now = System.nanoTime
+    try f
+    finally {
+      val elapsed = System.nanoTime - now
+      System.err.println(s"$tag took ${elapsed / 1.0e6} ms")
+    }
+  }
   def client(
       baseDirectory: File,
       args: Array[String],
@@ -1055,17 +1063,20 @@ object NetworkClient {
       useJNI: Boolean
   ): Int = {
     val client =
-      simpleClient(
-        NetworkClient.parseArgs(args).withBaseDirectory(baseDirectory),
-        inputStream,
-        printStream,
-        errorStream,
-        useJNI,
+      bm("simpleClient")(
+        simpleClient(
+          NetworkClient.parseArgs(args).withBaseDirectory(baseDirectory),
+          inputStream,
+          printStream,
+          errorStream,
+          useJNI,
+        )
       )
     try {
-      if (client.connect(log = true, promptCompleteUsers = false)) client.run()
+      if (bm("connect")(client.connect(log = true, promptCompleteUsers = false)))
+        bm("run")(client.run())
       else 1
-    } catch { case _: Exception => 1 } finally client.close()
+    } catch { case _: Exception => 1 } finally bm("close")(client.close())
   }
   def client(
       baseDirectory: File,
