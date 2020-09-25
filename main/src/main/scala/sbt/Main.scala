@@ -83,7 +83,7 @@ private[sbt] object xMain {
           setDaemon(true)
           start()
           override def run(): Unit = while (true) {
-            Thread.sleep(30000)
+            Thread.sleep(120000)
             ManagementFactory.getThreadMXBean().dumpAllThreads(true, true).foreach { ti =>
               System.err.println(
                 s"${ti.getThreadName()} ${ti.getThreadId()} ${ti
@@ -119,6 +119,7 @@ private[sbt] object xMain {
         }
       }
     } finally {
+      System.err.println("sbt server is exiting")
       // Clear any stray progress lines
       ShutdownHooks.close()
       if (Terminal.formatEnabledInEnv) {
