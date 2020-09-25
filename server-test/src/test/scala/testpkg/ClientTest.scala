@@ -120,6 +120,106 @@ object ClientTest extends AbstractServerTest {
 
     assert(complete("compi") == expected)
   }
+  test("compi completions1") { _ =>
+    val expected = Vector(
+      "compile",
+      "compile:",
+      "compileAnalysisFile",
+      "compileAnalysisFilename",
+      "compileAnalysisTargetRoot",
+      "compileEarly",
+      "compileIncSetup",
+      "compileIncremental",
+      "compileJava",
+      "compileOutputs",
+      "compileProgress",
+      "compileScalaBackend",
+      "compileSplit",
+      "compilers",
+    )
+
+    assert(complete("compi") == expected)
+  }
+  test("compi completions2") { _ =>
+    val expected = Vector(
+      "compile",
+      "compile:",
+      "compileAnalysisFile",
+      "compileAnalysisFilename",
+      "compileAnalysisTargetRoot",
+      "compileEarly",
+      "compileIncSetup",
+      "compileIncremental",
+      "compileJava",
+      "compileOutputs",
+      "compileProgress",
+      "compileScalaBackend",
+      "compileSplit",
+      "compilers",
+    )
+
+    assert(complete("compi") == expected)
+  }
+  test("compi completions3") { _ =>
+    val expected = Vector(
+      "compile",
+      "compile:",
+      "compileAnalysisFile",
+      "compileAnalysisFilename",
+      "compileAnalysisTargetRoot",
+      "compileEarly",
+      "compileIncSetup",
+      "compileIncremental",
+      "compileJava",
+      "compileOutputs",
+      "compileProgress",
+      "compileScalaBackend",
+      "compileSplit",
+      "compilers",
+    )
+
+    assert(complete("compi") == expected)
+  }
+  test("compi completions4") { _ =>
+    val expected = Vector(
+      "compile",
+      "compile:",
+      "compileAnalysisFile",
+      "compileAnalysisFilename",
+      "compileAnalysisTargetRoot",
+      "compileEarly",
+      "compileIncSetup",
+      "compileIncremental",
+      "compileJava",
+      "compileOutputs",
+      "compileProgress",
+      "compileScalaBackend",
+      "compileSplit",
+      "compilers",
+    )
+
+    assert(complete("compi") == expected)
+  }
+  test("compi completions5") { _ =>
+    val expected = Vector(
+      "compile",
+      "compile:",
+      "compileAnalysisFile",
+      "compileAnalysisFilename",
+      "compileAnalysisTargetRoot",
+      "compileEarly",
+      "compileIncSetup",
+      "compileIncremental",
+      "compileJava",
+      "compileOutputs",
+      "compileProgress",
+      "compileScalaBackend",
+      "compileSplit",
+      "compilers",
+    )
+
+    assert(complete("compi") == expected)
+  }
   test("testOnly completions") { _ =>
     val testOnlyExpected = Vector(
       "testOnly",
