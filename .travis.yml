@@ -53,5 +53,4 @@ cache:
   directories:
     - $HOME/.cache/coursier/v1
     - $HOME/.ivy2/cache
-    - $HOME/.sbt/boot
     - $HOME/.jabba
