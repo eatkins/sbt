@@ -8,6 +8,7 @@
 package testpkg
 
 import java.io.{ InputStream, OutputStream, PrintStream }
+import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit, TimeoutException }
 import sbt.internal.client.NetworkClient
 import sbt.internal.util.Util
 import scala.collection.mutable
@@ -41,15 +42,28 @@ object ClientTest extends AbstractServerTest {
       } else -1
     }
   }
-  private def client(args: String*) =
-    NetworkClient.client(
-      testPath.toFile,
-      args.toArray,
-      NullInputStream,
-      NullPrintStream,
-      NullPrintStream,
-      false
-    )
+  private def client(args: String*): Int = {
+    val result = new LinkedBlockingQueue[Integer]
+    val thread = new Thread("client-bg-thread") {
+      result.put(
+        NetworkClient.client(
+          testPath.toFile,
+          args.toArray,
+          NullInputStream,
+          NullPrintStream,
+          NullPrintStream,
+          false
+        )
+      )
+    }
+    result.poll(30, TimeUnit.SECONDS) match {
+      case null =>
+        thread.interrupt()
+        thread.join(5000)
+        throw new TimeoutException
+      case r => r
+    }
+  }
   // This ensures that the completion command will send a tab that triggers
   // sbt to call definedTestNames or discoveredMainClasses if there hasn't
   // been a necessary compilation
