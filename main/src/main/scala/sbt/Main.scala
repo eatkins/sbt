@@ -83,7 +83,7 @@ private[sbt] object xMain {
           setDaemon(true)
           start()
           override def run(): Unit = while (true) {
-            Thread.sleep(10000)
+            Thread.sleep(30000)
             ManagementFactory.getThreadMXBean().dumpAllThreads(true, true).foreach { ti =>
               System.err.println(
                 s"${ti.getThreadName()} ${ti.getThreadId()} ${ti
