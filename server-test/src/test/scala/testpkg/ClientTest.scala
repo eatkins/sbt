@@ -49,7 +49,7 @@ object ClientTest extends AbstractServerTest {
       start()
       override def run(): Unit = result.put(f)
     }
-    result.poll(30, TimeUnit.SECONDS) match {
+    result.poll(1, TimeUnit.MINUTES) match {
       case null =>
         thread.interrupt()
         thread.join(5000)

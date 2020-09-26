@@ -286,6 +286,8 @@ object MainLoop {
         )
         StandardMain.exchange.respondStatus(errorEvent)
         throw err
+    } finally {
+      System.err.println(s"finished ${exec.commandLine}")
     }
   }
 
