@@ -137,8 +137,13 @@ final class NetworkChannel(
       self.onSettingQuery(execId, req)
     private[sbt] def onCompletionRequest(execId: Option[String], cp: CompletionParams): Unit =
       self.onCompletionRequest(execId, cp)
-    private[sbt] def onCancellationRequest(execId: Option[String], crp: CancelRequestParams): Unit =
+    private[sbt] def onCancellationRequest(
+        execId: Option[String],
+        crp: CancelRequestParams
+    ): Unit = {
+      System.err.println(s"cancel $execId $crp")
       self.onCancellationRequest(execId, crp)
+    }
   }
 
   protected def authenticate(token: String): Boolean = instance.authenticate(token)
