@@ -55,6 +55,9 @@ object EventsTest extends AbstractServerTest {
       s"""{ "jsonrpc": "2.0", "id":$id, "method": "sbt/exec", "params": { "commandLine": "run" } }"""
     )
     assert(svr.waitForString(10.seconds) { s =>
+      s contains "Compiled events"
+    })
+    assert(svr.waitForString(10.seconds) { s =>
       s contains "Waiting for"
     })
     val cancelID = currentID.getAndIncrement()
@@ -72,6 +75,9 @@ object EventsTest extends AbstractServerTest {
     svr.sendJsonRpc(
       s"""{ "jsonrpc": "2.0", "id": "$id", "method": "sbt/exec", "params": { "commandLine": "run" } }"""
     )
+    assert(svr.waitForString(10.seconds) { s =>
+      s contains "Compiled events"
+    })
     assert(svr.waitForString(10.seconds) { s =>
       s contains "Waiting for"
     })
