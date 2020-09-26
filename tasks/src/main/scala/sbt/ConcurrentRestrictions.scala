@@ -182,7 +182,7 @@ object ConcurrentRestrictions {
     val pool = Executors.newCachedThreadPool()
     val service = completionService[A, R](pool, tags, warn, isSentinel)
     (service, force => {
-      System.err.println(s"shutting down $service")
+      new Exception(s"shutting down $service $force").printStackTrace(System.err)
       if (force) service.close()
       pool.shutdownNow()
       ()

@@ -66,7 +66,6 @@ object EventsTest extends AbstractServerTest {
     })
   }
 
-  /* This test is timing out.
   test("cancel on-going task with string id") { _ =>
     import sbt.Exec
     val id = Exec.newExecId
@@ -84,5 +83,4 @@ object EventsTest extends AbstractServerTest {
       s contains """"result":{"status":"Task cancelled""""
     })
   }
- */
 }
