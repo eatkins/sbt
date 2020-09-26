@@ -1087,8 +1087,11 @@ lazy val serverTestProj = (project in file("server-test"))
     Test / run / outputStrategy := Some(StdoutOutput),
     Test / run / fork := true,
     Test / sourceGenerators += Def.task {
-      val cp =
+      val rawClasspath =
         (Compile / fullClasspathAsJars).value.map(_.data).mkString(java.io.File.pathSeparator)
+      val cp =
+        if (scala.util.Properties.isWin) rawClasspath.replaceAllLiterally("\\", "\\\\")
+        else rawClasspath
       val content = {
         s"""|
             |package testpkg
