@@ -40,6 +40,7 @@ import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
 import sbt.internal.io.Retry
 import xsbti.AppProvider
+import java.util.concurrent.LinkedBlockingQueue
 
 /** This class is the entry point for sbt. */
 final class xMain extends xsbti.AppMain {
@@ -113,8 +114,20 @@ private[sbt] object xMain {
               case Some(l) => state0.put(Keys.bootServerSocket, l)
               case _       => state0
             }
-            try StandardMain.runManaged(state)
-            finally bootServerSocket.foreach(_.close())
+            val result = new LinkedBlockingQueue[xsbti.MainResult]
+            new Thread("sbt-main-thread") {
+              start()
+              override def interrupt(): Unit = {
+                new Exception("INTERRUPT").printStackTrace(System.err)
+                super.interrupt()
+              }
+              override def run(): Unit = {
+                try result.put(StandardMain.runManaged(state))
+                finally bootServerSocket.foreach(_.close())
+              }
+            }
+            try result.take
+            catch { case e: Throwable => e.printStackTrace(System.err); throw e }
           }
         }
       }
