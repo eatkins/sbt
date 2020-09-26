@@ -1072,7 +1072,15 @@ object BuiltinCommands {
           if (exec.commandLine.trim.isEmpty) newState
           else newState.clearGlobalLog
         res
-      } catch { case _: InterruptedException => s1.exit(true) }
+      } catch {
+        case e: Exception =>
+          e.printStackTrace(System.err)
+          s1.copy(
+              onFailure = Some(Exec(Shell, None)),
+              remainingCommands = Exec(Shell, None) +: s1.remainingCommands
+            )
+            .setInteractive(true)
+      }
     }
   }
 
