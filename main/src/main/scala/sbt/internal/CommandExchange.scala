@@ -132,10 +132,12 @@ private[sbt] final class CommandExchange {
       }
     }
     // Do not manually run GC until the user has been idling for at least the min gc interval.
-    impl(interval match {
+    val res = impl(interval match {
       case d: FiniteDuration => Some(d.fromNow)
       case _                 => None
     }, idleDeadline)
+    System.err.println(s"got exec $res")
+    res
   }
 
   private def addConsoleChannel(): Unit =
@@ -446,6 +448,7 @@ private[sbt] final class CommandExchange {
         fastTrackChannelQueue.take match {
           case null =>
           case mt: FastTrackTask =>
+            System.err.println(s"Got fast track ${mt.task} ${mt.channel}")
             mt.task match {
               case `attach` | "" => mt.channel.prompt(ConsolePromptEvent(lastState.get))
               case `Cancel` =>

@@ -206,6 +206,7 @@ object MainLoop {
     val exchange = StandardMain.exchange
     exchange notifyStatus
       ExecStatusEvent("Processing", channelName, exec.execId, Vector())
+    System.err.println(s"processing ${exec.commandLine}")
     try {
       def process(): State = {
         val progressState = state.get(sbt.Keys.currentTaskProgress) match {
