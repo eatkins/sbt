@@ -20,6 +20,7 @@ import scala.collection.mutable
  * @tparam A the type of a task
  */
 trait ConcurrentRestrictions[A] {
+  new Exception(s"new concurrent $this").printStackTrace(System.err)
 
   /** Internal state type used to describe a set of tasks. */
   type G
@@ -181,6 +182,7 @@ object ConcurrentRestrictions {
     val pool = Executors.newCachedThreadPool()
     val service = completionService[A, R](pool, tags, warn, isSentinel)
     (service, force => {
+      System.err.println(s"shutting down $service")
       if (force) service.close()
       pool.shutdownNow()
       ()
