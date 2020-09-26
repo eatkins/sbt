@@ -13,10 +13,10 @@ env:
     - SBT_LOCAL=false
     - secure: d3bu2KNwsVHwfhbGgO+gmRfDKBJhfICdCJFGWKf2w3Gv86AJZX9nuTYRxz0KtdvEHO5Xw8WTBZLPb2thSJqhw9OCm4J8TBAVqCP0ruUj4+aqBUFy4bVexQ6WKE6nWHs4JPzPk8c6uC1LG3hMuzlC8RGETXtL/n81Ef1u7NjyXjs=
   matrix:
-    - SBT_CMD="publishLocalBin; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj"
-    - SBT_CMD="publishLocalBin; mainProj/compile; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj"
-    - SBT_CMD="publishLocalBin; commandProj/compile; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj"
-    - SBT_CMD="publishLocalBin; buildThinClient; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj"
+    - SBT_CMD="publishLocalBin; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj/test"
+    - SBT_CMD="publishLocalBin; mainProj/compile; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj/test"
+    - SBT_CMD="publishLocalBin; commandProj/compile; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj/test"
+    - SBT_CMD="publishLocalBin; buildThinClient; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj/test"
 
 matrix:
   fast_finish: true
@@ -24,7 +24,7 @@ matrix:
     - env:
         - SBT_VERSION_PROP=-Dsbt.version=1.4.0-SNAPSHOT
         - TRAVIS_JDK=adopt@1.8.0-222
-        - SBT_CMD="publishLocalBin; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj"
+        - SBT_CMD="publishLocalBin; serverTestProj/test; serverTestProj/test; serverTestProj; serverTestProj/test; serverTestProj/test; serverTestProj/test"
 
 before_install:
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
