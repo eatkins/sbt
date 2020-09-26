@@ -779,7 +779,8 @@ object Terminal {
       private[util] val system: org.jline.terminal.Terminal,
   ) extends TerminalImpl(in, out, originalErr, "console0") {
     private[this] val rawMode = new AtomicBoolean(false)
-    enterRawMode()
+    val hasConsole = System.console != null
+    if (hasConsole) enterRawMode()
     override private[sbt] def getSizeImpl: (Int, Int) = {
       val size = system.getSize
       (size.getColumns, size.getRows)
@@ -811,22 +812,24 @@ object Terminal {
     override private[sbt] def setSize(width: Int, height: Int): Unit =
       system.setSize(new org.jline.terminal.Size(width, height))
 
-    override private[sbt] def enterRawMode(): Unit = if (rawMode.compareAndSet(false, true)) {
-      val now = System.nanoTime
-      in.setRawMode(true)
-      try JLine3.enterRawMode(system)
-      catch { case _: java.io.IOError => }
-      val elapsed = System.nanoTime - now
-      System.err.println(s"$this took ${elapsed / 10e6} ms to enter raw mode")
-    }
-    override private[sbt] def exitRawMode(): Unit = if (rawMode.compareAndSet(true, false)) {
-      val now = System.nanoTime
-      in.setRawMode(false)
-      try JLine3.exitRawMode(system)
-      catch { case _: java.io.IOError => }
-      val elapsed = System.nanoTime - now
-      System.err.println(s"$this took ${elapsed / 10e6} ms to exit raw mode")
-    }
+    override private[sbt] def enterRawMode(): Unit =
+      if (rawMode.compareAndSet(false, true) && hasConsole) {
+        val now = System.nanoTime
+        in.setRawMode(true)
+        try JLine3.enterRawMode(system)
+        catch { case _: java.io.IOError => }
+        val elapsed = System.nanoTime - now
+        System.err.println(s"$this took ${elapsed / 10e6} ms to enter raw mode")
+      }
+    override private[sbt] def exitRawMode(): Unit =
+      if (rawMode.compareAndSet(true, false) && hasConsole) {
+        val now = System.nanoTime
+        in.setRawMode(false)
+        try JLine3.exitRawMode(system)
+        catch { case _: java.io.IOError => }
+        val elapsed = System.nanoTime - now
+        System.err.println(s"$this took ${elapsed / 10e6} ms to exit raw mode")
+      }
     override def isColorEnabled: Boolean =
       props
         .map(_.color)
