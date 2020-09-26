@@ -916,6 +916,10 @@ final class NetworkChannel(
     override def close(): Unit = if (closed.compareAndSet(false, true)) {
       val threads = blockedThreads.synchronized {
         val t = blockedThreads.asScala.toVector
+        t.foreach { x =>
+          System.err.println(s"HUH $x")
+          System.err.println(x.getStackTrace() mkString "\n")
+        }
         blockedThreads.clear()
         t
       }
