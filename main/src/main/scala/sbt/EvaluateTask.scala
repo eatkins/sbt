@@ -447,6 +447,7 @@ object EvaluateTask {
 
     def shutdownImpl(force: Boolean): Unit = {
       // First ensure that all threads are stopped for task execution.
+      new Exception(s"shutting down $force").printStackTrace(System.err)
       shutdownThreads(force)
       config.progressReporter.stop()
 
