@@ -625,6 +625,7 @@ object Terminal {
                 }
               } catch { case _: InterruptedException => }
             readFrom(is)
+            System.err.println(activeTerminal.get.inputStream)
             readFrom(activeTerminal.get().inputStream)
         }
       }
@@ -632,8 +633,10 @@ object Terminal {
     }
     def read(): Int = {
       if (isScripted) -1
-      else if (bootInputStreamHolder.get == null) activeTerminal.get().inputStream.read()
-      else {
+      else if (bootInputStreamHolder.get == null) {
+        System.err.println(activeTerminal.get.inputStream)
+        activeTerminal.get().inputStream.read()
+      } else {
         val thread = new ReadThread
         @tailrec def poll(): Int = thread.result.poll(10, TimeUnit.MILLISECONDS) match {
           case null =>
