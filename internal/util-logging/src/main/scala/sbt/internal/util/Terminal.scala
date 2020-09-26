@@ -812,6 +812,17 @@ object Terminal {
     override private[sbt] def setSize(width: Int, height: Int): Unit =
       system.setSize(new org.jline.terminal.Size(width, height))
 
+    override def inputStream: InputStream =
+      if (hasConsole) in
+      else
+        new SimpleInputStream {
+          override def read(): Int = {
+            try this.synchronized(this.wait)
+            catch { case _: InterruptedException => }
+            -1
+          }
+        }
+
     override private[sbt] def enterRawMode(): Unit =
       if (rawMode.compareAndSet(false, true) && hasConsole) {
         val now = System.nanoTime
