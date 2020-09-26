@@ -773,7 +773,12 @@ final class NetworkChannel(
       try {
         blockedThreads.synchronized(blockedThreads.add(t))
         f
-      } catch { case _: InterruptedException => default } finally {
+      } catch {
+        case _: InterruptedException =>
+          System.err.println("clear interrupted")
+          Thread.interrupted
+          default
+      } finally {
         Util.ignoreResult(blockedThreads.synchronized(blockedThreads.remove(t)))
       }
     }
