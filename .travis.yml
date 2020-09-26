@@ -22,7 +22,6 @@ matrix:
   fast_finish: true
   include:
     - env:
-        - SBT_LOCAL=true
         - SBT_VERSION_PROP=-Dsbt.version=1.4.0-SNAPSHOT
         - TRAVIS_JDK=adopt@1.8.0-222
         - SBT_CMD="publishLocalBin; serverTestProj/test"
