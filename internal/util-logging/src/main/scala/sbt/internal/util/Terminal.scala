@@ -475,7 +475,9 @@ object Terminal {
     private[this] val runnable: Runnable = () => {
       @tailrec def impl(): Unit = {
         val _ = readQueue.take
+        originalErr.println(s"Reading from $in on background thread")
         val b = in.read
+        originalErr.println(s"got $b from $in on background thread")
         buffer.put(b)
         if (b != -1 && !Thread.interrupted()) impl()
         else closed.set(true)
@@ -491,6 +493,9 @@ object Terminal {
           try buffer.poll match {
             case null =>
               readQueue.put(())
+              originalErr.println(
+                s"No bytes available. Waiting for result from $in on background thread"
+              )
               result.put(buffer.take)
             case b if b == -1 => throw new ClosedChannelException
             case b            => result.put(b)
@@ -498,11 +503,14 @@ object Terminal {
         }
     override def read(): Int = {
       val result = new LinkedBlockingQueue[Integer]
+      originalErr.println(s"writeable input stream $this engering read")
       read(result)
-      result.poll match {
+      val res = result.poll match {
         case null => -1
         case i    => i.toInt
       }
+      originalErr.println(s"writeable input stream $this returning $res in read")
+      res
     }
     def cancel(): Unit = readThread.synchronized {
       Option(readThread.getAndSet(null)).foreach(_.interrupt())
@@ -616,6 +624,7 @@ object Terminal {
             def readFrom(inputStream: InputStream) =
               try {
                 if (running.get) {
+                  originalErr.println(s"boot thread reading from $inputStream")
                   inputStream.read match {
                     case -1 =>
                     case i =>
@@ -631,9 +640,15 @@ object Terminal {
       override def close(): Unit = if (running.compareAndSet(true, false)) this.interrupt()
     }
     def read(): Int = {
+      originalErr.println(
+        s"enter read scripted? $isScripted booting? ${bootInputStreamHolder.get != null}"
+      )
       if (isScripted) -1
-      else if (bootInputStreamHolder.get == null) activeTerminal.get().inputStream.read()
-      else {
+      else if (bootInputStreamHolder.get == null) {
+        val is = activeTerminal.get.inputStream
+        originalErr.println(s"reading from ${activeTerminal.get} $is")
+        is.read()
+      } else {
         val thread = new ReadThread
         @tailrec def poll(): Int = thread.result.poll(10, TimeUnit.MILLISECONDS) match {
           case null =>
