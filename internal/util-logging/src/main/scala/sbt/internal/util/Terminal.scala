@@ -812,7 +812,8 @@ object Terminal {
     override private[sbt] def setSize(width: Int, height: Int): Unit =
       system.setSize(new org.jline.terminal.Size(width, height))
 
-    override def inputStream: InputStream =
+    override def inputStream: InputStream = {
+      System.err.println(s"HUH $this $hasConsole")
       if (hasConsole) in
       else
         new SimpleInputStream {
@@ -822,6 +823,7 @@ object Terminal {
             -1
           }
         }
+    }
 
     override private[sbt] def enterRawMode(): Unit =
       if (rawMode.compareAndSet(false, true) && hasConsole) {
