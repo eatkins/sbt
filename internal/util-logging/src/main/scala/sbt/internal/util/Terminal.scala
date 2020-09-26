@@ -992,6 +992,7 @@ object Terminal {
   }
   private[sbt] object NullTerminal extends DefaultTerminal
   private[sbt] object SimpleTerminal extends DefaultTerminal {
+    System.err.println(s"WTF simple terminal ${isCI}")
     override lazy val inputStream: InputStream = if (isCI) new SimpleInputStream {
       override def read(): Int = {
         try this.synchronized(this.wait)
