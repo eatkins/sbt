@@ -1198,7 +1198,8 @@ private[sbt] object ContinuousCommands {
             case Some(c) => c
             case None =>
               lazy val exception = new IllegalStateException(s"No channel with name $channelName")
-              if (channelName == "console0") StandardMain.exchange.addConsoleChannel().getOrElse(throw exception)
+              if (channelName == "console0")
+                StandardMain.exchange.addConsoleChannel().getOrElse(throw exception)
               else throw exception
           }
           val dynamicInputs = mutable.Set.empty[DynamicInput]

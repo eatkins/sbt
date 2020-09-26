@@ -1080,6 +1080,7 @@ object BuiltinCommands {
               remainingCommands = Exec(Shell, None) +: s1.remainingCommands
             )
             .setInteractive(true)
+            .exit(false)
       }
     }
   }
