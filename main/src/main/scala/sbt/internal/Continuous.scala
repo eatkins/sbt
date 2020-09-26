@@ -787,6 +787,7 @@ private[sbt] object Continuous extends DeprecatedContinuous {
         val action =
           try {
             interrupted.set(false)
+            System.err.println(s"watch $terminal ${terminal.inputStream}")
             terminal.inputStream.read match {
               case -1   => throw new InterruptedException
               case 3    => Watch.CancelWatch // ctrl+c on windows
