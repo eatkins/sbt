@@ -13,19 +13,18 @@ env:
     - SBT_LOCAL=false
     - secure: d3bu2KNwsVHwfhbGgO+gmRfDKBJhfICdCJFGWKf2w3Gv86AJZX9nuTYRxz0KtdvEHO5Xw8WTBZLPb2thSJqhw9OCm4J8TBAVqCP0ruUj4+aqBUFy4bVexQ6WKE6nWHs4JPzPk8c6uC1LG3hMuzlC8RGETXtL/n81Ef1u7NjyXjs=
   matrix:
-    - SBT_CMD="mimaReportBinaryIssues ; javafmtCheck ; Test / javafmtCheck; scalafmtCheckAll ; scalafmtSbtCheck; serverTestProj/scalafmtCheckAll; headerCheck ;test:headerCheck ;whitesourceOnPush ;test:compile; publishLocal; test; serverTestProj/test; doc; $UTIL_TESTS; ++$SCALA_213; $UTIL_TESTS"
-    - SBT_CMD="scripted actions/* apiinfo/* compiler-project/* ivy-deps-management/* reporter/* tests/* watch/* classloader-cache/* package/*"
-    - SBT_CMD="dependencyTreeProj/publishLocal; scripted dependency-graph/* dependency-management/* plugins/* project-load/* java/* run/* nio/*"
-    - SBT_CMD="repoOverrideTest:scripted dependency-management/*; scripted source-dependencies/* project/*"
+    - SBT_CMD="publishLocalBin; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test"
+    - SBT_CMD="publishLocalBin; mainProj/compile; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test"
+    - SBT_CMD="publishLocalBin; commandProj/compile; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test"
+    - SBT_CMD="publishLocalBin; buildThinClient; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test"
 
 matrix:
   fast_finish: true
   include:
     - env:
-        - SBT_LOCAL=true
         - SBT_VERSION_PROP=-Dsbt.version=1.4.0-SNAPSHOT
         - TRAVIS_JDK=adopt@1.8.0-222
-        - SBT_CMD="++$SCALA_213; $UTIL_TESTS; ++$SCALA_212; $UTIL_TESTS; scripted actions/* source-dependencies/*1of3 dependency-management/*1of4 java/*"
+        - SBT_CMD="publishLocalBin; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test; serverTestProj/test"
 
 before_install:
   - curl -sL https://raw.githubusercontent.com/shyiko/jabba/0.11.0/install.sh | bash && . ~/.jabba/jabba.sh
@@ -40,7 +39,8 @@ install:
 
 script:
   # It doesn't need that much memory because compile and run are forked
-  - sbt -Dsbt.io.virtual=false $SBT_VERSION_PROP -Dsbt.ci=true -J-XX:ReservedCodeCacheSize=128m -J-Xmx800M -J-Xms800M -J-server "$SBT_CMD"
+  - sbt publishLocalBin
+  - sbt -Dsbt.version=1.4.0-SNAPSHOT -Dsbt.io.virtual=false $SBT_VERSION_PROP -Dsbt.ci=true -J-XX:ReservedCodeCacheSize=128m -J-Xmx800M -J-Xms800M -J-server "$SBT_CMD"
 
 before_cache:
   - find $HOME/.cache/coursier/v1 -name "ivydata-*.properties" -delete
