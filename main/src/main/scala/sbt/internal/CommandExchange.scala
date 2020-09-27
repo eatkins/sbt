@@ -138,13 +138,14 @@ private[sbt] final class CommandExchange {
     }, idleDeadline)
   }
 
-  private def addConsoleChannel(): Unit =
+  private[sbt] def addConsoleChannel(): Option[CommandChannel] =
     if (consoleChannel.isEmpty) {
       val name = ConsoleChannel.defaultName
       val console0 = new ConsoleChannel(name, mkAskUser(name))
       consoleChannel = Some(console0)
       subscribe(console0)
-    }
+      Some(console0)
+    } else None
   def run(s: State): State = run(s, s.get(autoStartServer).getOrElse(true))
   def run(s: State, autoStart: Boolean): State = {
     if (autoStartServerSysProp && autoStart) runServer(s)
@@ -376,7 +377,7 @@ private[sbt] final class CommandExchange {
           .withChannelName(currentExec.flatMap(_.source.map(_.channelName)))
       case _ => pe
     }
-    if (channels.isEmpty) addConsoleChannel()
+    if (channels.isEmpty && !Terminal.isCI) addConsoleChannel()
     channels.foreach(c => ProgressState.updateProgressState(newPE, c.terminal))
   }
 

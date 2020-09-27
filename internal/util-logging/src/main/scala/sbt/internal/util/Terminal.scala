@@ -182,7 +182,7 @@ object Terminal {
   // Disable noisy jline log spam
   if (System.getProperty("sbt.jline.verbose", "false") != "true")
     jline.internal.Log.setOutput(new PrintStream(_ => {}, false))
-  private[this] val isCI = System.getProperty("sbt.ci", "") == "true" ||
+  private[sbt] val isCI = System.getProperty("sbt.ci", "") == "true" ||
     sys.env.contains("BUILD_NUMBER") || sys.env.contains("CI")
   def consoleLog(string: String): Unit = {
     try Terminal.console.printStream.println(s"[info] $string")
