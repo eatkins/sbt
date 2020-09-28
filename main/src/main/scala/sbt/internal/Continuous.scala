@@ -1194,14 +1194,9 @@ private[sbt] object ContinuousCommands {
           val persistFileStamps = extracted.get(watchPersistFileStamps)
           val cachingRepo: FileTreeRepository[FileAttributes] =
             if (persistFileStamps) repo else new FileStampRepository(cache, repo)
-          val channel = StandardMain.exchange.channelForName(channelName) match {
-            case Some(c) => c
-            case None =>
-              lazy val exception = new IllegalStateException(s"No channel with name $channelName")
-              if (channelName == "console0")
-                StandardMain.exchange.addConsoleChannel().getOrElse(throw exception)
-              else throw exception
-          }
+          val channel = StandardMain.exchange
+            .channelForName(channelName)
+            .getOrElse(throw new IllegalStateException(s"No channel with name $channelName"))
           val dynamicInputs = mutable.Set.empty[DynamicInput]
           val context = LoggerContext(useLog4J = state.get(Keys.useLog4J.key).getOrElse(false))
           def cb: Continuous.Callbacks =
