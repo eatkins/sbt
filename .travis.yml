@@ -9,14 +9,14 @@ env:
     - SCALA_213=2.13.1
     - UTIL_TESTS="utilCache/test;utilControl/test;utilInterface/test;utilLogging/test;utilPosition/test;utilRelation/test;utilScripted/test;utilTracking/test"
     # WHITESOURCE_PASSWORD=
-    - SBT_VERSION_PROP=""
-    - SBT_LOCAL=false
+    - SBT_VERSION_PROP="-Dsbt.version=1.4.0-SNAPSHOT"
+    - SBT_LOCAL=true
     - secure: d3bu2KNwsVHwfhbGgO+gmRfDKBJhfICdCJFGWKf2w3Gv86AJZX9nuTYRxz0KtdvEHO5Xw8WTBZLPb2thSJqhw9OCm4J8TBAVqCP0ruUj4+aqBUFy4bVexQ6WKE6nWHs4JPzPk8c6uC1LG3hMuzlC8RGETXtL/n81Ef1u7NjyXjs=
   matrix:
-    - SBT_CMD="mimaReportBinaryIssues ; javafmtCheck ; Test / javafmtCheck; scalafmtCheckAll ; scalafmtSbtCheck; serverTestProj/scalafmtCheckAll; headerCheck ;test:headerCheck ;whitesourceOnPush ;test:compile; publishLocal; test; serverTestProj/test; doc; $UTIL_TESTS; ++$SCALA_213; $UTIL_TESTS"
-    - SBT_CMD="scripted actions/* apiinfo/* compiler-project/* ivy-deps-management/* reporter/* tests/* watch/* classloader-cache/* package/*"
+    - SBT_CMD="dependencyTreeProj/publishLocal; compile; scripted dependency-graph/* dependency-management/* plugins/* project-load/* java/* run/* nio/*"
+    - SBT_CMD="dependencyTreeProj/publishLocal; mainProj/compile; scripted dependency-graph/* dependency-management/* plugins/* project-load/* java/* run/* nio/*"
     - SBT_CMD="dependencyTreeProj/publishLocal; scripted dependency-graph/* dependency-management/* plugins/* project-load/* java/* run/* nio/*"
-    - SBT_CMD="repoOverrideTest:scripted dependency-management/*; scripted source-dependencies/* project/*"
+    - SBT_CMD="compile; dependencyTreeProj/publishLocal; scripted dependency-graph/* dependency-management/* plugins/* project-load/* java/* run/* nio/*"
 
 matrix:
   fast_finish: true
