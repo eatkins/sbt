@@ -8,6 +8,7 @@
 package sbt
 
 import java.io.{ File, IOException }
+import java.lang.management.ManagementFactory
 import java.net.URI
 import java.nio.channels.ClosedChannelException
 import java.nio.file.{ FileAlreadyExistsException, FileSystems, Files }
@@ -78,6 +79,21 @@ private[sbt] object xMain {
       if (userCommands.exists(isBsp)) {
         BspClient.run(dealiasBaseDirectory(configuration))
       } else {
+        new Thread("") {
+          setDaemon(true)
+          start()
+          override def run(): Unit = while (true) {
+            Thread.sleep(300000)
+            ManagementFactory.getThreadMXBean().dumpAllThreads(true, true).foreach { ti =>
+              System.err.println(
+                s"${ti.getThreadName()} ${ti.getThreadId()} ${ti
+                  .getThreadState()} ${ti.isSuspended} ${ti.isInNative}"
+              )
+              ti.getStackTrace().foreach(System.err.println)
+              System.err.println("")
+            }
+          }
+        }
         bootServerSocket.foreach(l => ITerminal.setBootStreams(l.inputStream, l.outputStream))
         ITerminal.withStreams(true) {
           if (clientModByEnv || userCommands.exists(isClient)) {
