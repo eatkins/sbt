@@ -389,6 +389,7 @@ object Defaults extends BuildCommon {
       canonicalInput :== true,
       echoInput :== true,
       terminal := state.value.get(terminalKey).getOrElse(Terminal(ITerminal.get)),
+      InstallSbtn.installSbtn := InstallSbtn.installSbtnImpl.evaluated,
     ) ++ LintUnused.lintSettings
       ++ DefaultBackgroundJobService.backgroundJobServiceSettings
       ++ RemoteCache.globalSettings
