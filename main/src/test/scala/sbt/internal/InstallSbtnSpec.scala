@@ -56,6 +56,15 @@ class InstallSbtnSpec extends FlatSpec {
               .directory(tmpDir.toFile)
               .start()
           proc.waitFor(1, TimeUnit.MINUTES)
+          if (proc.exitValue != 0) {
+            def dump(is: InputStream): Unit = {
+              val res = new Array[Byte](1024 * 1024)
+              val bytesRead = is.read(res)
+              if (bytesRead > 0) println(new String(res, 0, bytesRead))
+            }
+            dump(proc.getInputStream)
+            dump(proc.getErrorStream)
+          }
           assert(proc.exitValue == 0)
           assert(IO.read(foo.toFile) == "foo")
         } finally {
