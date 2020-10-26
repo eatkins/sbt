@@ -147,7 +147,8 @@ final class NetworkChannel(
   protected def authOptions: Set[ServerAuthentication] = auth
 
   override def mkUIThread: (State, CommandChannel) => UITask = (state, command) => {
-    if (interactive.get || ContinuousCommands.isInWatch(state, this)) mkUIThreadImpl(state, command)
+    if (interactive.get || ContinuousCommands.isInWatch(state, this) || terminal.prompt
+          .isInstanceOf[Prompt.Blocked]) mkUIThreadImpl(state, command)
     else
       new UITask {
         override private[sbt] val channel = NetworkChannel.this
@@ -683,7 +684,7 @@ final class NetworkChannel(
       doFlush()
     }
     override def write(b: Int): Unit = outputBuffer.synchronized {
-      outputBuffer.put(b.toByte)
+      Util.ignoreResult(outputBuffer.offer(b.toByte))
     }
     override def flush(): Unit = {
       flushFuture.get match {
@@ -704,7 +705,7 @@ final class NetworkChannel(
       }
     }
     override def write(b: Array[Byte]): Unit = outputBuffer.synchronized {
-      b.foreach(outputBuffer.put)
+      b.foreach(outputBuffer.offer)
     }
     override def write(b: Array[Byte], off: Int, len: Int): Unit = {
       write(java.util.Arrays.copyOfRange(b, off, off + len))

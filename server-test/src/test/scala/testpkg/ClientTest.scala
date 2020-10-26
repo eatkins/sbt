@@ -11,7 +11,11 @@ import java.io.{ InputStream, OutputStream, PrintStream }
 import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit, TimeoutException }
 import sbt.internal.client.NetworkClient
 import sbt.internal.util.Util
+import sbt.io.IO
 import scala.collection.mutable
+import scala.concurrent.duration._
+import scala.util.{ Success, Try }
+import java.io.File
 
 object ClientTest extends AbstractServerTest {
   override val testDirectory: String = "client"
@@ -42,6 +46,11 @@ object ClientTest extends AbstractServerTest {
       } else -1
     }
   }
+  class WriteableInputStream extends InputStream {
+    val queue = new LinkedBlockingQueue[Int]
+    def write(i: Int): Unit = queue.put(i)
+    override def read(): Int = queue.take
+  }
   private[this] def background[R](f: => R): R = {
     val result = new LinkedBlockingQueue[R]
     val thread = new Thread("client-bg-thread") {
@@ -57,18 +66,26 @@ object ClientTest extends AbstractServerTest {
       case r => r
     }
   }
-  private def client(args: String*): Int = {
+  private[this] def runInBackground(f: () => Unit, threadName: String): Thread = {
+    new Thread(threadName) {
+      override def run(): Unit = f()
+      setDaemon(true)
+      start()
+    }
+  }
+  private def client(inputStream: InputStream, args: String*): Int = {
     background(
       NetworkClient.client(
         testPath.toFile,
         args.toArray,
-        NullInputStream,
+        inputStream,
         NullPrintStream,
         NullPrintStream,
         false
       )
     )
   }
+  private def client(args: String*): Int = client(NullInputStream, args: _*)
   // This ensures that the completion command will send a tab that triggers
   // sbt to call definedTestNames or discoveredMainClasses if there hasn't
   // been a necessary compilation
@@ -141,5 +158,48 @@ object ClientTest extends AbstractServerTest {
   }
   test("quote with semi") { _ =>
     assert(complete("\"compile; fooB") == Vector("compile; fooBar"))
+  }
+  test("multiple clients can simultaneously call run") { _ =>
+    // In this test, we start two clients on background thread which both
+    // call the project main class. The main class takes a filename as
+    // argument. It first writes the string "start" to that file and then
+    // blocks on System.in until it receives a byte. Then it writes "finish"
+    // to the file and exits. We wait until the first client has successfully
+    // written to the file before starting up the second client but we write
+    // to the input stream of the second client first so that it is actually
+    // able to exit before the first client.
+    def blockUntilStart(file: File): Unit = {
+      val limit = 30.seconds.fromNow
+      while (Try(IO.read(file)) != Success("start") && !limit.isOverdue) {
+        Thread.sleep(20)
+      }
+      if (limit.isOverdue) throw new TimeoutException
+    }
+    IO.withTemporaryDirectory { dir =>
+      val fileA = new File(dir, "a")
+      val fileB = new File(dir, "b")
+      val aInputStream = new WriteableInputStream
+      val bInputStream = new WriteableInputStream
+      val aResult = new LinkedBlockingQueue[Int]
+      val bResult = new LinkedBlockingQueue[Int]
+      val aClientThread =
+        runInBackground(() => aResult.put(client(aInputStream, s"run $fileA")), "athread")
+      blockUntilStart(fileA)
+      val bClientThread =
+        runInBackground(() => bResult.put(client(bInputStream, s"run $fileB")), "bthread")
+
+      blockUntilStart(fileB)
+      bInputStream.write(10)
+      assert(bResult.poll(10, TimeUnit.SECONDS) == 0)
+      assert(IO.read(fileB) == "finish")
+
+      assert(IO.read(fileA) == "start")
+      aInputStream.write(10)
+      assert(aResult.poll(10, TimeUnit.SECONDS) == 0)
+      assert(IO.read(fileA) == "finish")
+
+      assert(!bClientThread.isAlive)
+      assert(!aClientThread.isAlive)
+    }
   }
 }
