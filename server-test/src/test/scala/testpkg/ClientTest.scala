@@ -79,8 +79,8 @@ object ClientTest extends AbstractServerTest {
         testPath.toFile,
         args.toArray,
         inputStream,
-        NullPrintStream,
-        NullPrintStream,
+        System.err,
+        System.err,
         false
       )
     )
